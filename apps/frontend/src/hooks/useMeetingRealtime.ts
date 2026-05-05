@@ -29,6 +29,12 @@ type UseMeetingRealtimeOptions = {
 
 type ConnectionStatus = "disconnected" | "connecting" | "connected";
 
+export type ChatReaction = {
+  emoji: string;
+  count: number;
+  reactors: string[];
+};
+
 export type RealtimeChatMessage = {
   id: string;
   text: string;
@@ -36,6 +42,7 @@ export type RealtimeChatMessage = {
   senderId: string;
   timestamp: number;
   isOwn: boolean;
+  reactions?: ChatReaction[];
 };
 
 type IncomingMessage = {
@@ -47,6 +54,9 @@ type IncomingMessage = {
     participantId?: string;
     displayName?: string;
   };
+  messageId?: string;
+  emoji?: string;
+  action?: string;
   participant?: {
     participantId?: string;
     displayName?: string;
@@ -108,6 +118,8 @@ export function useMeetingRealtime({
   const [typingParticipants, setTypingParticipants] = useState<Record<string, string>>({});
   const [participantMediaStates, setParticipantMediaStates] = useState<ParticipantMediaStateMap>({});
   const [unreadCount, setUnreadCount] = useState(0);
+  const [reactions, setReactions] = useState<Record<string, ChatReaction[]>>({});
+  const [participantNamesById, setParticipantNamesById] = useState<Record<string, string>>({});
 
   useEffect(() => {
     isChatOpenRef.current = isChatOpen;
@@ -196,6 +208,11 @@ export function useMeetingRealtime({
       }
 
       if (payload.type === "participant-joined" && payload.participant?.participantId && payload.participant.displayName) {
+        setParticipantNamesById((current) => ({
+          ...current,
+          [payload.participant!.participantId!]: payload.participant!.displayName!,
+        }));
+
         if (payload.participant.participantId !== selfParticipantIdRef.current) {
           onParticipantJoinedRef.current?.({
             participantId: payload.participant.participantId,
@@ -246,6 +263,16 @@ export function useMeetingRealtime({
           }
           return next;
         });
+
+        setParticipantNamesById((current) => {
+          const next = { ...current };
+          for (const participant of payload.participants ?? []) {
+            if (participant.participantId && participant.displayName) {
+              next[participant.participantId] = participant.displayName;
+            }
+          }
+          return next;
+        });
       }
 
       if (
@@ -263,6 +290,13 @@ export function useMeetingRealtime({
       }
 
       if (payload.type === "chat-message" && payload.text && payload.sender?.participantId) {
+        if (payload.sender.displayName) {
+          setParticipantNamesById((current) => ({
+            ...current,
+            [payload.sender!.participantId!]: payload.sender!.displayName!,
+          }));
+        }
+
         const isOwn =
           (selfParticipantIdRef.current && payload.sender.participantId === selfParticipantIdRef.current) || false;
         const message: RealtimeChatMessage = {
@@ -287,6 +321,11 @@ export function useMeetingRealtime({
       }
 
       if (payload.type === "typing-state" && payload.participantId && payload.displayName) {
+        setParticipantNamesById((current) => ({
+          ...current,
+          [payload.participantId as string]: payload.displayName as string,
+        }));
+
         setTypingParticipants((current) => {
           const next = { ...current };
           if (payload.isTyping) {
@@ -294,6 +333,84 @@ export function useMeetingRealtime({
           } else {
             delete next[payload.participantId as string];
           }
+          return next;
+        });
+      }
+
+      if (payload.type === "reaction" && payload.messageId && payload.emoji && payload.action && payload.participantId) {
+        if (payload.displayName) {
+          setParticipantNamesById((current) => ({
+            ...current,
+            [payload.participantId as string]: payload.displayName as string,
+          }));
+        }
+
+        setReactions((current) => {
+          const next = { ...current };
+          const participantId = payload.participantId as string;
+          const messageId = payload.messageId as string;
+          const targetEmoji = payload.emoji as string;
+          const messageReactions = (next[messageId] || []).map((reaction) => ({
+            ...reaction,
+            reactors: [...reaction.reactors],
+          }));
+
+          if (payload.action === "add") {
+            // One user can have only one reaction per message: remove previous emoji choices first.
+            for (const reaction of messageReactions) {
+              if (reaction.emoji === targetEmoji) {
+                continue;
+              }
+
+              const reactorIdx = reaction.reactors.indexOf(participantId);
+              if (reactorIdx >= 0) {
+                reaction.reactors.splice(reactorIdx, 1);
+                reaction.count -= 1;
+              }
+            }
+
+            const compacted = messageReactions.filter((reaction) => reaction.count > 0);
+            const targetReaction = compacted.find((reaction) => reaction.emoji === targetEmoji);
+
+            if (targetReaction) {
+              if (!targetReaction.reactors.includes(participantId)) {
+                targetReaction.reactors.push(participantId);
+                targetReaction.count += 1;
+              }
+            } else {
+              compacted.push({
+                emoji: targetEmoji,
+                count: 1,
+                reactors: [participantId],
+              });
+            }
+
+            next[messageId] = compacted;
+          } else if (payload.action === "remove") {
+            const targetReaction = messageReactions.find((reaction) => reaction.emoji === targetEmoji);
+
+            if (targetReaction) {
+              const reactorIdx = targetReaction.reactors.indexOf(participantId);
+              if (reactorIdx >= 0) {
+                targetReaction.reactors.splice(reactorIdx, 1);
+                targetReaction.count -= 1;
+              }
+            }
+
+            const compacted = messageReactions.filter((reaction) => reaction.count > 0);
+            if (compacted.length > 0) {
+              next[messageId] = compacted;
+            } else {
+              delete next[messageId];
+            }
+          } else {
+            if (messageReactions.length > 0) {
+              next[messageId] = messageReactions;
+            } else {
+              delete next[messageId];
+            }
+          }
+
           return next;
         });
       }
@@ -439,16 +556,32 @@ export function useMeetingRealtime({
     [roomId, safeSend]
   );
 
+  const sendReaction = useCallback(
+    (messageId: string, emoji: string, action: "add" | "remove" = "add") => {
+      return safeSend({
+        type: "reaction",
+        roomId,
+        messageId,
+        emoji,
+        action,
+      });
+    },
+    [roomId, safeSend]
+  );
+
   return {
     connectionStatus,
     chatMessages,
     typingNames,
     participantMediaStates,
     unreadCount,
+    reactions,
+    participantNamesById,
     sendChatMessage,
     setTyping,
     sendMeetingEnded,
     sendRecordingState,
     sendMediaState,
+    sendReaction,
   };
 }

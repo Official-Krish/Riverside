@@ -165,3 +165,43 @@ export async function notificationWorker() {
     }
   }
 }
+
+const CHAT_HISTORY_EXPIRY = 30 * 60; // 30 minutes in seconds
+const MAX_MESSAGES_PER_ROOM = 100;
+
+/**
+ * Retrieve recent chat messages for a room (last N messages).
+ */
+export async function getChatHistory(roomId: string, limit: number = 50): Promise<any[]> {
+  if (!roomId) return [];
+
+  try {
+    const key = `chat:${roomId}`;
+    // Get the most recent messages (highest scores = newest timestamps)
+    const messages = await redisPublisher.zrevrange(key, 0, limit - 1);
+    return messages.map((msg) => {
+      try {
+        return JSON.parse(msg);
+      } catch {
+        return null;
+      }
+    }).filter(Boolean);
+  } catch (error) {
+    console.error(`Failed to retrieve chat history for room ${roomId}:`, error);
+    return [];
+  }
+}
+
+/**
+ * Clear all chat messages for a room.
+ */
+export async function clearChatHistory(roomId: string): Promise<void> {
+  if (!roomId) return;
+
+  try {
+    const key = `chat:${roomId}`;
+    await redisPublisher.del(key);
+  } catch (error) {
+    console.error(`Failed to clear chat history for room ${roomId}:`, error);
+  }
+}

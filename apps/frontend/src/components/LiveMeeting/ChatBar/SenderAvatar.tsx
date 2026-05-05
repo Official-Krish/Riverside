@@ -1,4 +1,3 @@
-import React from "react";
 import { senderIndex, AVATAR_GRADIENTS, AVATAR_TEXT } from "./meetingChatSidebar.shared";
 
 export function SenderAvatar({ name, size = "lg" }: { name: string; size?: "sm" | "lg" }) {

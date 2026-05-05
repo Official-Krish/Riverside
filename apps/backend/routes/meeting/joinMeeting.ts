@@ -91,15 +91,56 @@ joinMeetingRouter.post("/join/:id", authMiddleware, async (req, res) => {
     }
 
     const existing = meeting.participants.find(p => p.userId === userId);
+    const isHost = meeting.userId === userId;
 
-    const isInvited = meeting.scheduleId
-      ? true
-      : existing !== undefined;
+    let hasAccess = false;
+    let accessReason = "";
 
-    if (!isInvited && meeting.passcode && meeting.passcode !== passcode) {
-      return res.status(403).json({ message: "Invalid passcode" });
+    // Check 1: Is user already a participant?
+    if (existing) {
+      hasAccess = true;
+      accessReason = "existing_participant";
     }
 
+    // Check 2: For scheduled meetings, verify user is in schedule participants
+    if (!hasAccess && meeting.scheduleId) {
+      const schedule = await prisma.meetingSchedule.findUnique({
+        where: { id: meeting.scheduleId },
+        select: { hostId: true, participants: { select: { userId: true } } },
+      });
+
+      if (schedule) {
+        const isScheduleHost = schedule.hostId === userId;
+        const isScheduleParticipant = schedule.participants.some(p => p.userId === userId);
+
+        if (isScheduleHost || isScheduleParticipant) {
+          hasAccess = true;
+          accessReason = "scheduled_meeting_invited";
+        }
+      }
+    }
+
+    // Check 3: For instant meetings, verify correct passcode if not already invited
+    if (!hasAccess && meeting.passcode) {
+      if (passcode !== meeting.passcode) {
+        return res.status(403).json({ 
+          message: "Access denied. Invalid or missing passcode.",
+          code: "INVALID_PASSCODE" 
+        });
+      }
+      hasAccess = true;
+      accessReason = "passcode_verified";
+    }
+
+    // Final access check: If user is not host, not participant, not scheduled, and no valid passcode
+    if (!hasAccess && !isHost) {
+      return res.status(403).json({ 
+        message: "Access denied. You are not invited to this meeting.",
+        code: "NOT_INVITED" 
+      });
+    }
+
+    // Add or update participant
     if (!existing) {
       await prisma.meetingParticipant.create({
         data: {
@@ -118,7 +159,7 @@ joinMeetingRouter.post("/join/:id", authMiddleware, async (req, res) => {
     return res.status(200).json({
       roomId: meeting.roomId,
       meetingId: meeting.id,
-      isHost: meeting.userId === userId,
+      isHost,
       recordingState: meeting.recordingState,
     });
 

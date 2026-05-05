@@ -10,6 +10,7 @@ import {
   upsertParticipant,
 } from "./state";
 import { broadcastToRoom, normalizeText, sendJson } from "./socket-utils";
+import { storeChatMessage } from "./chatHistory";
 import type { RelayerSocket, SocketMetadata, WsPayload } from "./types";
 
 const HOST_DISCONNECT_GRACE_MS = 12000;
@@ -179,7 +180,7 @@ export function handleSocketClose(ws: RelayerSocket) {
   handleSocketLeave(ws);
 }
 
-export function handleSocketMessage(ws: RelayerSocket, data: WsPayload) {
+export async function handleSocketMessage(ws: RelayerSocket, data: WsPayload) {
   const type = typeof data.type === "string" ? data.type : "";
   const roomId = typeof data.roomId === "string" ? data.roomId.trim() : "";
 
@@ -231,7 +232,7 @@ export function handleSocketMessage(ws: RelayerSocket, data: WsPayload) {
       return;
     }
 
-    broadcastToRoom(roomId, {
+    const messagePayload = {
       type: "chat-message",
       id: crypto.randomUUID(),
       roomId,
@@ -241,7 +242,12 @@ export function handleSocketMessage(ws: RelayerSocket, data: WsPayload) {
         participantId: metadata.participantId,
         displayName: metadata.displayName,
       },
-    });
+    };
+
+    // Store in Redis for history
+    await storeChatMessage(roomId, messagePayload);
+
+    broadcastToRoom(roomId, messagePayload);
     return;
   }
 
@@ -292,6 +298,35 @@ export function handleSocketMessage(ws: RelayerSocket, data: WsPayload) {
       displayName: metadata.displayName,
       isMuted: participant.isMuted,
       isVideoOff: participant.isVideoOff,
+    });
+    return;
+  }
+
+  if (type === "reaction") {
+    const messageId = typeof data.messageId === "string" ? data.messageId.trim() : "";
+    const emoji = typeof data.emoji === "string" ? data.emoji.trim() : "";
+    const action = data.action === "remove" ? "remove" : "add";
+
+    if (!messageId || !emoji) {
+      sendJson(ws, { type: "error", message: "messageId and emoji are required for reaction" });
+      return;
+    }
+
+    // Validate emoji is a single emoji (basic check)
+    if (emoji.length > 20) {
+      sendJson(ws, { type: "error", message: "Invalid emoji" });
+      return;
+    }
+
+    broadcastToRoom(roomId, {
+      type: "reaction",
+      roomId,
+      messageId,
+      emoji,
+      participantId: metadata.participantId,
+      displayName: metadata.displayName,
+      action,
+      timestamp: Date.now(),
     });
     return;
   }

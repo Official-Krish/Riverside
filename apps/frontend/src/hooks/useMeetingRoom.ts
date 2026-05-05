@@ -24,11 +24,13 @@ export function useMeetingRoom({
   displayName,
   selectedCameraId,
   selectedMicId,
+  enabled = true,
 }: {
   meetingId: string;
   displayName: string;
   selectedCameraId?: string;
   selectedMicId?: string;
+  enabled?: boolean;
 }) {
   const [connectionState, setConnectionState] = useState<ConnectionState>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -337,7 +339,7 @@ export function useMeetingRoom({
   }, []);
 
   useEffect(() => {
-    if (!meetingId) {
+    if (!meetingId || !enabled) {
       return;
     }
 
@@ -517,6 +519,7 @@ export function useMeetingRoom({
   }, [
     addRemoteTrack,
     displayName,
+    enabled,
     leaveRoom,
     meetingId,
     parsedBase.host,

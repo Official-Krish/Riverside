@@ -1,7 +1,11 @@
 import { handleSocketClose, handleSocketMessage } from "./handlers";
 import { parseJsonMessage, sendJson } from "./socket-utils";
+import { initializeChatHistory } from "./chatHistory";
 
 export function startRelayerServer() {
+  // Initialize chat history Redis connection
+  initializeChatHistory();
+
   Bun.serve({
     fetch(req, server) {
       if (server.upgrade(req)) {

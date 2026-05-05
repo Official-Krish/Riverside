@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { http } from "../../../https";
 import type { RealtimeChatMessage } from "../../../hooks/useMeetingRealtime";
+import type { ChatReaction } from "@repo/types";
 import IssueActionsModal from "./IssueActionsModal";
 import IssueCreateModal from "./IssueCreateModal";
 import {
@@ -23,8 +24,12 @@ type MeetingChatSidebarProps = {
   typingNames: string[];
   selfName?: string;
   participants?: { name: string; color: string }[];
+  reactions?: Record<string, ChatReaction[]>;
+  participantNamesById?: Record<string, string>;
+  participantId?: string | null;
   onSendMessage: (text: string) => void;
   onTyping: (isTyping: boolean) => void;
+  onSendReaction?: (messageId: string, emoji: string, action: "add" | "remove") => void;
 };
 
 type RepoItem = {
@@ -38,8 +43,12 @@ export function MeetingChatSidebar({
   typingNames,
   selfName,
   participants = [],
+  reactions = {},
+  participantNamesById = {},
+  participantId,
   onSendMessage,
   onTyping,
+  onSendReaction,
 }: MeetingChatSidebarProps) {
   const [draft, setDraft] = useState("");
   const [showIssueModal, setShowIssueModal] = useState(false);
@@ -192,7 +201,7 @@ export function MeetingChatSidebar({
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: "100%", opacity: 0 }}
           transition={{ duration: 0.24, ease: "easeInOut" }}
-          className="fixed bottom-0 right-0 top-0 z-50 flex w-[420px] max-w-[96vw] flex-col border-l border-[#f5a623]/12 bg-[linear-gradient(180deg,#110d09_0%,#080705_100%)]"
+          className="fixed bottom-0 right-0 top-0 z-50 flex w-105 max-w-[96vw] flex-col border-l border-[#f5a623]/12 bg-[linear-gradient(180deg,#110d09_0%,#080705_100%)]"
         >
           <div className="border-b border-[#f5a623]/10 px-4 py-4">
             <div className="flex items-center justify-between">
@@ -289,8 +298,15 @@ export function MeetingChatSidebar({
             </div>
           )}
 
-          <div>
-            <MessageList messages={messages} selfName={selfName} />
+          <div className="flex min-h-0 flex-1 flex-col">
+            <MessageList 
+              messages={messages} 
+              selfName={selfName} 
+              reactions={reactions}
+              participantNamesById={participantNamesById}
+              participantId={participantId}
+              onSendReaction={onSendReaction}
+            />
             <div ref={bottomRef} />
           </div>
 
@@ -314,7 +330,7 @@ export function MeetingChatSidebar({
               </div>
             )}
           </div>
-         <div className="mt-26">
+          <div className="shrink-0">
             <Composer
                 draft={draft}
                 setDraft={setDraft}
