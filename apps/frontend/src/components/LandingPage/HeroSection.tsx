@@ -1,5 +1,6 @@
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
+import WeaveBackground from "../Background";
 
 function LiveWaveform({ color, speed = 1, height = 40, bars: barCount = 48 }: {
   color: string; speed?: number; height?: number; bars?: number;
@@ -38,24 +39,10 @@ const tracks = [
 
 export function HeroSection() {
   return (
-    <section className="relative isolate overflow-hidden min-h-screen flex flex-col px-6 sm:px-10 lg:px-16 pt-20 pb-12 border-b border-neutral-800">
+    <section className="relative isolate min-h-screen flex flex-col px-6 sm:px-10 lg:px-16 pt-20 pb-12 border-b border-neutral-800">
+      <WeaveBackground />
 
-      {/* ── Background ── */}
-      <div className="absolute inset-0 -z-10 pointer-events-none">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-225 h-125"
-          style={{ background: "radial-gradient(ellipse at 50% -10%, rgba(245,166,35,0.08) 0%, transparent 65%)" }} />
-        <div className="absolute bottom-0 right-0 w-150 h-100"
-          style={{ background: "radial-gradient(ellipse at 100% 100%, rgba(20,30,60,0.5) 0%, transparent 60%)" }} />
-        {/* Dot grid */}
-        <div className="absolute inset-0"
-          style={{
-            backgroundImage: "radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)",
-            backgroundSize: "32px 32px",
-            maskImage: "radial-gradient(ellipse at 50% 30%, black 20%, transparent 75%)",
-          }} />
-      </div>
-
-      <div className="mx-auto w-full max-w-6xl flex flex-col flex-1">
+      <div className="relative z-10 mx-auto w-full max-w-6xl flex flex-col flex-1">
 
         {/* ── HEADLINE — full width, centered, large ── */}
         <div className="flex-1 flex flex-col items-center justify-center text-center pt-8 pb-10">

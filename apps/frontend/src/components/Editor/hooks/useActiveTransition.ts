@@ -5,7 +5,7 @@
  */
 
 import { useMemo } from "react";
-import type { Track, Clip, ClipTransition } from "../types";
+import type { Track, ClipTransition } from "../types";
 
 export interface ActiveTransitionState {
   type: ClipTransition;

@@ -451,7 +451,6 @@ export function Editor() {
               tracks={tracks}
               onAddClip={handleAddClip}
               onAddAudio={handleAddAudio}
-              onAddOverlay={handleAddOverlay}
               onPlayPause={handlePlayPause}
               onSplitAtPlayhead={handleSplitAtPlayhead}
               onUndo={handleUndoWithToast}

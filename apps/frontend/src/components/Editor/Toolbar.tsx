@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import {
-  Play, Pause, Download, Plus, Type, Scissors,
+  Play, Pause, Download, Plus, Scissors,
   Undo2, Redo2, RotateCcw, Check,
   ChevronDown, ChevronUp, Move, Maximize, Music2,
 } from "lucide-react";
@@ -30,7 +30,6 @@ interface ToolbarProps {
   tracks: any[];
   onAddClip: () => void;
   onAddAudio: () => void;
-  onAddOverlay: (overlay: any) => void;
   onPlayPause: () => void;
   onSplitAtPlayhead: () => void;
   onUndo: () => void;
@@ -50,7 +49,6 @@ export function Toolbar({
   tracks,
   onAddClip,
   onAddAudio,
-  onAddOverlay,
   onPlayPause,
   onSplitAtPlayhead,
   onUndo,
@@ -63,17 +61,6 @@ export function Toolbar({
 
   const handleSliderChange = (value: number[]) => {
     onSeek(value[0]);
-  };
-
-  const handleAddTextOverlay = () => {
-    onAddOverlay({
-      type: "TEXT",
-      content: { text: "New Text" },
-      timelineStartMs: currentTime,
-      durationMs: 5000,
-      transform: { x: 100, y: 100 },
-      style: {},
-    });
   };
 
   const isTransformModified = canvasTransform

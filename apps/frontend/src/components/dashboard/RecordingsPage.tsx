@@ -11,7 +11,6 @@ import {
 import { motion } from "motion/react";
 import { useState } from "react";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationPrevious, PaginationNext } from "@/components/ui/pagination";
-import type { MeetingDetails } from "@repo/types/api";
 import { getHttpErrorMessage } from "@/lib/httpError";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";

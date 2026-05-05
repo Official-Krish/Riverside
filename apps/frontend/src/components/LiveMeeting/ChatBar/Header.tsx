@@ -1,4 +1,3 @@
-import React from "react";
 import { FolderGit2, GitBranch, MessageSquare, X } from "lucide-react";
 
 export default function Header(props: {

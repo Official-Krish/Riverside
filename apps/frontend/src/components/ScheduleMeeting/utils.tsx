@@ -1,4 +1,4 @@
-import { BellOff, Hash, Mail, Webhook } from "lucide-react";
+import { BellOff } from "lucide-react";
 import { FaDiscord, FaSlack } from "react-icons/fa";
 import { SiGmail } from "react-icons/si";
 

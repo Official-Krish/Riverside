@@ -43,6 +43,7 @@ export function useSignup(setErrorMessage: (msg: string | null) => void) {
       const response = await http.post<SignupResponse>("/user/signup", { name, email, password });
       return response.data;
     },
+    //@ts-ignore
     onSuccess: (data, variables) => {
       // Don't set auth yet - user needs to verify email first
       navigate(`/verify-pending?email=${encodeURIComponent(variables.email)}`);
