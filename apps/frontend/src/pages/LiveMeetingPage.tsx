@@ -21,6 +21,7 @@ import { useMeetingRecording } from "../hooks/useMeetingRecording";
 import { useMeetingRoom } from "../hooks/useMeetingRoom";
 import { http } from "../https";
 import { getParticipantMediaState } from "../lib/participantMediaState";
+import { getHttpErrorMessage } from "../lib/httpError";
 import type {
   FocusedTiles,
   MeetingConnectionState,
@@ -28,6 +29,7 @@ import type {
   MeetingTile,
   RemoteAudioTrackItem,
 } from "../types/meeting";
+import type { JoinMeetingResponse } from "@repo/types/api";
 
 export function LiveMeetingPage() {
   const { meetingId = "" } = useParams();
@@ -40,14 +42,25 @@ export function LiveMeetingPage() {
 
   const displayName = searchParams.get("name") || "Guest";
   const isHost = searchParams.get("role") === "host";
+  const passcode = searchParams.get("passcode") || "";
   const roomName = useMemo(() => meetingId.trim(), [meetingId]);
   const initialRecordingState = searchParams.get("recordingState") === "true";
   const selectedMicId = searchParams.get("micId") || "";
   const selectedCameraId = searchParams.get("cameraId") || "";
 
+  const joinMutation = useMutation<JoinMeetingResponse, unknown, { passcode?: string } | undefined>({
+    mutationFn: async (vars) => {
+      const res = await http.post<JoinMeetingResponse>(`/meeting/join/${meetingId}`, {
+        passcode: vars?.passcode || undefined,
+      });
+      return res.data;
+    },
+  });
+
   useEffect(() => {
-    endingRef.current = ending;
-  }, [ending]);
+    if (!meetingId) return;
+    joinMutation.mutate({ passcode: passcode || undefined });
+  }, [meetingId]);
 
   const {
     connectionState,
@@ -76,6 +89,7 @@ export function LiveMeetingPage() {
     displayName,
     selectedCameraId,
     selectedMicId,
+    enabled: joinMutation.status === "success",
   });
 
   const {
@@ -481,6 +495,60 @@ export function LiveMeetingPage() {
           Back to dashboard
         </Link>
       </section>
+    );
+  }
+
+  // Show loading state while joining meeting
+  if (joinMutation.status === "pending") {
+    return (
+      <motion.section
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.28, ease: "easeOut" }}
+        className="relative h-[calc(100vh-3rem)] overflow-hidden rounded-2xl border border-[#f5a623]/16 bg-[#060504] flex items-center justify-center"
+      >
+        <div className="text-center">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#f5a623]/16 bg-[#130f0a]/92 px-4 py-2 text-sm mb-4">
+            <svg className="h-4 w-4 animate-spin text-[#f5a623]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Joining meeting...
+          </div>
+          <p className="text-[#c9af79] text-sm mt-2">Please wait while we verify access</p>
+        </div>
+      </motion.section>
+    );
+  }
+
+  // Show error state if join failed
+  if (joinMutation.status === "error") {
+    const errorMsg = getHttpErrorMessage(
+      joinMutation.error,
+      "You don't have permission to join this meeting."
+    );
+    return (
+      <motion.section
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.28, ease: "easeOut" }}
+        className="relative h-[calc(100vh-3rem)] overflow-hidden rounded-2xl border border-[#f5a623]/16 bg-[#060504] flex items-center justify-center"
+      >
+        <div className="rounded-[2rem] border border-border/80 bg-card/82 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.12)] backdrop-blur-xl max-w-md">
+          <h1 className="text-2xl font-semibold text-red-300">
+            Access Denied
+          </h1>
+          <p className="mt-3 text-muted-foreground text-sm">
+            {errorMsg || "You don't have permission to join this meeting."}
+          </p>
+          <Link
+            to="/dashboard"
+            className="mt-6 inline-flex rounded-full bg-primary px-5 py-3 text-sm font-medium text-primary-foreground"
+          >
+            Back to dashboard
+          </Link>
+        </div>
+      </motion.section>
     );
   }
 
