@@ -161,3 +161,59 @@ export type GoogleAuthResponse = {
   token: string;
   message: string;
 }
+
+export type ChatMessageSender = {
+  participantId: string;
+  displayName: string;
+};
+
+export type RealtimeChatMessage = {
+  id: string;
+  type: "chat-message" | "system";
+  roomId: string;
+  text: string;
+  timestamp: number;
+  sender: ChatMessageSender;
+  reactions?: ChatReaction[];
+};
+
+export type ChatReaction = {
+  emoji: string;
+  count: number;
+  reactors: string[]; // participantIds who added this reaction
+};
+
+export type ChatReactionPayload = {
+  type: "reaction";
+  roomId: string;
+  messageId: string;
+  emoji: string;
+  participantId: string;
+  displayName: string;
+  action: "add" | "remove"; // add or remove the reaction
+  timestamp: number;
+};
+
+export type TypingStatePayload = {
+  type: "typing-state";
+  roomId: string;
+  participantId: string;
+  displayName: string;
+  isTyping: boolean;
+};
+
+export type PresenceState = {
+  participantId: string;
+  displayName: string;
+  isOnline: boolean;
+  lastSeen: number;
+};
+
+export type ChatPresencePayload = {
+  type: "presence";
+  roomId: string;
+  participantId: string;
+  displayName: string;
+  isOnline: boolean;
+  timestamp: number;
+};

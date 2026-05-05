@@ -1,13 +1,18 @@
-import { MessageSquare } from "lucide-react";
 import type { RealtimeChatMessage } from "../../../hooks/useMeetingRealtime";
 import { formatTimestamp } from "./meetingChatSidebar.shared";
 import SenderAvatar from "./SenderAvatar";
+import { MessageReactions } from "./MessageReactions";
+import type { ChatReaction } from "@repo/types";
 
 export default function MessageList(props: {
   messages: RealtimeChatMessage[];
   selfName?: string;
+  reactions?: Record<string, ChatReaction[]>;
+  participantNamesById?: Record<string, string>;
+  participantId?: string | null;
+  onSendReaction?: (messageId: string, emoji: string, action: "add" | "remove") => void;
 }) {
-  const { messages, selfName } = props;
+  const { messages, selfName, reactions = {}, participantNamesById = {}, participantId, onSendReaction } = props;
 
   const normalizedSelfName = (selfName || "").trim().toLowerCase();
 
@@ -64,6 +69,16 @@ export default function MessageList(props: {
             <div className={["max-w-[84%] rounded-[22px] px-3.5 py-3 shadow-[0_8px_20px_rgba(0,0,0,0.12)]", isOwnMessage ? "rounded-br-md border border-[#f5a623]/20 bg-linear-to-br from-[#6f4815] via-[#53340f] to-[#3c250a]" : "rounded-bl-md border border-white/7 bg-white/4"].join(" ")}>
               <p className="text-[13px] leading-relaxed text-[#fff5de]">{message.text}</p>
             </div>
+
+            <MessageReactions
+              reactions={reactions[message.id] || []}
+              participantId={participantId}
+              participantNamesById={participantNamesById}
+              align={isOwnMessage ? "end" : "start"}
+              onReactionClick={(emoji, action) => {
+                onSendReaction?.(message.id, emoji, action);
+              }}
+            />
           </div>
         );
       })}

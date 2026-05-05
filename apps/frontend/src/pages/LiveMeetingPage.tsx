@@ -109,6 +109,9 @@ export function LiveMeetingPage() {
     sendRecordingState,
     sendMediaState,
     participantMediaStates,
+    reactions,
+    participantNamesById,
+    sendReaction,
   } = useMeetingRealtime({
     roomId: roomName,
     displayName,
@@ -610,6 +613,10 @@ export function LiveMeetingPage() {
         selfName={displayName}
         onSendMessage={sendChatMessage}
         onTyping={setTyping}
+        reactions={reactions}
+        participantNamesById={participantNamesById}
+        participantId={localParticipantId}
+        onSendReaction={sendReaction}
       />
       {ending || endMeetingMutation.isPending ? (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">

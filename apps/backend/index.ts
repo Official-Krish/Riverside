@@ -11,6 +11,7 @@ import { notificationWorker } from "./utils/redis";
 import RecordingRouter from "./routes/recording";
 import editorRouter from "./routes/editor";
 import GithubRouter from "./routes/github";
+import chatRouter from "./routes/chat";
 
 const app = express();
 const recordingsRoot = path.resolve(process.cwd(), "../../recordings");
@@ -27,6 +28,7 @@ app.use("/api/v1/notifications", NotificationRouter);
 app.use("/api/v1/recording", RecordingRouter);
 app.use("/api/v1/editor", editorRouter);
 app.use("/api/v1/github", GithubRouter);
+app.use("/api/v1/chat", chatRouter);
 
 notificationWorker().catch((error) => {
     console.error("Error in sendInvitationEmail:", error);
