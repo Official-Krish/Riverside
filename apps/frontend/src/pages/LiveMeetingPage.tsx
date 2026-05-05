@@ -479,6 +479,79 @@ export function LiveMeetingPage() {
     await endMeetingMutation.mutateAsync();
   };
 
+  useEffect(() => {
+    const handleShortcutKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat) {
+        return;
+      }
+
+      if (event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(target.tagName) ||
+          Boolean(target.closest("a,button,[role='button']")))
+      ) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+
+      if (key === "m") {
+        event.preventDefault();
+        void toggleAudio();
+        return;
+      }
+
+      if (key === "v") {
+        event.preventDefault();
+        void toggleVideo();
+        return;
+      }
+
+      if (key === "s") {
+        event.preventDefault();
+        void toggleScreenShare();
+        return;
+      }
+
+      if (key === "l") {
+        event.preventDefault();
+        setActiveLayout((current) => {
+          if (current === "focus") {
+            setSelectedParticipantId(null);
+            return "grid";
+          }
+
+          setSelectedParticipantId(allTiles[0]?.id ?? null);
+          return "focus";
+        });
+        return;
+      }
+
+      if (key === "u") {
+        event.preventDefault();
+        setIsChatOpen(false);
+        setIsSidebarOpen((current) => !current);
+        return;
+      }
+
+      if (key === "c") {
+        event.preventDefault();
+        setIsSidebarOpen(false);
+        setIsChatOpen((current) => !current);
+      }
+    };
+
+    window.addEventListener("keydown", handleShortcutKeyDown);
+
+    return () => window.removeEventListener("keydown", handleShortcutKeyDown);
+  }, [allTiles, setActiveLayout, setIsChatOpen, setIsSidebarOpen, setSelectedParticipantId, toggleAudio, toggleScreenShare, toggleVideo]);
+
   if (!roomName) {
     return (
       <section className="rounded-[2rem] border border-border/80 bg-card/82 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.12)] backdrop-blur-xl">
