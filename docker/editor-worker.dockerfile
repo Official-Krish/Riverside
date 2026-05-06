@@ -3,9 +3,8 @@ FROM oven/bun:1 AS builder
 WORKDIR /app
 
 COPY package.json bun.lock turbo.json ./
-COPY apps/backend/package.json apps/backend/package.json
+COPY apps/editor-worker/package.json apps/editor-worker/package.json
 COPY packages/db/package.json packages/db/package.json
-COPY packages/types/package.json packages/types/package.json
 
 RUN bun install
 
@@ -13,14 +12,12 @@ COPY . .
 
 FROM oven/bun:1 AS runtime
 
-WORKDIR /app/apps/backend
+WORKDIR /app/apps/editor-worker
 
 ENV NODE_ENV=production
 
 COPY --from=builder /app/node_modules /app/node_modules
-COPY --from=builder /app/apps/backend /app/apps/backend
+COPY --from=builder /app/apps/editor-worker /app/apps/editor-worker
 COPY --from=builder /app/packages /app/packages
-
-EXPOSE 3000
 
 CMD ["bun", "index.ts"]

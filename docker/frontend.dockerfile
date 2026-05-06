@@ -1,14 +1,28 @@
-FROM node:20
+FROM oven/bun:1 AS builder
 
-# Set the working directory
 WORKDIR /app
 
-# Copy the rest of the application
-COPY apps/client/package.json ./
-COPY apps/client/ ./
+COPY package.json bun.lock turbo.json ./
+COPY apps/frontend/package.json apps/frontend/package.json
+COPY packages/node-registry/package.json packages/node-registry/package.json
+COPY packages/types/package.json packages/types/package.json
 
-RUN npm install --verbose
+RUN bun install
 
-EXPOSE 5173
+COPY . .
 
-CMD ["npm", "run", "dev"]
+ARG VITE_BACKEND_URL=/api/v1
+ENV VITE_BACKEND_URL=${VITE_BACKEND_URL}
+
+WORKDIR /app/apps/frontend
+
+RUN bun run build
+
+FROM nginx:1.27-alpine AS runtime
+
+COPY docker/nginx.frontend.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/apps/frontend/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
