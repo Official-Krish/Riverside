@@ -1,11 +1,13 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { spawn } from "node:child_process";
+import { constants, createDecipheriv, createPrivateKey, privateDecrypt, type KeyObject } from "node:crypto";
 import { Redis } from "ioredis";
 import ffmpegStatic from "ffmpeg-static";
 import ffprobeStatic from "ffprobe-static";
 import jwt from "jsonwebtoken";
 import axios from "axios";
+import { prisma } from "@repo/db/client";
 
 const redisClient = new Redis({
     host: process.env.REDIS_HOST || "localhost",
@@ -24,7 +26,16 @@ interface UserChunk {
     userId: string;
     localPath: string;
     timestamp: number; // milliseconds since epoch
+    metadata?: {
+        isEncrypted: boolean;
+        sourceMimeType: string | null;
+        encryptionAlgorithm: string | null;
+        encryptionIv: string | null;
+        encryptionTagBits: number | null;
+    } | null;
 }
+
+let cachedServerPrivateKey: KeyObject | null = null;
 
 interface ProcessedUser {
     userId: string;
@@ -98,6 +109,30 @@ function escapeConcatFilePath(filePath: string): string {
     return filePath.replace(/'/g, "'\\''");
 }
 
+function mimeTypeToExtension(mimeType?: string | null): string {
+    if (!mimeType) {
+        return "webm";
+    }
+
+    if (mimeType.includes("mp4")) {
+        return "mp4";
+    }
+
+    if (mimeType.includes("ogg")) {
+        return "ogg";
+    }
+
+    if (mimeType.includes("webm")) {
+        return "webm";
+    }
+
+    return "webm";
+}
+
+function getWrappedCekKey(meetingId: string, participantId: string) {
+    return `meeting:wrapped-cek:${meetingId}:${participantId}`;
+}
+
 class LocalVideoMerger {
     private readonly meetingId: string;
     private readonly recordingsRoot: string;
@@ -124,6 +159,101 @@ class LocalVideoMerger {
 
     private log(message: string) {
         console.log(`[${new Date().toISOString()}] ${message}`);
+    }
+
+    private async getServerPrivateKey(): Promise<KeyObject> {
+        if (cachedServerPrivateKey) {
+            return cachedServerPrivateKey;
+        }
+
+        const keyPair = await prisma.serverKeyPair.findUnique({
+            where: { id: "singleton" },
+            select: { privateKeyPem: true },
+        });
+
+        if (!keyPair) {
+            throw new Error("Server keypair not found in database");
+        }
+
+        cachedServerPrivateKey = createPrivateKey(keyPair.privateKeyPem);
+        return cachedServerPrivateKey;
+    }
+
+    private async getWrappedMeetingCek(participantId: string): Promise<Buffer> {
+        const record = await redisClient.hgetall(getWrappedCekKey(this.meetingId, participantId));
+
+        if (!record?.wrappedCek) {
+            throw new Error(`Wrapped CEK not found for participant ${participantId}`);
+        }
+
+        const parsed = JSON.parse(record.wrappedCek) as number[];
+        return Buffer.from(parsed);
+    }
+
+    private async unwrapMeetingCek(participantId: string): Promise<Buffer> {
+        const wrappedCek = await this.getWrappedMeetingCek(participantId);
+        const privateKey = await this.getServerPrivateKey();
+
+        return privateDecrypt(
+            {
+                key: privateKey,
+                oaepHash: "sha256",
+                padding: constants.RSA_PKCS1_OAEP_PADDING,
+            },
+            wrappedCek
+        );
+    }
+
+    private decryptEncryptedChunk(ciphertext: Buffer, cek: Buffer, ivBase64: string, tagBits: number | null): Buffer {
+        const iv = Buffer.from(ivBase64, "base64");
+        const authTagBytes = Math.max(16, Math.floor((tagBits ?? 128) / 8));
+
+        if (ciphertext.length <= authTagBytes) {
+            throw new Error("Encrypted chunk is too small to contain an auth tag");
+        }
+
+        const encryptedBody = ciphertext.subarray(0, ciphertext.length - authTagBytes);
+        const authTag = ciphertext.subarray(ciphertext.length - authTagBytes);
+        const decipher = createDecipheriv("aes-256-gcm", cek, iv);
+
+        decipher.setAuthTag(authTag);
+
+        return Buffer.concat([decipher.update(encryptedBody), decipher.final()]);
+    }
+
+    private async decryptChunkToTempFile(chunk: UserChunk): Promise<string> {
+        if (!chunk.metadata?.isEncrypted) {
+            return chunk.localPath;
+        }
+
+        if (chunk.metadata.encryptionAlgorithm !== "AES-GCM") {
+            throw new Error(`Unsupported chunk encryption algorithm: ${chunk.metadata.encryptionAlgorithm || "unknown"}`);
+        }
+
+        if (!chunk.metadata.encryptionIv) {
+            throw new Error(`Missing encryption IV for chunk ${chunk.localPath}`);
+        }
+
+        const wrappedCek = await this.unwrapMeetingCek(chunk.userId);
+        const ciphertext = await fs.readFile(chunk.localPath);
+        const plaintext = this.decryptEncryptedChunk(
+            ciphertext,
+            wrappedCek,
+            chunk.metadata.encryptionIv,
+            chunk.metadata.encryptionTagBits
+        );
+
+        const decryptedDir = path.join(this.tempDir, "decrypted", chunk.userId);
+        await fs.mkdir(decryptedDir, { recursive: true });
+
+        const sourceExtension = mimeTypeToExtension(chunk.metadata.sourceMimeType);
+        const decryptedPath = path.join(
+            decryptedDir,
+            `${path.basename(chunk.localPath, path.extname(chunk.localPath))}.decrypted.${sourceExtension}`
+        );
+
+        await fs.writeFile(decryptedPath, plaintext);
+        return decryptedPath;
     }
 
     private async createDirectories() {
@@ -353,17 +483,38 @@ class LocalVideoMerger {
     }
 
     private async collectUserChunks(): Promise<Map<string, UserChunk[]>> {
-        const startTime = Date.now();
-        
         const usersRoot = path.join(this.recordingsRoot, this.meetingId, "raw", "users");
+        const meetingRecord = await prisma.meeting.findUnique({
+            where: { roomId: this.meetingId },
+            select: { id: true },
+        });
+
+        if (!meetingRecord) {
+            throw new Error(`Meeting not found for roomId ${this.meetingId}`);
+        }
+
+        const mediaChunks = await prisma.mediaChunk.findMany({
+            where: { meetingId: meetingRecord.id },
+            select: {
+                bucketLink: true,
+                isEncrypted: true,
+                sourceMimeType: true,
+                encryptionAlgorithm: true,
+                encryptionIv: true,
+                encryptionTagBits: true,
+            },
+        });
+
+        const metadataByPath = new Map(
+            mediaChunks.map((record) => [path.resolve(record.bucketLink), record])
+        );
 
         const userDirs = await fs.readdir(usersRoot, { withFileTypes: true }).catch(() => []);
-            if (userDirs.length === 0) {
+        if (userDirs.length === 0) {
             throw new Error(`No local chunks found in ${usersRoot}`);
         }
 
         const userChunks = new Map<string, UserChunk[]>();
-        let totalChunks = 0;
 
         for (const dirent of userDirs) {
             if (!dirent.isDirectory()) {
@@ -376,16 +527,36 @@ class LocalVideoMerger {
 
             const chunks = files
                 .filter((file) => /chunk-.*\.(webm|mp4|ogg)$/i.test(file))
-                .map((file) => ({
-                    userId,
-                    localPath: path.join(userDirPath, file),
-                    timestamp: parseChunkTimestamp(file) ?? Date.now(),
-                }))
+                .map((file) => {
+                    const localPath = path.join(userDirPath, file);
+                    const metadata = metadataByPath.get(path.resolve(localPath));
+
+                    return {
+                        userId,
+                        localPath,
+                        timestamp: parseChunkTimestamp(file) ?? Date.now(),
+                        metadata: metadata
+                            ? {
+                                isEncrypted: metadata.isEncrypted,
+                                sourceMimeType: metadata.sourceMimeType,
+                                encryptionAlgorithm: metadata.encryptionAlgorithm,
+                                encryptionIv: metadata.encryptionIv,
+                                encryptionTagBits: metadata.encryptionTagBits,
+                            }
+                            : null,
+                    };
+                })
                 .sort((a, b) => a.timestamp - b.timestamp); // Sort by timestamp
+
+            const encryptedChunks = chunks.filter((chunk) => chunk.metadata?.isEncrypted);
+            if (encryptedChunks.length > 0) {
+                for (const chunk of encryptedChunks) {
+                    chunk.localPath = await this.decryptChunkToTempFile(chunk);
+                }
+            }
 
             if (chunks.length > 0) {
                 userChunks.set(userId, chunks);
-                totalChunks += chunks.length;
             }
         }
 
@@ -479,7 +650,6 @@ class LocalVideoMerger {
                     this.config.frameRate.toString(),
                     outputVideo,
                     ], 600000, `${label}:encode-webm-fragments`);
-                    const elapsed = Date.now() - startTime;
                     return outputVideo;
                 }
 
@@ -721,7 +891,6 @@ class LocalVideoMerger {
         outputPath,
         ], 900000, `${label}:xstack`);
 
-        const elapsed = Date.now() - startTime;
         return outputPath;
     }
 
@@ -733,8 +902,6 @@ class LocalVideoMerger {
         
         await fs.copyFile(gridVideoPath, finalPath);
         
-        const elapsed = Date.now() - startTime;
-
         // GCP upload flow retained for future use (intentionally commented, not removed).
         // import { Storage } from "@google-cloud/storage";
         // const storage = new Storage({ keyFilename: "./gcp-key.json" });
@@ -806,11 +973,9 @@ class LocalVideoMerger {
         try {
             let phaseStart = Date.now();
             await this.createDirectories();
-            let phaseDuration = Date.now() - phaseStart;
 
             phaseStart = Date.now();
             const userChunks = await this.collectUserChunks();
-            phaseDuration = Date.now() - phaseStart;
             
             // Calculate recording start time and user join times
             let recordingStartTime = Number.MAX_VALUE;
@@ -857,18 +1022,14 @@ class LocalVideoMerger {
                     leadingPaddingSeconds,
                 });
             });
-            phaseDuration = Date.now() - phaseStart;
 
             if (failedUsers.length > 0) {
-                phaseStart = Date.now();
                 const baseDuration =
                 processedUsers.length > 0
                     ? Math.max(...processedUsers.map((user) => user.duration))
                     : Math.max(...failedUsers.map((user) => user.estimatedDuration));
 
-                let failedCount = 0;
                 for (const failedUser of failedUsers) {
-                    failedCount++;
                     const leadingPaddingSeconds = Math.max(0, (failedUser.joinTimestamp - recordingStartTime) / 1000);
                     const placeholderDuration = Math.max(1, baseDuration - leadingPaddingSeconds);
                     
@@ -887,7 +1048,6 @@ class LocalVideoMerger {
                         leadingPaddingSeconds,
                     });
                 }
-                phaseDuration = Date.now() - phaseStart;
             }
 
             if (processedUsers.length === 0) {
@@ -897,17 +1057,11 @@ class LocalVideoMerger {
             // Sort by join time for consistent grid layout (users appear in order they joined)
             processedUsers.sort((a, b) => a.joinTimestamp - b.joinTimestamp);
 
-            phaseStart = Date.now();
             const normalized = await this.normalizeVideoDurations(processedUsers);
-            phaseDuration = Date.now() - phaseStart;
 
-            phaseStart = Date.now();
             const gridVideo = await this.createGridVideo(normalized);
-            phaseDuration = Date.now() - phaseStart;
 
-            phaseStart = Date.now();
             const finalPath = await this.persistFinal(gridVideo);
-            phaseDuration = Date.now() - phaseStart;
 
             await this.cleanupLegacyRecordingsTmp();
 
@@ -952,17 +1106,12 @@ async function processQueue() {
 
     while (true) {
         let meetingId: string | null = null;
-        const queueStart = Date.now();
         try {
-            const result = await Promise.race([
-                redisClient.blpop("ProcessVideo", 0),
-                new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error("Redis timeout")), 35000)
-                ) as Promise<[string, string]>
-            ]) as [string, string];
-            
+            const result = (await redisClient.blpop("ProcessVideo", 35)) as [string, string] | null;
+
             if (!result) {
-                console.log(`[${new Date().toISOString()}] No result from queue`);
+                // No job within timeout, continue loop and wait again.
+                console.log(`[${new Date().toISOString()}] Queue timeout (no job), waiting for next job...`);
                 continue;
             }
 

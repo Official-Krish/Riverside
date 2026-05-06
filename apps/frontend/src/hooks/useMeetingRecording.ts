@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { http } from "../https";
 import type { RecordingStatusResponse } from "@repo/types/api";
+import { encryptMeetingChunk } from "../lib/meetingCrypto";
 
 type ConnectionState = "idle" | "loading-lib" | "connecting" | "connected" | "failed";
 
@@ -78,8 +79,16 @@ export function useMeetingRecording({
     const startedAt = new Date().toISOString();
 
     uploadChainRef.current = uploadChainRef.current.then(async () => {
+      const participantForNonce = localParticipantId || "unknown-participant";
+      const encryptedPayload = await encryptMeetingChunk({
+        meetingId,
+        participantId: participantForNonce,
+        sequenceNumber: nextSequence,
+        chunk,
+      });
+
       const formData = new FormData();
-      formData.append("video", chunk, `chunk-${nextSequence}.webm`);
+      formData.append("video", encryptedPayload.encryptedChunk, `chunk-${nextSequence}.enc`);
       formData.append("meetingId", meetingKey);
       if (localParticipantId) {
         formData.append("participantId", localParticipantId);
@@ -87,15 +96,23 @@ export function useMeetingRecording({
       formData.append("sequenceNumber", String(nextSequence));
       formData.append("startedAt", startedAt);
       formData.append("durationMs", String(CHUNK_DURATION_MS));
-      formData.append("mimeType", chunk.type || "video/webm");
+      formData.append("mimeType", "application/octet-stream");
+      formData.append("isEncrypted", "true");
+      formData.append("sourceMimeType", encryptedPayload.sourceMimeType);
+      formData.append("encryptionAlgorithm", encryptedPayload.algorithm);
+      formData.append("encryptionIv", encryptedPayload.ivBase64);
+      formData.append("encryptionTagBits", String(encryptedPayload.tagBits));
 
       await http.post("/upload-chunk", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
       });
+    }).catch(() => {
+      setRecordingError("Failed to encrypt or upload one or more chunks.");
+      setIsUploadingChunks(false);
     });
-  }, [roomName, localParticipantId]);
+  }, [roomName, localParticipantId, meetingId]);
 
   const getSupportedMimeType = useCallback(() => {
     const types = [

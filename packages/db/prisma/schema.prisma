@@ -150,6 +150,11 @@ model MediaChunk {
   meetingId      String
   bucketLink     String
   mimeType       String?
+  sourceMimeType String?
+  isEncrypted    Boolean           @default(false)
+  encryptionAlgorithm String?
+  encryptionIv   String?
+  encryptionTagBits Int?
   uploaderUserId String?
   sequenceNumber Int?
   durationMs     Int?
@@ -299,6 +304,17 @@ model ExportJob {
   @@map("export_jobs")
 }
 
+model ServerKeyPair {
+  id         String   @id @default("singleton") // Only one keypair per server
+  publicKeyPem  String
+  privateKeyPem String
+  algorithm  String   @default("RSA-OAEP-256")
+  modulusLength Int    @default(4096)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("server_keypairs")
+}
 
 enum MeetingRole {
   HOST

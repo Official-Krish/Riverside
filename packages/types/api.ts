@@ -42,6 +42,21 @@ export type JoinMeetingResponse = {
   recordingState: "IDLE" | "RECORDING" | "UPLOADING" | "PROCESSING" | "READY" | "FAILED";
 };
 
+export type ServerPublicKeyResponse = {
+  algorithm: "RSA-OAEP-256";
+  publicKey: JsonWebKey;
+};
+
+export type RegisterWrappedCekRequest = {
+  wrappedCek: number[];
+};
+
+export type RegisterWrappedCekResponse = {
+  message: string;
+  meetingId: string;
+  participantId: string;
+};
+
 export type MeetingSchedule = {
   id: string;
   title: string;
