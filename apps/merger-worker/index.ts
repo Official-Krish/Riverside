@@ -1079,7 +1079,7 @@ class LocalVideoMerger {
     }
 }
 
-async function reportWorkerStatus(meetingId: string, status: "PROCESSING" | "READY" | "FAILED", finalPath?: string) {
+async function reportWorkerStatus(meetingId: string, status: "PROCESSING" | "FAILED", finalPath?: string) {
     const backendUrl = process.env.BACKEND_URL || "http://localhost:3000/api/v1";
     try {
         await axios.request({
@@ -1136,14 +1136,6 @@ async function processQueue() {
                 
                 // Queue for transcoding
                 await redisClient.rpush("TranscodeVideo", JSON.stringify({ meetingId, finalPath }));
-                
-                // Report successful completion
-                try {
-                    await reportWorkerStatus(meetingId, "READY", finalPath);
-                } catch (error) {
-                    console.error(`[${new Date().toISOString()}] Failed to report READY status:`, error);
-                    // Still consider it success since merge completed
-                }
             } catch (error) {
                 console.error(`[${new Date().toISOString()}] Merge failed for ${meetingId}:`, error);
                 try {

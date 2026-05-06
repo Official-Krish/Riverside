@@ -27,13 +27,13 @@ export function Overview({
 }) {
   const navigate = useNavigate();
   const [recentPage, setRecentPage] = useState(1);
-  const recentPageSize = 4;
+  const recentPageSize = 2;
   const totalRecentPages = Math.ceil(meetings.length / recentPageSize);
   const paginatedRecentMeetings = meetings.slice((recentPage - 1) * recentPageSize, recentPage * recentPageSize);
 
   const [readyPage, setReadyPage] = useState(1);
   const readyMeetings = meetings.filter((meeting) => meeting.recordingState === "READY");
-  const readyPageSize = 3;
+  const readyPageSize = 2;
   const totalReadyPages = Math.ceil(readyMeetings.length / readyPageSize);
   const paginatedReadyMeetings = readyMeetings.slice((readyPage - 1) * readyPageSize, readyPage * readyPageSize);
 

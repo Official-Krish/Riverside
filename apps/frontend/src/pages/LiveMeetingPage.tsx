@@ -136,6 +136,8 @@ export function LiveMeetingPage() {
     connectionState,
     isRecording,
     setIsRecording,
+    isMuted,
+    isVideoOff,
     selectedMicId,
   });
 
