@@ -12,6 +12,7 @@ import RecordingRouter from "./routes/recording";
 import editorRouter from "./routes/editor";
 import GithubRouter from "./routes/github";
 import chatRouter from "./routes/chat";
+import rateLimiter from "./utils/rateLimiter";
 
 const app = express();
 const recordingsRoot = path.resolve(process.cwd(), "../../recordings");
@@ -19,6 +20,12 @@ const recordingsRoot = path.resolve(process.cwd(), "../../recordings");
 app.use(express.json());
 app.use(cors());
 app.use("/api/v1/recordings", express.static(recordingsRoot));
+
+// Trust proxy if behind a load balancer / nginx so req.ip is correct
+app.set("trust proxy", true);
+
+// Global rate limiter (per-IP)
+app.use(rateLimiter({ windowSeconds: 60, maxRequests: 200 }));
 
 app.use("/api/v1/user", userRouter);
 app.use("/api/v1/meeting", meetingRouter);
