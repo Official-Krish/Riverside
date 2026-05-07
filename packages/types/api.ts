@@ -85,6 +85,11 @@ export type RecordingStatusResponse = {
   processingStartedAt?: string | null;
   processingEndedAt?: string | null;
   isEnded: boolean;
+  recordingLimit?: {
+    recordingsUsed: number;
+    recordingsLimit: number;
+    remainingRecordings: number;
+  };
 };
 
 export type RecordingPageParticipant = {
@@ -108,6 +113,18 @@ export type RecordingPageResponse = {
     email?: string | null;
     role: string;
   }[];
+  recordingLimit?: {
+    recordingsUsed: number;
+    recordingsLimit: number;
+    remainingRecordings: number;
+  };
+};
+
+export type RecordingLimitCheckResponse = {
+  recordingsUsed: number;
+  recordingsLimit: number;
+  remainingRecordings: number;
+  allowed: boolean;
 };
 
 export type MeetingDetails = {

@@ -20,6 +20,7 @@ model User {
   githubUsername String?
   avatarUrl String?
   timezone  String?   
+  tier      UserTier  @default(FREE)
   deletedAt DateTime? 
 
   createdAt DateTime @default(now())
@@ -369,4 +370,10 @@ enum NotificationType {
   RECORDING_READY
   RECORDING_FAILED
   OTHER
+}
+
+enum UserTier {
+  FREE
+  PRO
+  ENTERPRISE
 }

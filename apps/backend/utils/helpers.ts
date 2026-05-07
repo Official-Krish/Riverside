@@ -209,6 +209,64 @@ export function toPublicRecordingLink(localPath: string) {
   return `/api/v1/recordings/${normalizedRelative}`;
 }
 
+// Rate limiting configuration
+export const RECORDING_LIMITS = {
+  FREE: 3,
+  PRO: 50,
+  ENTERPRISE: -1, // unlimited
+} as const;
+
+export async function getRecordingCount(userId: string): Promise<number> {
+  const recordingCount = await prisma.meeting.count({
+    where: {
+      userId,
+      finalRecording: {
+        isNot: null,
+      },
+    },
+  });
+
+  return recordingCount;
+}
+
+export interface RecordingLimitCheckResult {
+  allowed: boolean;
+  recordingsUsed: number;
+  recordingsLimit: number;
+  remainingRecordings: number;
+}
+
+export async function checkRecordingLimit(userId: string): Promise<RecordingLimitCheckResult> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { tier: true },
+  });
+
+  if (!user) {
+    return {
+      allowed: false,
+      recordingsUsed: 0,
+      recordingsLimit: 0,
+      remainingRecordings: 0,
+    };
+  }
+
+  const tier = user.tier || 'FREE';
+  const limit = RECORDING_LIMITS[tier];
+  const recordingsUsed = await getRecordingCount(userId);
+
+  // -1 means unlimited (ENTERPRISE)
+  const remainingRecordings = limit === -1 ? -1 : limit - recordingsUsed;
+  const allowed = limit === -1 || recordingsUsed < limit;
+
+  return {
+    allowed,
+    recordingsUsed,
+    recordingsLimit: limit === -1 ? -1 : limit,
+    remainingRecordings,
+  };
+}
+
 export function sanitizePathSegment(value: unknown) {
   const text = String(value || "").trim();
   if (!text) {
