@@ -14,11 +14,13 @@ import { MeetingChatSidebar } from "../components/LiveMeeting/MeetingChatSidebar
 import { MeetingControls } from "../components/LiveMeeting/MeetingControls";
 import { MeetingInfo } from "../components/LiveMeeting/MeetingInfo";
 import { RecordingIndicator } from "../components/LiveMeeting/RecordingIndicator";
+import { RecordingLimitIndicator } from "../components/LiveMeeting/RecordingLimitIndicator";
 import { MeetingStage } from "../components/LiveMeeting/MeetingStage";
 import { ParticipantsSidebar } from "../components/LiveMeeting/ParticipantsSidebar";
 import { useMeetingRealtime } from "../hooks/useMeetingRealtime";
 import { useMeetingRecording } from "../hooks/useMeetingRecording";
 import { useMeetingRoom } from "../hooks/useMeetingRoom";
+import { useRecordingLimit } from "../hooks/useRecordingLimit";
 import { http } from "../https";
 import { getParticipantMediaState } from "../lib/participantMediaState";
 import { getHttpErrorMessage } from "../lib/httpError";
@@ -112,6 +114,12 @@ export function LiveMeetingPage() {
     setIsRecording,
     selectedMicId,
   });
+
+  const {
+    data: recordingLimitData,
+    isLoading: recordingLimitLoading,
+    isError: recordingLimitError,
+  } = useRecordingLimit();
 
   const {
     chatMessages,
@@ -637,6 +645,16 @@ export function LiveMeetingPage() {
 
       <RecordingIndicator isRecording={isRecording} />
 
+      <div className="absolute top-4 right-4 z-30 pointer-events-auto">
+        {isHost && (
+          <RecordingLimitIndicator
+            limit={recordingLimitData}
+            isLoading={recordingLimitLoading}
+            isError={recordingLimitError}
+          />
+        )}
+      </div>
+
       <MeetingInfo
         meetingId={meetingId}
         participantCount={participantList.length}
@@ -672,7 +690,8 @@ export function LiveMeetingPage() {
         isHost={isHost}
         isUploadingChunks={isUploadingChunks}
         isRecordingBusy={isRecordingBusy}
-        canToggleRecording={connectionState === "connected"}
+        canToggleRecording={connectionState === "connected" && (recordingLimitData?.allowed ?? true)}
+        recordingLimitExceeded={recordingLimitData && !recordingLimitData.allowed}
         unreadMessages={unreadCount}
         recordingButtonLabel={recordingButtonLabel}
         onToggleAudio={async () => {
@@ -718,6 +737,17 @@ export function LiveMeetingPage() {
         }}
         onToggleRecording={() => {
           if (!isHost) {
+            return;
+          }
+
+          // Check recording limit before allowing to start
+          if (!isRecording && recordingLimitData && !recordingLimitData.allowed) {
+            toast.error(
+              `Recording limit exceeded. You have ${recordingLimitData.recordingsUsed} of ${recordingLimitData.recordingsLimit} recordings.`,
+              {
+                duration: 5000,
+              }
+            );
             return;
           }
 
