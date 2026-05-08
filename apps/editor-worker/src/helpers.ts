@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { spawn } from "node:child_process";
+import { toPublicRecordingLink as toPublicS3Url } from "./storage";
 
 export const recordingsRoot = path.resolve(process.cwd(), "../../recordings");
 
@@ -10,24 +11,26 @@ export function toLocalRecordingPath(value: string) {
   }
 
   if (value.startsWith("/api/v1/recordings/")) {
-    const relativePath = value.replace("/api/v1/recordings/", "");
-    return path.join(recordingsRoot, relativePath);
+    return value.replace("/api/v1/recordings/", "");
+  }
+
+  if (value.startsWith("http://") || value.startsWith("https://")) {
+    return value;
   }
 
   if (path.isAbsolute(value)) {
     return value;
   }
 
+  if (value.includes("/")) {
+    return value.replace(/\\/g, "/");
+  }
+
   return path.join(recordingsRoot, value);
 }
 
 export function toPublicRecordingLink(localPath: string) {
-  const normalizedRelative = path.relative(recordingsRoot, localPath).split(path.sep).join("/");
-  if (!normalizedRelative || normalizedRelative.startsWith("..")) {
-    return localPath;
-  }
-
-  return `/api/v1/recordings/${normalizedRelative}`;
+  return toPublicS3Url(localPath);
 }
 
 export async function ensureDir(dirPath: string) {
