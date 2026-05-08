@@ -1,7 +1,7 @@
 import express from "express";
 import { authMiddleware } from "../utils/authMiddleware";
 import { prisma } from "@repo/db/client";
-import { canViewFinalRecording, canEditFinalRecording, normalizeEmails, toSingleString, checkRecordingLimit } from "../utils/helpers";
+import { canViewFinalRecording, canEditFinalRecording, normalizeEmails, toSingleString, checkRecordingLimit, normalizeFinalRecordingLink } from "../utils/helpers";
 import { putRecordingVisibilitySchema, removeRecordingVisibilitySchema } from "@repo/types";
 
 const RecordingRouter = express.Router();
@@ -198,6 +198,12 @@ RecordingRouter.get("/page/:id", authMiddleware, async (req, res) => {
         visibleToEmails,
       });
 
+    const normalizedFinalRecording = normalizeFinalRecordingLink(meeting.finalRecording);
+    const canExposeUrls = canViewRecording && meeting.recordingState === "READY";
+    const finalVideoUrl = canExposeUrls ? normalizedFinalRecording?.videoLink ?? null : null;
+
+    const hlsBasePath = canExposeUrls && meeting.roomId ? `${process.env.CDN_BASE_URL || "https://cdn.krishlabs.tech"}/${meeting.roomId}/hls` : null;
+
     let response: any = {
       id: meeting.id,
       meetingId: meeting.roomId,
@@ -211,6 +217,10 @@ RecordingRouter.get("/page/:id", authMiddleware, async (req, res) => {
       visibleToEmails,
       startedAt: meeting.recordingStartedAt,
       endedAt: meeting.recordingStoppedAt,
+      finalVideoUrl,
+      hlsManifestUrl: hlsBasePath ? `${hlsBasePath}/master.m3u8` : null,
+      hlsThumbnailVttUrl: hlsBasePath ? `${hlsBasePath}/thumbnails.vtt` : null,
+      hlsPosterUrl: hlsBasePath ? `${hlsBasePath}/poster.jpg` : null,
       participants: meeting.participants.map((p) => ({
         email: p.user.email?.toLowerCase() || null,
         role: p.role,

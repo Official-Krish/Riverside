@@ -1,8 +1,7 @@
 import path from "path";
-import fs from "fs/promises";
 import { prisma } from "@repo/db/client";
 import { sanitizePathSegment, getFileExtension } from "./helpers";
-import { recordingsRoot } from "./helpers";
+import { keyToCdnUrl, putObjectToS3 } from "./storage";
 
 interface UploadChunkParams {
   fileBuffer: Buffer;
@@ -18,6 +17,7 @@ interface UploadChunkParams {
 
 export async function uploadChunk({
   fileBuffer,
+  fileMimeType,
   meetingId: roomId,
   userId,
   rawParticipantId,
@@ -45,7 +45,7 @@ export async function uploadChunk({
     startedAt,
   });
 
-  await writeChunkToDisk(outputPath, fileBuffer);
+  await writetoS3(outputPath, fileBuffer, fileMimeType || mimeType);
 
   await prisma.mediaChunk.upsert({
     where: {
@@ -74,7 +74,7 @@ export async function uploadChunk({
     },
   });
 
-  return outputPath;
+  return keyToCdnUrl(outputPath);
 }
 
 function buildChunkOutputPath({
@@ -101,6 +101,7 @@ function buildChunkOutputPath({
       : timestamp;
 
   const relativeChunkPath = path.join(
+    "weave-recordings",
     roomId,
     "raw",
     "users",
@@ -108,12 +109,16 @@ function buildChunkOutputPath({
     `chunk-${chunkSuffix}.${extension}`
   );
 
-  return path.join(recordingsRoot, relativeChunkPath);
+  return relativeChunkPath.split(path.sep).join("/");
 }
 
-async function writeChunkToDisk(outputPath: string, buffer: Buffer) {
-  await fs.mkdir(path.dirname(outputPath), { recursive: true });
-  await fs.writeFile(outputPath, buffer);
+
+async function writetoS3(outputPath: string, buffer: Buffer, contentType: string) {
+  await putObjectToS3({
+    key: outputPath,
+    body: buffer,
+    contentType: contentType || "video/webm",
+  });
 }
 
 async function resolveMeetingForUploader(roomId: string, userId: string) {

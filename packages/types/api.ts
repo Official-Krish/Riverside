@@ -109,6 +109,10 @@ export type RecordingPageResponse = {
   visibleToEmails: string[];
   startedAt?: string | null;
   endedAt?: string | null;
+  finalVideoUrl?: string | null;
+  hlsManifestUrl?: string | null;
+  hlsThumbnailVttUrl?: string | null;
+  hlsPosterUrl?: string | null;
   participants: {
     email?: string | null;
     role: string;

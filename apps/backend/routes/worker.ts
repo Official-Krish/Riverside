@@ -27,7 +27,7 @@ workerRouter.post("/upload-chunk", authMiddleware, rateLimiter({ windowSeconds: 
   const durationMs = req.body.durationMs ? Number(req.body.durationMs) : null;
  
   try {
-    const outputPath = await uploadChunk({
+    await uploadChunk({
       fileBuffer: req.file.buffer,
       fileMimeType: req.file.mimetype,
       meetingId: String(req.body.meetingId),
@@ -39,7 +39,7 @@ workerRouter.post("/upload-chunk", authMiddleware, rateLimiter({ windowSeconds: 
       mimeType,
     });
  
-    res.status(200).json({ message: "Chunk uploaded successfully", path: outputPath });
+    res.status(200).json({ message: "Chunk uploaded successfully"});
   } catch (error: any) {
     if (error?.statusCode === 400) {
       res.status(400).json({ message: error.message });

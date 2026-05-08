@@ -6,7 +6,8 @@
   "devDependencies": {
     "@types/bun": "latest",
     "@repo/db": "workspace:*",
-    "@repo/types": "workspace:*"
+    "@repo/types": "workspace:*",
+    "@repo/amazons3": "workspace:*"
   },
   "peerDependencies": {
     "typescript": "^5"
