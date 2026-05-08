@@ -15,6 +15,14 @@ import {
 } from "./utils";
 import axios from "axios";
 import jwt from "jsonwebtoken";
+import {
+  deletePrefixFromS3,
+  getObjectBytesFromS3,
+  normalizeS3Key,
+  putObjectToS3,
+  resolveStorageContext,
+  tryExtractS3Key,
+} from "@repo/amazons3";
 
 type TranscodePayload = {
   meetingId: string;
@@ -25,6 +33,7 @@ const QUEUE_NAME = "TranscodeVideo";
 const recordingsRoot = path.resolve(process.cwd(), "../../recordings");
 const ffmpegBin = process.env.FFMPEG_PATH || ffmpegStatic || "ffmpeg";
 const ffprobeBin = process.env.FFPROBE_PATH || ffprobeStatic.path || "ffprobe";
+const storage = resolveStorageContext();
 
 const redisClient = new Redis({
   host: process.env.REDIS_HOST,
@@ -103,19 +112,74 @@ function readDurationSeconds(videoPath: string): Promise<number> {
   });
 }
 
-function getInputPath(payload: TranscodePayload) {
+function toInputS3Key(payload: TranscodePayload) {
   if (payload.finalPath && payload.finalPath.trim()) {
-    return payload.finalPath;
+    const key = tryExtractS3Key(payload.finalPath);
+    if (key) {
+      return key;
+    }
   }
 
-  return path.join(recordingsRoot, payload.meetingId, "final", "meeting_grid_recording.mp4");
+  return normalizeS3Key(`${payload.meetingId}/final/meeting_grid_recording.mp4`);
+}
+
+async function downloadS3ObjectToFile(key: string, targetPath: string) {
+  const bytes = await getObjectBytesFromS3({
+    s3Client: storage.s3Client,
+    bucketName: storage.bucketName,
+    key,
+  });
+  if (!bytes) {
+    throw new Error(`Empty S3 object body for key: ${key}`);
+  }
+
+  await fs.writeFile(targetPath, bytes);
+}
+
+async function clearS3Prefix(prefix: string) {
+  await deletePrefixFromS3({
+    s3Client: storage.s3Client,
+    bucketName: storage.bucketName,
+    prefix,
+  });
+}
+
+function guessContentType(fileName: string) {
+  if (fileName.endsWith(".m3u8")) return "application/vnd.apple.mpegurl";
+  if (fileName.endsWith(".ts")) return "video/mp2t";
+  if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")) return "image/jpeg";
+  if (fileName.endsWith(".vtt")) return "text/vtt";
+  return "application/octet-stream";
+}
+
+async function uploadDirectoryToS3(localDir: string, prefix: string) {
+  const entries = await fs.readdir(localDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(localDir, entry.name);
+    if (entry.isDirectory()) {
+      await uploadDirectoryToS3(fullPath, `${prefix}${entry.name}/`);
+      continue;
+    }
+
+    const body = await fs.readFile(fullPath);
+    await putObjectToS3({
+      s3Client: storage.s3Client,
+      bucketName: storage.bucketName,
+      key: `${prefix}${entry.name}`,
+      body,
+      contentType: guessContentType(entry.name),
+    });
+  }
 }
 
 async function processMeeting(payload: TranscodePayload) {
-  const inputPath = getInputPath(payload);
+  const inputKey = toInputS3Key(payload);
+  const localWorkDir = path.join(recordingsRoot, "tmp", `transcode_${payload.meetingId}_${Date.now()}`);
+  const inputPath = path.join(localWorkDir, "input.mp4");
   const outputDir = getTranscodeOutputDir(recordingsRoot, payload.meetingId);
 
-  await fs.access(inputPath);
+  await fs.mkdir(localWorkDir, { recursive: true });
+  await downloadS3ObjectToFile(inputKey, inputPath);
   await fs.mkdir(outputDir, { recursive: true });
 
   log(`Transcoding started for ${payload.meetingId}`);
@@ -132,6 +196,15 @@ async function processMeeting(payload: TranscodePayload) {
 
   const vtt = buildThumbnailVtt(duration);
   await fs.writeFile(path.join(outputDir, "thumbnails.vtt"), vtt, "utf8");
+
+  const hlsPrefix = `weave-recordings/${payload.meetingId}/hls/`;
+  await clearS3Prefix(hlsPrefix);
+  await uploadDirectoryToS3(outputDir, hlsPrefix);
+
+  await Promise.allSettled([
+    fs.rm(outputDir, { recursive: true, force: true }),
+    fs.rm(localWorkDir, { recursive: true, force: true }),
+  ]);
 
   log(`Transcoding completed for ${payload.meetingId}`);
 }
@@ -223,7 +296,7 @@ async function workQueue() {
       try {
         await reportWorkerStatus(payload.meetingId, "PROCESSING");
         await processMeeting(payload);
-        const callbackFinalPath = payload.finalPath || getInputPath(payload);
+        const callbackFinalPath = payload.finalPath || toInputS3Key(payload);
         await reportWorkerStatus(payload.meetingId, "READY", callbackFinalPath);
       } catch (error) {
         console.error(`[transcoder] Failed for ${payload.meetingId}:`, error);

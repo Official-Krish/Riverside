@@ -6,6 +6,13 @@ import ffmpegStatic from "ffmpeg-static";
 import ffprobeStatic from "ffprobe-static";
 import jwt from "jsonwebtoken";
 import axios from "axios";
+import {
+    deletePrefixFromS3,
+    getObjectBytesFromS3,
+    listObjectKeysByPrefix,
+    putObjectToS3,
+    resolveStorageContext,
+} from "@repo/amazons3";
 
 const redisClient = new Redis({
     host: process.env.REDIS_HOST || "localhost",
@@ -102,7 +109,8 @@ class LocalVideoMerger {
     private readonly meetingId: string;
     private readonly recordingsRoot: string;
     private readonly tempDir: string;
-    private readonly outputDir: string;
+    private readonly bucketName: string;
+    private readonly s3Client: ReturnType<typeof resolveStorageContext>["s3Client"];
 
     private config = {
         frameRate: 60,
@@ -117,7 +125,9 @@ class LocalVideoMerger {
         this.meetingId = meetingId;
         this.recordingsRoot = path.resolve(process.cwd(), "../../recordings");
         this.tempDir = path.join(this.recordingsRoot, "tmp", `media_merge_${Date.now()}`);
-        this.outputDir = path.join(this.recordingsRoot, this.meetingId, "final");
+        const storage = resolveStorageContext();
+        this.bucketName = storage.bucketName;
+        this.s3Client = storage.s3Client;
         this.ffmpegBin = process.env.FFMPEG_PATH || ffmpegStatic || "ffmpeg";
         this.ffprobeBin = process.env.FFPROBE_PATH || ffprobeStatic.path || "ffprobe";
     }
@@ -128,9 +138,9 @@ class LocalVideoMerger {
 
     private async createDirectories() {
         await fs.mkdir(this.tempDir, { recursive: true });
+        await fs.mkdir(path.join(this.tempDir, "chunks"), { recursive: true });
         await fs.mkdir(path.join(this.tempDir, "videos"), { recursive: true });
         await fs.mkdir(path.join(this.tempDir, "output"), { recursive: true });
-        await fs.mkdir(this.outputDir, { recursive: true });
     }
 
     private async executeFFmpeg(args: string[], timeoutMs: number = 600000, label: string = "FFmpeg"): Promise<void> {
@@ -353,44 +363,59 @@ class LocalVideoMerger {
     }
 
     private async collectUserChunks(): Promise<Map<string, UserChunk[]>> {
-        const startTime = Date.now();
-        
-        const usersRoot = path.join(this.recordingsRoot, this.meetingId, "raw", "users");
-
-        const userDirs = await fs.readdir(usersRoot, { withFileTypes: true }).catch(() => []);
-            if (userDirs.length === 0) {
-            throw new Error(`No local chunks found in ${usersRoot}`);
-        }
-
+        const prefix = `weave-recordings/${this.meetingId}/raw/users/`;
+        const chunkCacheRoot = path.join(this.tempDir, "chunks");
         const userChunks = new Map<string, UserChunk[]>();
-        let totalChunks = 0;
 
-        for (const dirent of userDirs) {
-            if (!dirent.isDirectory()) {
+        const keys = await listObjectKeysByPrefix({
+            s3Client: this.s3Client,
+            bucketName: this.bucketName,
+            prefix,
+            keyFilter: (key) => /chunk-.*\.(webm|mp4|ogg)$/i.test(key),
+        });
+
+        for (const key of keys) {
+            const relativeKey = key.startsWith(prefix) ? key.slice(prefix.length) : key;
+            const pathParts = relativeKey.split("/").filter(Boolean);
+            if (pathParts.length < 2) {
                 continue;
             }
 
-            const userId = dirent.name;
-            const userDirPath = path.join(usersRoot, userId);
-            const files = await fs.readdir(userDirPath).catch(() => []);
+            const userId = pathParts[0]!;
+            const fileName = pathParts[pathParts.length - 1]!;
+            const userLocalDir = path.join(chunkCacheRoot, userId);
+            await fs.mkdir(userLocalDir, { recursive: true });
 
-            const chunks = files
-                .filter((file) => /chunk-.*\.(webm|mp4|ogg)$/i.test(file))
-                .map((file) => ({
-                    userId,
-                    localPath: path.join(userDirPath, file),
-                    timestamp: parseChunkTimestamp(file) ?? Date.now(),
-                }))
-                .sort((a, b) => a.timestamp - b.timestamp); // Sort by timestamp
-
-            if (chunks.length > 0) {
-                userChunks.set(userId, chunks);
-                totalChunks += chunks.length;
+            const localPath = path.join(userLocalDir, fileName);
+            const bytes = await getObjectBytesFromS3({
+                s3Client: this.s3Client,
+                bucketName: this.bucketName,
+                key,
+            });
+            if (!bytes) {
+                continue;
             }
+
+            await fs.writeFile(localPath, bytes);
+
+            const item: UserChunk = {
+                userId,
+                localPath,
+                timestamp: parseChunkTimestamp(fileName) ?? Date.now(),
+            };
+
+            const existing = userChunks.get(userId) || [];
+            existing.push(item);
+            userChunks.set(userId, existing);
         }
 
         if (userChunks.size === 0) {
-            throw new Error("No valid chunk files found for any user");
+            throw new Error(`No chunk objects found in s3://${this.bucketName}/${prefix}`);
+        }
+
+        for (const [userId, chunks] of userChunks.entries()) {
+            chunks.sort((a, b) => a.timestamp - b.timestamp);
+            userChunks.set(userId, chunks);
         }
 
         return userChunks;
@@ -720,31 +745,36 @@ class LocalVideoMerger {
         this.config.frameRate.toString(),
         outputPath,
         ], 900000, `${label}:xstack`);
-
-        const elapsed = Date.now() - startTime;
         return outputPath;
     }
 
     private async persistFinal(gridVideoPath: string): Promise<string> {
-        const startTime = Date.now();
-        const label = `persistFinal[${path.basename(gridVideoPath)}]`;
-        
-        const finalPath = path.join(this.outputDir, "meeting_grid_recording.mp4");
-        
-        await fs.copyFile(gridVideoPath, finalPath);
-        
-        const elapsed = Date.now() - startTime;
+        const finalKey = `weave-recordings/${this.meetingId}/final/meeting_grid_recording.mp4`;
+        const body = await fs.readFile(gridVideoPath);
 
-        // GCP upload flow retained for future use (intentionally commented, not removed).
-        // import { Storage } from "@google-cloud/storage";
-        // const storage = new Storage({ keyFilename: "./gcp-key.json" });
-        // const bucket = storage.bucket(process.env.BUCKET_NAME!);
-        // await bucket.upload(gridVideoPath, {
-        //   destination: `weave/${this.meetingId}/processed/video/meeting_grid_recording.mp4`,
-        //   metadata: { contentType: "video/mp4" },
-        // });
+        await putObjectToS3({
+            s3Client: this.s3Client,
+            bucketName: this.bucketName,
+            key: finalKey,
+            body,
+            contentType: "video/mp4",
+        });
 
-        return finalPath;
+        return finalKey;
+    }
+
+    private async cleanupSourceChunksFromS3(): Promise<void> {
+        const prefix = `weave-recordings/${this.meetingId}/raw/users/`;
+        await deletePrefixFromS3({
+            s3Client: this.s3Client,
+            bucketName: this.bucketName,
+            prefix,
+        });
+    }
+
+    private async cleanupLegacyLocalChunks(): Promise<void> {
+        const rawDir = path.join(this.recordingsRoot, this.meetingId, "raw");
+        await fs.rm(rawDir, { recursive: true, force: true }).catch(() => undefined);
     }
 
     private async cleanup(): Promise<void> {
@@ -909,6 +939,9 @@ class LocalVideoMerger {
             const finalPath = await this.persistFinal(gridVideo);
             phaseDuration = Date.now() - phaseStart;
 
+            await this.cleanupSourceChunksFromS3();
+            await this.cleanupLegacyLocalChunks();
+
             await this.cleanupLegacyRecordingsTmp();
 
             const totalDuration = Date.now() - totalStartTime;
@@ -952,14 +985,8 @@ async function processQueue() {
 
     while (true) {
         let meetingId: string | null = null;
-        const queueStart = Date.now();
         try {
-            const result = await Promise.race([
-                redisClient.blpop("ProcessVideo", 0),
-                new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error("Redis timeout")), 35000)
-                ) as Promise<[string, string]>
-            ]) as [string, string];
+            const result = await redisClient.blpop("ProcessVideo", 35);
             
             if (!result) {
                 console.log(`[${new Date().toISOString()}] No result from queue`);
@@ -975,6 +1002,7 @@ async function processQueue() {
             }
 
             try {
+                console.log(`[${new Date().toISOString()}] Starting merge for meeting ${meetingId}...`);
                 await reportWorkerStatus(meetingId, "PROCESSING");
             } catch (error) {
                 console.error(`[${new Date().toISOString()}] Failed to report PROCESSING status:`, error);
@@ -987,14 +1015,6 @@ async function processQueue() {
                 
                 // Queue for transcoding
                 await redisClient.rpush("TranscodeVideo", JSON.stringify({ meetingId, finalPath }));
-                
-                // Report successful completion
-                try {
-                    await reportWorkerStatus(meetingId, "READY", finalPath);
-                } catch (error) {
-                    console.error(`[${new Date().toISOString()}] Failed to report READY status:`, error);
-                    // Still consider it success since merge completed
-                }
             } catch (error) {
                 console.error(`[${new Date().toISOString()}] Merge failed for ${meetingId}:`, error);
                 try {
