@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { persistAuth } from "../../lib/auth";
+import { persistAuth, setStoredName } from "../../lib/auth";
 import { getHttpErrorMessage } from "../../lib/httpError";
 import { useNavigate } from "react-router-dom";
 import type { LoginResponse, SignupResponse } from "@repo/types/api";
@@ -45,7 +45,7 @@ export function useSignup(setErrorMessage: (msg: string | null) => void) {
     },
     //@ts-ignore
     onSuccess: (data, variables) => {
-      // Don't set auth yet - user needs to verify email first
+      setStoredName(variables.name);
       navigate(`/verify-pending?email=${encodeURIComponent(variables.email)}`);
     },
     onError: (error) => {
