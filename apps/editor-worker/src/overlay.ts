@@ -12,7 +12,9 @@ export function buildOverlayFilter(overlays: any[], timelineOffsetMs = 0, stageW
 
   const filters = sortedOverlays
     .map((o) => {
-      const text = sanitizeDrawtext(o.content?.text ?? "");
+      let text = sanitizeDrawtext(o.content?.text ?? "");
+      // Ensure literal newlines are represented as escaped \n for ffmpeg drawtext
+      text = text.replace(/\r?\n/g, "\\n");
       if (!text) return null;
 
       const style = o.style ?? {};
@@ -54,11 +56,28 @@ export function buildOverlayFilter(overlays: any[], timelineOffsetMs = 0, stageW
       }
 
       if (style.textShadow) {
-        styleParts.push(`shadowx=2`, `shadowy=2`, `shadowcolor=0x000000aa`);
+        const sx = Number(style.textShadow.x ?? 2);
+        const sy = Number(style.textShadow.y ?? 2);
+        const sColor = normalizeHexColor(style.textShadow.color, "000000");
+        const sAlpha = Number(style.textShadow.opacity ?? 0.66);
+        styleParts.push(`shadowx=${sx}`, `shadowy=${sy}`, `shadowcolor=0x${sColor}${Math.round(Math.max(0, Math.min(1, sAlpha)) * 255).toString(16).padStart(2, '0')}`);
       }
+
+      // Stroke / outline support
+      if (Number.isFinite(style.strokeWidth) && style.strokeWidth > 0) {
+        const sw = Number(style.strokeWidth || 0);
+        const sc = normalizeHexColor(style.strokeColor, "000000");
+        styleParts.push(`borderw=${sw}`, `bordercolor=0x${sc}`);
+      }
+
 
       if (alphaExpr) {
         styleParts.push(`alpha='${alphaExpr}'`);
+      }
+
+      // Enable text alignment by horizontal position expressions for drawtext
+      if (style.textAlign === "center") {
+        // already using center expression above
       }
 
       return `drawtext=text='${text}':${styleParts.join(":")}`;

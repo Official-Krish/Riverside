@@ -55,10 +55,25 @@ export interface OverlayStyle {
   fontWeight?: "normal" | "bold";
   fontStyle?: "normal" | "italic";
   textAlign?: "left" | "center" | "right";
-  textShadow?: boolean;
+  textShadow?:
+    | boolean
+    | {
+        color?: string;
+        blur?: number;
+        x?: number;
+        y?: number;
+        opacity?: number;
+      };
   backgroundColor?: string;
   backgroundOpacity?: number;
+  backgroundRadius?: number;
   letterSpacing?: number;
+  lineHeight?: number;
+  underline?: boolean;
+  strikeThrough?: boolean;
+  strokeWidth?: number;
+  strokeColor?: string;
+  maxWidth?: number;
 }
 
 export interface Overlay {
