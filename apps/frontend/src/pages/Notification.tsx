@@ -27,7 +27,7 @@ export default function NotificationsPage() {
     declineRecording,
     activeFilter,
     setActiveFilter,
-  } = useNotifications(isAuthenticated, name || "User", navigate);
+  } = useNotifications(isAuthenticated, name?.trim() || undefined, navigate);
 
   const filtered = notifications.filter((n) => {
     if (activeFilter === "All") return true;

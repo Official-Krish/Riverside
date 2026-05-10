@@ -30,18 +30,19 @@ export function RecordingsPage({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const pageSize = 4;
-  // Paginate meetings
-  const readyRecordings = meetings.filter((meeting) => {return meeting.recordingState === "READY" && meeting.finalRecording !== null});
-  const paginatedMeetings = readyRecordings.slice((page - 1) * pageSize, page * pageSize);
-  const totalPages = Math.ceil(readyRecordings.length / pageSize);
-
-  const processingRecordings = paginatedMeetings.filter(
+  const recordingItems = meetings.filter(
+    (meeting) => meeting.recordingStartedAt !== null || meeting.recordingState !== "IDLE"
+  );
+  const readyRecordings = recordingItems.filter((meeting) => meeting.recordingState === "READY");
+  const processingRecordings = recordingItems.filter(
     (meeting) =>
       meeting.recordingState === "PROCESSING" ||
       meeting.recordingState === "UPLOADING" ||
       meeting.recordingState === "RECORDING"
   );
-  const failedRecordings = paginatedMeetings.filter((meeting) => meeting.recordingState === "FAILED");
+  const failedRecordings = recordingItems.filter((meeting) => meeting.recordingState === "FAILED");
+  const paginatedMeetings = recordingItems.slice((page - 1) * pageSize, page * pageSize);
+  const totalPages = Math.ceil(recordingItems.length / pageSize);
 
   const deleteMutation = useMutation({
     mutationFn: async (roomId: string) => {
@@ -105,16 +106,16 @@ export function RecordingsPage({
             {getHttpErrorMessage(error, "Could not load recordings.")}
           </p>
         </div>
-      ) : (meetings.length === 0 || readyRecordings.length === 0) ? (
+      ) : recordingItems.length === 0 ? (
         <div className="rounded-2xl border border-[#f5a623]/10 bg-black/18 px-5 py-6 text-sm text-[#a89880]">
           No recordings found yet. End a recorded meeting and it will appear here.
         </div>
       ) : (
         <div className="space-y-6">
           {[
-            { title: "Ready to export", items: readyRecordings, tone: "ready" },
-            { title: "Still processing", items: processingRecordings, tone: "processing" },
-            { title: "Attention needed", items: failedRecordings, tone: "failed" },
+            { title: "Ready to export", items: paginatedMeetings.filter((meeting) => meeting.recordingState === "READY"), tone: "ready" },
+            { title: "Still processing", items: paginatedMeetings.filter((meeting) => meeting.recordingState === "PROCESSING" || meeting.recordingState === "UPLOADING" || meeting.recordingState === "RECORDING"), tone: "processing" },
+            { title: "Attention needed", items: paginatedMeetings.filter((meeting) => meeting.recordingState === "FAILED"), tone: "failed" },
           ]
             .filter((group) => group.items.length > 0)
             .map((group) => (

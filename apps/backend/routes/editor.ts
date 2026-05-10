@@ -1,12 +1,12 @@
 import express from "express";
 import multer from "multer";
-import * as fs from "node:fs/promises";
-import * as path from "node:path";
 import { authMiddleware } from "../utils/authMiddleware";
 import { prisma } from "@repo/db/client";
 import { CreateEditorProjectSchema, SaveEditorProjectSchema } from "@repo/types";
 import { redisPublisher } from "../utils/redis";
-import { canViewFinalRecording, recordingsRoot, toPublicRecordingLink } from "../utils/helpers";
+import { canViewFinalRecording, toPublicRecordingLink } from "../utils/helpers";
+import { buildS3Key } from "@repo/amazons3";
+import { putObjectToS3 } from "../utils/storage";
 import { EDITOR_RENDER_QUEUE, writeProjectSnapshot } from "../utils/editor.helpers";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 500 * 1024 * 1024 } }); // 500 MB
@@ -387,13 +387,16 @@ editorRouter.post("/projects/:id/assets/upload", authMiddleware, upload.single("
             return res.status(404).json({ message: "Project not found" });
         }
 
-        // Save file to recordings/<roomId>/editor-assets/<uuid>.<ext>
-        const ext = path.extname(file.originalname || ".mp4") || ".mp4";
+        // Save asset to S3: <roomId>/editor-assets/<uuid>.<ext>
+        const extMatch = (file.originalname || "").match(/\.([a-zA-Z0-9]+)$/);
+        const ext = extMatch ? `.${extMatch[1]}` : ".mp4";
         const fileId = crypto.randomUUID();
-        const assetDir = path.join(recordingsRoot, project.meeting.roomId, "editor-assets");
-        await fs.mkdir(assetDir, { recursive: true });
-        const filePath = path.join(assetDir, `${fileId}${ext}`);
-        await fs.writeFile(filePath, file.buffer);
+        const objectKey = buildS3Key(project.meeting.roomId, "editor-assets", `${fileId}${ext}`);
+        await putObjectToS3({
+            key: objectKey,
+            body: file.buffer,
+            contentType: file.mimetype || undefined,
+        });
 
         const explicitAssetType = typeof req.body?.assetType === "string" ? String(req.body.assetType).toUpperCase() : null;
         const isAudio = file.mimetype?.startsWith("audio/");
@@ -411,7 +414,7 @@ editorRouter.post("/projects/:id/assets/upload", authMiddleware, upload.single("
                 projectId,
                 meetingId: project.meetingId,
                 assetType,
-                url: filePath,
+                url: objectKey,
                 durationMs,
             },
         });

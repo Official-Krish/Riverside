@@ -28,6 +28,7 @@ type MeetingControlsProps = {
   isUploadingChunks: boolean;
   isRecordingBusy: boolean;
   canToggleRecording: boolean;
+  recordingLimitExceeded?: boolean;
   unreadMessages: number;
   recordingButtonLabel: string;
   onToggleAudio: () => void;
@@ -161,6 +162,7 @@ export function MeetingControls({
   isUploadingChunks,
   isRecordingBusy,
   canToggleRecording,
+  recordingLimitExceeded,
   unreadMessages,
   recordingButtonLabel,
   onToggleAudio,
@@ -332,9 +334,11 @@ export function MeetingControls({
                 hint={
                   recordingActive
                     ? "Stop the current recording"
-                    : canToggleRecording
-                      ? "Start recording this meeting"
-                      : "Recording unavailable right now"
+                    : recordingLimitExceeded
+                      ? "Recording limit exceeded"
+                      : canToggleRecording
+                        ? "Start recording this meeting"
+                        : "Recording unavailable right now"
                 }
                 onClick={onToggleRecording}
                 active={recordingActive}

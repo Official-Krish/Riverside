@@ -100,6 +100,11 @@ export type RecordingStatusResponse = {
   processingStartedAt?: string | null;
   processingEndedAt?: string | null;
   isEnded: boolean;
+  recordingLimit?: {
+    recordingsUsed: number;
+    recordingsLimit: number;
+    remainingRecordings: number;
+  };
 };
 
 export type RecordingPageParticipant = {
@@ -119,10 +124,26 @@ export type RecordingPageResponse = {
   visibleToEmails: string[];
   startedAt?: string | null;
   endedAt?: string | null;
+  finalVideoUrl?: string | null;
+  hlsManifestUrl?: string | null;
+  hlsThumbnailVttUrl?: string | null;
+  hlsPosterUrl?: string | null;
   participants: {
     email?: string | null;
     role: string;
   }[];
+  recordingLimit?: {
+    recordingsUsed: number;
+    recordingsLimit: number;
+    remainingRecordings: number;
+  };
+};
+
+export type RecordingLimitCheckResponse = {
+  recordingsUsed: number;
+  recordingsLimit: number;
+  remainingRecordings: number;
+  allowed: boolean;
 };
 
 export type MeetingDetails = {

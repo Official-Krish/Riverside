@@ -84,12 +84,9 @@ export function FinalRecordingPage() {
     setEmailInput("");
   };
 
-  const hlsManifestUrl = meeting?.meetingId
-    ? `/api/v1/recordings/${meeting.meetingId}/hls/master.m3u8` : "";
-  const thumbnailVttUrl = meeting?.meetingId
-    ? `/api/v1/recordings/${meeting.meetingId}/hls/thumbnails.vtt` : "";
-  const posterUrl = meeting?.meetingId
-    ? `/api/v1/recordings/${meeting.meetingId}/hls/poster.jpg` : "";
+  const hlsManifestUrl = meeting?.hlsManifestUrl || "";
+  const thumbnailVttUrl = meeting?.hlsThumbnailVttUrl || "";
+  const posterUrl = meeting?.hlsPosterUrl || "";
 
   const canRenderPlayer = Boolean(
     meeting?.canViewRecording && meeting?.recordingState === "READY"

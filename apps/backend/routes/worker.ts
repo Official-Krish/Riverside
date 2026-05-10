@@ -1,6 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { authMiddleware, serviceAuthMiddleware } from "../utils/authMiddleware";
+import rateLimiter from "../utils/rateLimiter";
 import { workerRecordingStatusSchema } from "@repo/types";
 import { handleFailedStatus, handleProcessingStatus, handleReadyStatus } from "../utils/Notification.helper";
 import { uploadChunk } from "../utils/uploadChunk.service";
@@ -8,7 +9,7 @@ import { uploadChunk } from "../utils/uploadChunk.service";
 const workerRouter = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-workerRouter.post("/upload-chunk", authMiddleware, upload.single("video"), async (req, res) => {
+workerRouter.post("/upload-chunk", authMiddleware, rateLimiter({ windowSeconds: 60, maxRequests: 600, prefix: "upload", keyGenerator: (req) => (req.userId ? `user:${req.userId}` : undefined) }), upload.single("video"), async (req, res) => {
   if (!req.file || !req.body.meetingId) {
     res.status(400).json({ message: "Missing file or meetingId" });
     return;
@@ -31,7 +32,7 @@ workerRouter.post("/upload-chunk", authMiddleware, upload.single("video"), async
   const encryptionTagBits = req.body.encryptionTagBits ? Number(req.body.encryptionTagBits) : null;
  
   try {
-    const outputPath = await uploadChunk({
+    await uploadChunk({
       fileBuffer: req.file.buffer,
       fileMimeType: req.file.mimetype,
       meetingId: String(req.body.meetingId),
@@ -48,7 +49,7 @@ workerRouter.post("/upload-chunk", authMiddleware, upload.single("video"), async
       encryptionTagBits,
     });
  
-    res.status(200).json({ message: "Chunk uploaded successfully", path: outputPath });
+    res.status(200).json({ message: "Chunk uploaded successfully"});
   } catch (error: any) {
     if (error?.statusCode === 400) {
       res.status(400).json({ message: error.message });

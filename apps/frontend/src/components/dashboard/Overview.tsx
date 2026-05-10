@@ -87,8 +87,8 @@ export function Overview({
                   {new Date(getMeetingDate(meeting)).toLocaleDateString()} · {getMeetingParticipantCount(meeting)} tracks
                 </p>
               </div>
-              <span className="shrink-0 text-[11px] text-[#b49650]/50">
-                {Math.round(Math.random() * 1200 + 200)} MB
+              <span className="shrink-0 rounded-full border border-green-500/20 bg-green-500/10 px-2.5 py-1 text-[10px] font-bold text-green-300/90">
+                Ready
               </span>
             </div>
           ))}

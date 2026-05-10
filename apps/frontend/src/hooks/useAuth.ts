@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { clearStoredAuth, getStoredName, getStoredToken } from "../lib/auth";
+import { http } from "../https";
+import { clearStoredAuth, getStoredName, getStoredToken, setStoredName } from "../lib/auth";
+import type { UserProfileResponse } from "@repo/types/api";
 
 export function useAuth() {
   const [token, setToken] = useState<string | null>(() => {
@@ -31,6 +33,34 @@ export function useAuth() {
       window.removeEventListener("storage", syncAuth);
     };
   }, []);
+
+  useEffect(() => {
+    if (!token || name) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const restoreName = async () => {
+      try {
+        const response = await http.get<UserProfileResponse>("/user/me");
+        const restoredName = response.data.user.name?.trim();
+
+        if (!cancelled && restoredName) {
+          setStoredName(restoredName);
+          setName(restoredName);
+        }
+      } catch {
+        // If the token is invalid, the HTTP interceptor will clear auth.
+      }
+    };
+
+    void restoreName();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [name, token]);
 
   return {
     token,

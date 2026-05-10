@@ -4,8 +4,7 @@ import { CalendarDays, Clock3, Users, Video, Download, Pencil } from "lucide-rea
 import { Link } from "react-router-dom"
 
 export const RecordingDetail = ({ meeting }: { meeting: RecordingPageResponse;}) => {
-    const downloadableMp4Url = meeting?.meetingId
-    ? `/api/v1/recordings/${meeting.meetingId}/final/meeting_grid_recording.mp4` : "";
+    const downloadableMp4Url = meeting?.finalVideoUrl || "";
 
     const startedAt = meeting.startedAt ? new Date(meeting.startedAt) : null;
     const endedAt = meeting.endedAt ? new Date(meeting.endedAt) : null;

@@ -11,6 +11,7 @@ import { buildClipRenderArgs } from "./transitions";
 import { buildOverlayFilter } from "./overlay";
 import { buildAudioMixArgs, buildConcatArgs } from "./audio";
 import { promoteRenderedVideo, refreshMeetingRecordingArtifacts } from "./artifacts";
+import { downloadSourceToLocal } from "./storage";
 
 function buildOverlayBurnInArgs(inputPath: string, overlays: any[], outputPath: string, width: number, height: number): string[] {
   const overlay = buildOverlayFilter(overlays, 0, width, height);
@@ -55,18 +56,40 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
 
   if (!videoClips.length) throw new Error("No video clips found in project");
 
-  const sourcePaths = new Set(videoClips.map((clip) => clip.sourcePath));
-  await Promise.all([...sourcePaths].map((sourcePath) => verifySourceExists(sourcePath)));
-
   const exportDir = path.join(recordingsRoot, roomId, "editor", "projects", projectId, "exports");
   await ensureDir(exportDir);
+  const sourceCacheDir = path.join(recordingsRoot, roomId, "editor", "projects", projectId, "sources");
+
+  const sourcePaths = new Set([
+    ...videoClips.map((clip) => clip.sourcePath),
+    ...audioClips.map((clip) => clip.sourcePath),
+  ]);
+
+  const sourceMap = new Map<string, string>();
+  await Promise.all(
+    [...sourcePaths].map(async (sourcePath) => {
+      const resolved = await downloadSourceToLocal(sourcePath, sourceCacheDir);
+      sourceMap.set(sourcePath, resolved);
+      await verifySourceExists(resolved);
+    })
+  );
+
+  const resolvedVideoClips = videoClips.map((clip) => ({
+    ...clip,
+    sourcePath: sourceMap.get(clip.sourcePath) || clip.sourcePath,
+  }));
+
+  const resolvedAudioClips = audioClips.map((clip) => ({
+    ...clip,
+    sourcePath: sourceMap.get(clip.sourcePath) || clip.sourcePath,
+  }));
 
   const outputPath = path.join(exportDir, `${jobId}.mp4`);
   const videoOnlyPath = outputPath.replace(/\.mp4$/, "_video.mp4");
   const overlayedPath = outputPath.replace(/\.mp4$/, "_overlay.mp4");
   const previewPath = outputPath.replace(/\.mp4$/, "_preview.mp4");
 
-  const firstClip = videoClips[0]!;
+  const firstClip = resolvedVideoClips[0]!;
 
   // ── Preview (low-res, ultrafast) ──────────────────────────────────────────
   log("debug", "Generating preview", { jobId });
@@ -90,21 +113,21 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
   let concatListPath: string | null = null;
 
   try {
-    if (videoClips.length === 1) {
-      const c = videoClips[0]!;
+    if (resolvedVideoClips.length === 1) {
+      const c = resolvedVideoClips[0]!;
       await runBinary(CONFIG.FFMPEG_BIN, buildClipRenderArgs(c, videoOnlyPath, width, height, fps));
       await updateProgress(jobId, 75);
     } else {
       // ── Multi-clip: encode parts then concat ────────────────────────────
-      for (let i = 0; i < videoClips.length; i++) {
-        const c = videoClips[i]!;
+      for (let i = 0; i < resolvedVideoClips.length; i++) {
+        const c = resolvedVideoClips[i]!;
         const partPath = path.join(exportDir, `${jobId}_part${i}.mp4`);
 
-        log("debug", `Encoding part ${i + 1}/${videoClips.length}`, { jobId });
+        log("debug", `Encoding part ${i + 1}/${resolvedVideoClips.length}`, { jobId });
         await runBinary(CONFIG.FFMPEG_BIN, buildClipRenderArgs(c, partPath, width, height, fps));
 
         tempFiles.push(partPath);
-        await updateProgress(jobId, 10 + Math.round(((i + 1) / videoClips.length) * 70));
+        await updateProgress(jobId, 10 + Math.round(((i + 1) / resolvedVideoClips.length) * 70));
       }
 
       const { args, listPath } = await buildConcatArgs(tempFiles, videoOnlyPath);
@@ -124,9 +147,9 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
       await updateProgress(jobId, 93);
     }
 
-    if (audioClips.length > 0) {
-      log("debug", "Mixing external audio tracks", { jobId, audioClips: audioClips.length });
-      const mixArgs = buildAudioMixArgs(overlayedPath, audioClips, outputPath);
+    if (resolvedAudioClips.length > 0) {
+      log("debug", "Mixing external audio tracks", { jobId, audioClips: resolvedAudioClips.length });
+      const mixArgs = buildAudioMixArgs(overlayedPath, resolvedAudioClips, outputPath);
       await runBinary(CONFIG.FFMPEG_BIN, mixArgs);
       await updateProgress(jobId, 98);
       // Clean up intermediate files (will be skipped in finally block)

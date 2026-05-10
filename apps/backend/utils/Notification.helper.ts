@@ -46,11 +46,11 @@ export async function handleReadyStatus(meetingIdentifier: string, finalPath: st
       where: { meetingId: meeting.id },
       create: {
         meetingId: meeting.id,
-        videoLink: publicFinalPath,
+        videoLink: `https://${process.env.CDN_BASE_URL}/weave-recordings/${meeting.roomId}/final/meeting-grid.mp4`,
         visibleToEmails: [],
       },
       update: {
-        videoLink: publicFinalPath,
+        videoLink: `https://${process.env.CDN_BASE_URL}/weave-recordings/${meeting.roomId}/final/meeting-grid.mp4`,
       },
     });
 

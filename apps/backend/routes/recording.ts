@@ -1,7 +1,7 @@
 import express from "express";
 import { authMiddleware } from "../utils/authMiddleware";
 import { prisma } from "@repo/db/client";
-import { canViewFinalRecording, canEditFinalRecording, normalizeEmails, toSingleString } from "../utils/helpers";
+import { canViewFinalRecording, canEditFinalRecording, normalizeEmails, toSingleString, checkRecordingLimit, normalizeFinalRecordingLink } from "../utils/helpers";
 import { putRecordingVisibilitySchema, removeRecordingVisibilitySchema } from "@repo/types";
 
 const RecordingRouter = express.Router();
@@ -198,7 +198,13 @@ RecordingRouter.get("/page/:id", authMiddleware, async (req, res) => {
         visibleToEmails,
       });
 
-    return res.status(200).json({
+    const normalizedFinalRecording = normalizeFinalRecordingLink(meeting.finalRecording);
+    const canExposeUrls = canViewRecording && meeting.recordingState === "READY";
+    const finalVideoUrl = canExposeUrls ? normalizedFinalRecording?.videoLink ?? null : null;
+
+    const hlsBasePath = canExposeUrls && meeting.roomId ? `${process.env.CDN_BASE_URL || "https://cdn.krishlabs.tech"}/${meeting.roomId}/hls` : null;
+
+    let response: any = {
       id: meeting.id,
       meetingId: meeting.roomId,
       roomName: meeting.roomName,
@@ -211,11 +217,30 @@ RecordingRouter.get("/page/:id", authMiddleware, async (req, res) => {
       visibleToEmails,
       startedAt: meeting.recordingStartedAt,
       endedAt: meeting.recordingStoppedAt,
+      finalVideoUrl,
+      hlsManifestUrl: hlsBasePath ? `${hlsBasePath}/master.m3u8` : null,
+      hlsThumbnailVttUrl: hlsBasePath ? `${hlsBasePath}/thumbnails.vtt` : null,
+      hlsPosterUrl: hlsBasePath ? `${hlsBasePath}/poster.jpg` : null,
       participants: meeting.participants.map((p) => ({
         email: p.user.email?.toLowerCase() || null,
         role: p.role,
       })),
-    });
+    };
+
+    // Include rate limit info for the host
+    if (isHost) {
+      const limitCheck = await checkRecordingLimit(userId);
+      response = {
+        ...response,
+        recordingLimit: {
+          recordingsUsed: limitCheck.recordingsUsed,
+          recordingsLimit: limitCheck.recordingsLimit,
+          remainingRecordings: limitCheck.remainingRecordings,
+        },
+      };
+    }
+
+    return res.status(200).json(response);
 
   } catch (error) {
     console.error("Error fetching recording page details:", error);
@@ -262,9 +287,10 @@ RecordingRouter.get("/status/:id", authMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Meeting not found" });
     }
 
-    return res.status(200).json({
+    const isHost = meeting.userId === userId;
+    let response: any = {
       roomId: meeting.roomId,
-      isHost: meeting.userId === userId,
+      isHost,
       isRecording: meeting.recordingState === "RECORDING",
       recordingState: meeting.recordingState,
       recordingStartedAt: meeting.recordingStartedAt,
@@ -272,7 +298,22 @@ RecordingRouter.get("/status/:id", authMiddleware, async (req, res) => {
       processingStartedAt: meeting.processingStartedAt,
       processingEndedAt: meeting.processingEndedAt,
       isEnded: meeting.isEnded,
-    });
+    };
+
+    // Include rate limit info for the host
+    if (isHost) {
+      const limitCheck = await checkRecordingLimit(userId);
+      response = {
+        ...response,
+        recordingLimit: {
+          recordingsUsed: limitCheck.recordingsUsed,
+          recordingsLimit: limitCheck.recordingsLimit,
+          remainingRecordings: limitCheck.remainingRecordings,
+        },
+      };
+    }
+
+    return res.status(200).json(response);
   } catch (error) {
     console.error("Error fetching recording status:", error);
     return res.status(500).json({ message: "Internal server error" });
@@ -304,6 +345,18 @@ RecordingRouter.post("/start/:id", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "Meeting already ended" });
     }
 
+    // Check recording limit
+    const limitCheck = await checkRecordingLimit(userId);
+    if (!limitCheck.allowed) {
+      return res.status(429).json({
+        message: "Recording limit exceeded",
+        code: "RECORDING_LIMIT_EXCEEDED",
+        recordingsUsed: limitCheck.recordingsUsed,
+        recordingsLimit: limitCheck.recordingsLimit,
+        remainingRecordings: limitCheck.remainingRecordings,
+      });
+    }
+
     const recordingStartedAt = new Date();
 
     await prisma.meeting.update({
@@ -322,6 +375,9 @@ RecordingRouter.post("/start/:id", authMiddleware, async (req, res) => {
       isRecording: true,
       recordingState: "RECORDING",
       recordingStartedAt,
+      recordingsUsed: limitCheck.recordingsUsed,
+      recordingsLimit: limitCheck.recordingsLimit,
+      remainingRecordings: limitCheck.remainingRecordings,
     });
   } catch (error) {
     console.error("Error starting recording:", error);
@@ -463,6 +519,28 @@ RecordingRouter.get("/getRaw/:id", authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching raw chunks:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+RecordingRouter.get("/limit/check", authMiddleware, async (req, res) => {
+  const userId = req.userId;
+
+  if (!userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  try {
+    const limitCheck = await checkRecordingLimit(userId);
+
+    return res.status(200).json({
+      recordingsUsed: limitCheck.recordingsUsed,
+      recordingsLimit: limitCheck.recordingsLimit,
+      remainingRecordings: limitCheck.remainingRecordings,
+      allowed: limitCheck.allowed,
+    });
+  } catch (error) {
+    console.error("Error checking recording limit:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 });

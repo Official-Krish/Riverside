@@ -1,11 +1,13 @@
 import { prisma } from "@repo/db/client";
-import path from "node:path";
 import { redisPublisher } from "./redis";
 import { Resend } from "resend";
+import {
+  toPublicRecordingLink,
+} from "./storage";
+
+export { toPublicRecordingLink };
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
-
-export const recordingsRoot = path.resolve(process.cwd(), "../../recordings");
 
 export function toSingleString(value: string | string[] | undefined): string | null {
     if (typeof value === "string") {
@@ -37,7 +39,7 @@ export function generateRandomToken() {
 
 export async function SendVerificationEmail(email: string, token: string) {
   await resend.emails.send({
-    from: "Weave <support@weave.krishdev.xyz>",
+    from: "Weave <support@weave.krishlabs.tech>",
     to: email,
     subject: `Verify Your Weave Account`,
     html: ` <!DOCTYPE html>
@@ -161,19 +163,14 @@ export function normalizeEmails(values: unknown): string[] {
 export function normalizeFinalRecordingLinks<T extends { videoLink: string }>(recordings: T[]): T[] {
     return recordings.map((recording) => {
         const videoLink = recording.videoLink || "";
-
-        if (videoLink.startsWith("/api/v1/recordings/")) {
-            return recording;
-        }
-
-        const normalizedRelative = path.relative(recordingsRoot, videoLink).split(path.sep).join("/");
-        if (!normalizedRelative || normalizedRelative.startsWith("..")) {
+    const normalizedUrl = toPublicRecordingLink(videoLink);
+    if (!normalizedUrl || normalizedUrl === videoLink) {
             return recording;
         }
 
         return {
             ...recording,
-            videoLink: `/api/v1/recordings/${normalizedRelative}`,
+      videoLink: normalizedUrl,
         };
     });
 }
@@ -185,28 +182,73 @@ export function normalizeFinalRecordingLink<T extends { videoLink: string }>(rec
 
     const videoLink = recording.videoLink || "";
 
-    if (videoLink.startsWith("/api/v1/recordings/")) {
-        return recording;
-    }
-
-    const normalizedRelative = path.relative(recordingsRoot, videoLink).split(path.sep).join("/");
-    if (!normalizedRelative || normalizedRelative.startsWith("..")) {
+    const normalizedUrl = toPublicRecordingLink(videoLink);
+    if (!normalizedUrl || normalizedUrl === videoLink) {
         return recording;
     }
 
     return {
         ...recording,
-        videoLink: `/api/v1/recordings/${normalizedRelative}`,
+      videoLink: normalizedUrl,
     };
 }
 
-export function toPublicRecordingLink(localPath: string) {
-  const normalizedRelative = path.relative(recordingsRoot, localPath).split(path.sep).join("/");
-  if (!normalizedRelative || normalizedRelative.startsWith("..")) {
-    return localPath;
+// Rate limiting configuration
+export const RECORDING_LIMITS = {
+  FREE: 3,
+  PRO: 50,
+  ENTERPRISE: -1, // unlimited
+} as const;
+
+export async function getRecordingCount(userId: string): Promise<number> {
+  const recordingCount = await prisma.meeting.count({
+    where: {
+      userId,
+      finalRecording: {
+        isNot: null,
+      },
+    },
+  });
+
+  return recordingCount;
+}
+
+export interface RecordingLimitCheckResult {
+  allowed: boolean;
+  recordingsUsed: number;
+  recordingsLimit: number;
+  remainingRecordings: number;
+}
+
+export async function checkRecordingLimit(userId: string): Promise<RecordingLimitCheckResult> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { tier: true },
+  });
+
+  if (!user) {
+    return {
+      allowed: false,
+      recordingsUsed: 0,
+      recordingsLimit: 0,
+      remainingRecordings: 0,
+    };
   }
 
-  return `/api/v1/recordings/${normalizedRelative}`;
+  const tier = user.tier || 'FREE';
+  const limit = RECORDING_LIMITS[tier];
+  const recordingsUsed = await getRecordingCount(userId);
+
+  // -1 means unlimited (ENTERPRISE)
+  const remainingRecordings = limit === -1 ? -1 : limit - recordingsUsed;
+  const allowed = limit === -1 || recordingsUsed < limit;
+
+  return {
+    allowed,
+    recordingsUsed,
+    recordingsLimit: limit === -1 ? -1 : limit,
+    remainingRecordings,
+  };
 }
 
 export function sanitizePathSegment(value: unknown) {

@@ -1,11 +1,21 @@
-FROM oven/bun:latest
-RUN apt-get update && apt-get install -y ffmpeg bc 
+FROM oven/bun:1 AS builder
 
 WORKDIR /app
-COPY ./apps/merger-worker/package.json .
+
+COPY package.json bun.lock turbo.json ./
+COPY apps/merger-worker/package.json apps/merger-worker/package.json
 
 RUN bun install
 
-COPY apps/merger-worker/ .
+COPY apps/merger-worker /app/apps/merger-worker
 
-CMD ["bun", "run", "index.ts"]
+FROM oven/bun:1 AS runtime
+
+WORKDIR /app/apps/merger-worker
+
+ENV NODE_ENV=production
+
+COPY --from=builder /app/node_modules /app/node_modules
+COPY --from=builder /app/apps/merger-worker /app/apps/merger-worker
+
+CMD ["bun", "index.ts"]

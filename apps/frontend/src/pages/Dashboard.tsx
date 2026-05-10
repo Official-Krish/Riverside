@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { GetAllMeetingsResponse, JoinMeetingResponse } from "@repo/types/api";
 import { toast } from "sonner";
+import { CalendarDays, LayoutDashboard, Sparkles, Video } from "lucide-react";
 import { Meetings } from "../components/dashboard/Meetings";
 import { RecordingsPage } from "../components/dashboard/RecordingsPage";
 import { useAuth } from "../hooks/useAuth";
@@ -16,6 +17,18 @@ import { UpcomingMeetings } from "@/components/dashboard/UpcomingMeetings";
 import { buildMeetingLivePath } from "@/lib/meeting";
 
 type ThemeMode = "light" | "dark";
+type DashboardSection = "overview" | "meetings" | "recordings" | "upcoming";
+
+const sectionOptions: Array<{
+  id: DashboardSection;
+  label: string;
+  icon: typeof LayoutDashboard;
+}> = [
+  { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "meetings", label: "Meetings", icon: Video },
+  { id: "upcoming", label: "Upcoming", icon: CalendarDays },
+  { id: "recordings", label: "Recordings", icon: Sparkles },
+];
 
 function getInitialTheme(): ThemeMode {
   if (typeof window === "undefined") {
@@ -97,7 +110,7 @@ export function Dashboard() {
   const schedules = meetingsQuery?.data?.schedules ?? [];
   const liveMeetings = meetings.filter((meeting) => !meeting.isEnded);
 
-  const setSection = (nextSection: "overview" | "meetings" | "recordings" | "upcoming") => {
+  const setSection = (nextSection: DashboardSection) => {
     const nextParams = new URLSearchParams(searchParams);
 
     if (nextSection === "overview") {
@@ -122,13 +135,37 @@ export function Dashboard() {
         signOut={signOut}
       />
 
-      <main className="flex flex-1 flex-col gap-5 overflow-auto p-6 sm:p-7">
+      <main className="flex flex-1 flex-col gap-5 overflow-auto p-4 sm:p-6 lg:p-7">
         <Topbar
           name={name}
           liveMeetings={liveMeetings}
           meetings={meetings}
           schedules={schedules}
         />
+
+        <div className="lg:hidden">
+          <nav
+            aria-label="Dashboard sections"
+            className="flex gap-2 overflow-x-auto pb-1"
+          >
+            {sectionOptions.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setSection(id)}
+                className={[
+                  "inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition",
+                  section === id
+                    ? "border-[#f5a623]/25 bg-[#f5a623]/12 text-[#f5c86a]"
+                    : "border-white/8 bg-white/4 text-[#fff5de]/68",
+                ].join(" ")}
+              >
+                <Icon className="size-4" />
+                {label}
+              </button>
+            ))}
+          </nav>
+        </div>
 
         <AnimatePresence mode="wait">
           {section === "overview" ? (

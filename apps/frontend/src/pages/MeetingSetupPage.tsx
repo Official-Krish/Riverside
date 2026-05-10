@@ -26,16 +26,16 @@ export function MeetingSetupPage() {
     previewError, errorMessage,
     addInvite, removeInvite,
     createMeetingMutation, joinMeetingMutation,
-    isBusy, submitCreate, submitJoin,
+    isBusy, busyLabel, submitCreate, submitJoin,
   } = useMeetingSetup({ displayNameFallback: name || "", navigate });
 
   return (
-    <div className="flex min-h-[calc(100vh-76px)] items-center justify-center bg-[#0a0908] px-5 py-10">
+    <div className="flex min-h-[calc(100vh-76px)] items-center justify-center bg-[#0a0908] px-4 py-8 sm:px-5 sm:py-10">
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: "easeOut" }}
-        className="grid w-full max-w-215 gap-4 lg:grid-cols-2"
+        className="grid w-full max-w-215 gap-4 xl:grid-cols-[minmax(0,1fr)_440px]"
       >
         {/* Left — form */}
         <div className="flex flex-col gap-5 rounded-3xl border border-[#f5a623]/12 bg-[#0f0d0a] p-7">
@@ -139,6 +139,12 @@ export function MeetingSetupPage() {
             </AnimatePresence>
           </div>
 
+          {busyLabel ? (
+            <p className="rounded-xl border border-[#f5a623]/15 bg-[#f5a623]/8 px-4 py-2.5 text-[12px] text-[#f5d08d]">
+              {busyLabel}
+            </p>
+          ) : null}
+
           {errorMessage && (
             <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-[12px] text-red-400">
               {errorMessage}
@@ -148,7 +154,17 @@ export function MeetingSetupPage() {
 
         {/* Right — preview */}
         <div className="flex flex-col gap-4 rounded-3xl border border-[#f5a623]/12 bg-[#0f0d0a] p-7">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#f5a623]/55">Camera preview</p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#f5a623]/55">Camera preview</p>
+              <p className="mt-1 text-[12px] leading-relaxed text-[#c8a870]/58">
+                Check framing, verify your mic, and make sure the room feels ready before you enter.
+              </p>
+            </div>
+            <span className="rounded-full border border-[#f5a623]/14 bg-[#f5a623]/8 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#f5d08d]">
+              Preflight
+            </span>
+          </div>
 
           <DevicePreview
             videoRef={videoRef}
@@ -214,6 +230,22 @@ export function MeetingSetupPage() {
           </div>
 
           <audio ref={monitorAudioRef} autoPlay playsInline className="hidden" />
+
+          <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#f5a623]/60">Before you continue</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {[
+                "Frame your face in the center of the preview.",
+                "Use headphones if you enable mic monitoring.",
+                "Invite teammates now or share the room after joining.",
+                "Network drops will not affect local capture quality.",
+              ].map((tip) => (
+                <div key={tip} className="rounded-xl border border-white/7 bg-black/18 px-3 py-3 text-[12px] leading-5 text-[#fff5de]/78">
+                  {tip}
+                </div>
+              ))}
+            </div>
+          </div>
 
           <div className="h-px bg-[#f5a623]/8" />
 

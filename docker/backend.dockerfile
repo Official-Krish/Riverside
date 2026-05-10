@@ -1,18 +1,26 @@
-FROM oven/bun:latest
-RUN apt-get update -y && apt-get install -y openssl
+FROM oven/bun:1 AS builder
 
 WORKDIR /app
 
-COPY bun.lock .
-COPY package.json .
-
-COPY apps/backend ./apps/backend
-COPY packages ./packages
-
+COPY package.json bun.lock turbo.json ./
+COPY apps/backend/package.json apps/backend/package.json
+COPY packages/db/package.json packages/db/package.json
+COPY packages/types/package.json packages/types/package.json
 
 RUN bun install
-RUN bun run prisma:generate
+
+COPY . .
+
+FROM oven/bun:1 AS runtime
+
+WORKDIR /app/apps/backend
+
+ENV NODE_ENV=production
+
+COPY --from=builder /app/node_modules /app/node_modules
+COPY --from=builder /app/apps/backend /app/apps/backend
+COPY --from=builder /app/packages /app/packages
 
 EXPOSE 3000
 
-CMD ["bun", "run", "backend"]
+CMD ["bun", "index.ts"]

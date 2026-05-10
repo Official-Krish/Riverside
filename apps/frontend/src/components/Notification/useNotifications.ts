@@ -12,6 +12,7 @@ export const notificationsQueryKey = ["notifications"];
 export function useNotifications(isAuthenticated: boolean, name?: string, navigate?: (url: string) => void) {
   const queryClient = useQueryClient();
   const [activeFilter, setActiveFilter] = useState<Filter>("All");
+  const displayName = name?.trim() || "Guest";
 
   const notificationsQuery = useQuery({
     queryKey: notificationsQueryKey,
@@ -111,7 +112,7 @@ export function useNotifications(isAuthenticated: boolean, name?: string, naviga
       navigate(
         buildMeetingLivePath({
           roomId: data.roomId,
-          name: name || "Guest",
+          name: displayName,
           role: data.isHost ? "host" : "guest",
           recordingState: data.recordingState === "RECORDING",
           micId: vars.devices.micId,
