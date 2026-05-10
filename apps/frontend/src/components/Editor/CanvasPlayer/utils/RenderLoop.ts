@@ -235,6 +235,16 @@ function drawTextOverlay(
   const fontStyle = style?.fontStyle === "italic" ? "italic" : "normal";
   const color = style?.color || "#ffffff";
   const textAlign = style?.textAlign || "left";
+  const lineHeight = style?.lineHeight || 1.2;
+  const letterSpacing = style?.letterSpacing || 0;
+  const underline = Boolean(style?.underline);
+  const strike = Boolean(style?.strikeThrough);
+  const strokeWidth = Number(style?.strokeWidth || 0);
+  const strokeColor = style?.strokeColor || "#000000";
+  const maxWidth = style?.maxWidth || null;
+
+  // Prepare lines (support explicit newlines + optional soft wrapping)
+  const rawLines = String(text).split("\n");
 
   ctx.save();
   ctx.scale(scaleX, scaleY);
@@ -243,41 +253,153 @@ function drawTextOverlay(
   ctx.textAlign = textAlign as CanvasTextAlign;
   ctx.textBaseline = "top";
 
-  // Background
+  const wrappedLines =
+    maxWidth && maxWidth > 0
+      ? rawLines.flatMap((line) => wrapLine(ctx, line, maxWidth, letterSpacing))
+      : rawLines;
+
+  // background box
   if (style?.backgroundColor) {
     const bgOpacity = style.backgroundOpacity ?? 0.5;
-    const metrics = ctx.measureText(text);
-    const bgX = transform.x - 4;
-    const bgY = transform.y - 2;
-    const bgW = metrics.width + 8;
-    const bgH = fontSize + 4;
+    // compute width by longest line
+    let widest = 0;
+    for (const ln of wrappedLines) {
+      const m = ctx.measureText(ln).width + (letterSpacing * Math.max(0, ln.length - 1));
+      if (m > widest) widest = m;
+    }
+    const paddingX = 8;
+    const paddingY = 6;
+    const bgX = transform.x - paddingX;
+    const bgY = transform.y - paddingY;
+    const bgW = widest + paddingX * 2;
+    const bgH = wrappedLines.length * (fontSize * lineHeight) + paddingY * 2;
 
     ctx.save();
     ctx.globalAlpha = bgOpacity;
     ctx.fillStyle = style.backgroundColor;
-    ctx.fillRect(bgX, bgY, bgW, bgH);
-    ctx.restore();
-    ctx.fillStyle = color;
-  }
-
-  // Text shadow
-  if (style?.textShadow) {
-    ctx.shadowColor = "rgba(0,0,0,0.6)";
-    ctx.shadowBlur = 4;
-    ctx.shadowOffsetX = 1;
-    ctx.shadowOffsetY = 1;
-  }
-
-  // Letter spacing
-  if (style?.letterSpacing && style.letterSpacing !== 0) {
-    let x = transform.x;
-    for (const char of text) {
-      ctx.fillText(char, x, transform.y);
-      x += ctx.measureText(char).width + (style.letterSpacing || 0);
+    if (style.backgroundRadius) {
+      const r = Number(style.backgroundRadius || 6);
+      // rounded rect
+      roundRect(ctx, bgX, bgY, bgW, bgH, r);
+      ctx.fill();
+    } else {
+      ctx.fillRect(bgX, bgY, bgW, bgH);
     }
-  } else {
-    ctx.fillText(text, transform.x, transform.y);
+    ctx.restore();
+  }
+
+  // shadow
+  if (style?.textShadow) {
+    if (typeof style.textShadow === "boolean") {
+      if (style.textShadow) {
+        ctx.shadowColor = "rgba(0,0,0,0.6)";
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
+      }
+    } else {
+      ctx.shadowColor = style.textShadow.color || "rgba(0,0,0,0.6)";
+      ctx.shadowBlur = Number(style.textShadow.blur ?? 4);
+      ctx.shadowOffsetX = Number(style.textShadow.x ?? 1);
+      ctx.shadowOffsetY = Number(style.textShadow.y ?? 1);
+    }
+  }
+
+  // stroke/outline
+  if (strokeWidth > 0) {
+    ctx.lineWidth = strokeWidth;
+    ctx.strokeStyle = strokeColor;
+  }
+
+  // Render lines with optional letter spacing
+  let y = transform.y;
+  for (const ln of wrappedLines) {
+    if (letterSpacing && letterSpacing !== 0) {
+      let x = transform.x;
+      // adjust starting x for alignment
+      if (textAlign === "center") {
+        const totalW = measureTextWithLetterSpacing(ctx, ln, letterSpacing);
+        x = transform.x - totalW / 2;
+      } else if (textAlign === "right") {
+        const totalW = measureTextWithLetterSpacing(ctx, ln, letterSpacing);
+        x = transform.x - totalW;
+      }
+      for (let i = 0; i < ln.length; i++) {
+        const ch = ln[i];
+        if (strokeWidth > 0) ctx.strokeText(ch, x, y);
+        ctx.fillText(ch, x, y);
+        x += ctx.measureText(ch).width + letterSpacing;
+      }
+    } else {
+      if (strokeWidth > 0) ctx.strokeText(ln, transform.x, y);
+      ctx.fillText(ln, transform.x, y);
+    }
+
+    // underline
+    if (underline) {
+      const metrics = ctx.measureText(ln);
+      let lineX = transform.x;
+      if (textAlign === "center") lineX = transform.x - metrics.width / 2;
+      if (textAlign === "right") lineX = transform.x - metrics.width;
+      const underlineY = y + fontSize + 2;
+      ctx.fillRect(lineX, underlineY, metrics.width, Math.max(1, Math.round(fontSize * 0.06)));
+    }
+
+    // strike-through
+    if (strike) {
+      const metrics = ctx.measureText(ln);
+      let lineX = transform.x;
+      if (textAlign === "center") lineX = transform.x - metrics.width / 2;
+      if (textAlign === "right") lineX = transform.x - metrics.width;
+      const strikeY = y + fontSize * 0.45;
+      ctx.fillRect(lineX, strikeY, metrics.width, Math.max(1, Math.round(fontSize * 0.06)));
+    }
+
+    y += fontSize * lineHeight;
   }
 
   ctx.restore();
+}
+
+function wrapLine(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  letterSpacing: number
+) {
+  if (!text) return [""];
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let current = words[0] || "";
+
+  for (let i = 1; i < words.length; i++) {
+    const next = `${current} ${words[i]}`;
+    const nextWidth = measureTextWithLetterSpacing(ctx, next, letterSpacing);
+    if (nextWidth <= maxWidth) {
+      current = next;
+    } else {
+      lines.push(current);
+      current = words[i];
+    }
+  }
+  lines.push(current);
+  return lines;
+}
+
+function measureTextWithLetterSpacing(ctx: CanvasRenderingContext2D, text: string, letterSpacing: number) {
+  let w = 0;
+  for (const ch of text) {
+    w += ctx.measureText(ch).width + letterSpacing;
+  }
+  return w - letterSpacing;
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
 }
