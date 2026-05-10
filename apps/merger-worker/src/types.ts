@@ -1,7 +1,16 @@
+export interface EncryptionMetadata {
+    isEncrypted: boolean;
+    sourceMimeType: string | null;
+    encryptionAlgorithm: string | null;
+    encryptionIv: string | null;
+    encryptionTagBits: number | null;
+}
+
 export interface UserChunk {
     userId: string;
     localPath: string;
     timestamp: number;
+    metadata?: EncryptionMetadata | null;
 }
 
 export interface ProcessedUser {
