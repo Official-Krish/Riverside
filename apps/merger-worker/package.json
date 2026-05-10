@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@google-cloud/storage": "^7.16.0",
+    "@repo/db": "workspace:*",
     "ffmpeg-static": "^5.2.0",
     "ffprobe-static": "^3.1.0",
     "fs": "^0.0.1-security",

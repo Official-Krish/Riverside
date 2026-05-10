@@ -22,6 +22,7 @@ import { useMeetingRecording } from "../hooks/useMeetingRecording";
 import { useMeetingRoom } from "../hooks/useMeetingRoom";
 import { useRecordingLimit } from "../hooks/useRecordingLimit";
 import { http } from "../https";
+import { generateMeetingCek, persistMeetingCek, wrapMeetingCek } from "../lib/meetingCrypto";
 import { getParticipantMediaState } from "../lib/participantMediaState";
 import { getHttpErrorMessage } from "../lib/httpError";
 import type {
@@ -31,7 +32,11 @@ import type {
   MeetingTile,
   RemoteAudioTrackItem,
 } from "../types/meeting";
-import type { JoinMeetingResponse } from "@repo/types/api";
+import type {
+  JoinMeetingResponse,
+  RegisterWrappedCekResponse,
+  ServerPublicKeyResponse,
+} from "@repo/types/api";
 
 export function LiveMeetingPage() {
   const { meetingId = "" } = useParams();
@@ -50,12 +55,33 @@ export function LiveMeetingPage() {
   const selectedMicId = searchParams.get("micId") || "";
   const selectedCameraId = searchParams.get("cameraId") || "";
 
+  const wrappedCekMutation = useMutation<RegisterWrappedCekResponse, unknown, void>({
+    mutationFn: async () => {
+      const publicKeyResponse = await http.get<ServerPublicKeyResponse>("/keys/public");
+      const cek = generateMeetingCek();
+      persistMeetingCek(roomName, cek);
+
+      const wrappedCek = await wrapMeetingCek(publicKeyResponse.data.publicKey, cek);
+      const response = await http.post<RegisterWrappedCekResponse>(
+        `/keys/meeting/${meetingId}/wrapped-cek`,
+        {
+          wrappedCek,
+        }
+      );
+
+      return response.data;
+    },
+  });
+
   const joinMutation = useMutation<JoinMeetingResponse, unknown, { passcode?: string } | undefined>({
     mutationFn: async (vars) => {
       const res = await http.post<JoinMeetingResponse>(`/meeting/join/${meetingId}`, {
         passcode: vars?.passcode || undefined,
       });
       return res.data;
+    },
+    onSuccess: () => {
+      wrappedCekMutation.mutate();
     },
   });
 
@@ -91,7 +117,7 @@ export function LiveMeetingPage() {
     displayName,
     selectedCameraId,
     selectedMicId,
-    enabled: joinMutation.status === "success",
+    enabled: joinMutation.status === "success" && wrappedCekMutation.status === "success",
   });
 
   const {
@@ -112,6 +138,8 @@ export function LiveMeetingPage() {
     connectionState,
     isRecording,
     setIsRecording,
+    isMuted,
+    isVideoOff,
     selectedMicId,
   });
 
@@ -580,7 +608,7 @@ export function LiveMeetingPage() {
   }
 
   // Show loading state while joining meeting
-  if (joinMutation.status === "pending") {
+  if (joinMutation.status === "pending" || wrappedCekMutation.status === "pending") {
     return (
       <motion.section
         initial={{ opacity: 0, y: 8 }}
@@ -603,9 +631,9 @@ export function LiveMeetingPage() {
   }
 
   // Show error state if join failed
-  if (joinMutation.status === "error") {
+  if (joinMutation.status === "error" || wrappedCekMutation.status === "error") {
     const errorMsg = getHttpErrorMessage(
-      joinMutation.error,
+      joinMutation.error || wrappedCekMutation.error,
       "You don't have permission to join this meeting."
     );
     return (

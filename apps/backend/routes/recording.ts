@@ -532,7 +532,7 @@ RecordingRouter.get("/limit/check", authMiddleware, async (req, res) => {
 
   try {
     const limitCheck = await checkRecordingLimit(userId);
-    
+
     return res.status(200).json({
       recordingsUsed: limitCheck.recordingsUsed,
       recordingsLimit: limitCheck.recordingsLimit,

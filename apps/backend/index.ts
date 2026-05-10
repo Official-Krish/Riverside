@@ -13,6 +13,8 @@ import editorRouter from "./routes/editor";
 import GithubRouter from "./routes/github";
 import chatRouter from "./routes/chat";
 import rateLimiter from "./utils/rateLimiter";
+import keysRouter from "./routes/keys";
+import { ensureServerKeyPair } from "./utils/keys";
 
 const app = express();
 const recordingsRoot = path.resolve(process.cwd(), "../../recordings");
@@ -36,9 +38,15 @@ app.use("/api/v1/recording", RecordingRouter);
 app.use("/api/v1/editor", editorRouter);
 app.use("/api/v1/github", GithubRouter);
 app.use("/api/v1/chat", chatRouter);
+app.use("/api/v1/keys", keysRouter);
 
 notificationWorker().catch((error) => {
     console.error("Error in sendInvitationEmail:", error);
+});
+
+ensureServerKeyPair().catch((error) => {
+    console.error("Failed to bootstrap server keypair:", error);
+    process.exit(1);
 });
 
 app.listen(3000, () => {

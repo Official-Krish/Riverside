@@ -25,6 +25,11 @@ workerRouter.post("/upload-chunk", authMiddleware, rateLimiter({ windowSeconds: 
   const sequenceNumber = req.body.sequenceNumber ? Number(req.body.sequenceNumber) : null;
   const startedAt = req.body.startedAt ? new Date(req.body.startedAt) : null;
   const durationMs = req.body.durationMs ? Number(req.body.durationMs) : null;
+  const isEncrypted = String(req.body.isEncrypted || "false").toLowerCase() === "true";
+  const sourceMimeType = req.body.sourceMimeType ? String(req.body.sourceMimeType) : null;
+  const encryptionAlgorithm = req.body.encryptionAlgorithm ? String(req.body.encryptionAlgorithm) : null;
+  const encryptionIv = req.body.encryptionIv ? String(req.body.encryptionIv) : null;
+  const encryptionTagBits = req.body.encryptionTagBits ? Number(req.body.encryptionTagBits) : null;
  
   try {
     await uploadChunk({
@@ -37,6 +42,11 @@ workerRouter.post("/upload-chunk", authMiddleware, rateLimiter({ windowSeconds: 
       startedAt,
       durationMs,
       mimeType,
+      isEncrypted,
+      sourceMimeType,
+      encryptionAlgorithm,
+      encryptionIv,
+      encryptionTagBits,
     });
  
     res.status(200).json({ message: "Chunk uploaded successfully"});

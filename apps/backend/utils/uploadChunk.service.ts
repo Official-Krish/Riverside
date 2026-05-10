@@ -13,6 +13,11 @@ interface UploadChunkParams {
   startedAt: Date | null;
   durationMs: number | null;
   mimeType: string;
+  isEncrypted?: boolean;
+  sourceMimeType?: string | null;
+  encryptionAlgorithm?: string | null;
+  encryptionIv?: string | null;
+  encryptionTagBits?: number | null;
 }
 
 export async function uploadChunk({
@@ -25,6 +30,11 @@ export async function uploadChunk({
   startedAt,
   durationMs,
   mimeType,
+  isEncrypted = false,
+  sourceMimeType,
+  encryptionAlgorithm,
+  encryptionIv,
+  encryptionTagBits = null,
 }: UploadChunkParams) {
   const participantId =
     sanitizePathSegment(userId) || sanitizePathSegment(rawParticipantId);
@@ -59,6 +69,11 @@ export async function uploadChunk({
       meetingId: meeting.id,
       bucketLink: outputPath,
       mimeType,
+      sourceMimeType,
+      isEncrypted,
+      encryptionAlgorithm,
+      encryptionIv,
+      encryptionTagBits: toValidNumber(encryptionTagBits),
       uploaderUserId: userId,
       sequenceNumber: toValidNumber(sequenceNumber),
       durationMs: toValidNumber(durationMs),
@@ -68,6 +83,11 @@ export async function uploadChunk({
     update: {
       bucketLink: outputPath,
       mimeType,
+      sourceMimeType,
+      isEncrypted,
+      encryptionAlgorithm,
+      encryptionIv,
+      encryptionTagBits: toValidNumber(encryptionTagBits),
       durationMs: toValidNumber(durationMs),
       startedAt: startedAt && !Number.isNaN(startedAt.getTime()) ? startedAt : null,
       status: "UPLOADED",
