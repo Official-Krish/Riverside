@@ -2,6 +2,28 @@ import { useEffect, useRef, useState } from "react";
 import type { Overlay } from "./types";
 import { X, Check } from "lucide-react";
 
+type SnapGuideKind = "edge" | "center" | "distribution";
+
+type SnapGuide = {
+  position: number;
+  label: string;
+  kind: SnapGuideKind;
+};
+
+type OverlayBounds = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+type Axis = "x" | "y";
+
+type SnapCandidate = {
+  position: number;
+  guide: SnapGuide;
+};
+
 interface OverlayLayerProps {
   overlays: Overlay[];
   timelineTime: number;
@@ -38,27 +60,214 @@ export function OverlayLayer({
   handleCommitTextEdit,
 }: OverlayLayerProps) {
   const overlayEditContainerRef = useRef<HTMLDivElement | null>(null);
-  const [activeGuides, setActiveGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
+  const overlayRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [activeGuides, setActiveGuides] = useState<{ x: SnapGuide | null; y: SnapGuide | null }>({ x: null, y: null });
 
   const SNAP_THRESHOLD_PX = 8;
+  const DISTRIBUTION_THRESHOLD_PX = 14;
 
-  const snapValue = (value: number, candidates: number[], threshold: number) => {
-    let closest = value;
-    let minDiff = Number.POSITIVE_INFINITY;
+  const visibleOverlays = overlays.filter(
+    (o) => timelineTime >= o.timelineStartMs && timelineTime <= o.timelineStartMs + o.durationMs
+  );
 
-    for (const c of candidates) {
-      const diff = Math.abs(c - value);
-      if (diff < minDiff) {
-        minDiff = diff;
-        closest = c;
+  const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
+  const estimateOverlayBounds = (overlay: Overlay): OverlayBounds => {
+    const fontSize = overlay.style?.fontSize || 24;
+    const lineHeight = overlay.style?.lineHeight || 1.2;
+    const maxWidth = overlay.style?.maxWidth || 320;
+    const lines = (overlay.content.text || "").split("\n");
+    const approxCharWidth = fontSize * 0.58;
+    const estimatedWidth = Math.min(
+      maxWidth,
+      Math.max(40, ...lines.map((line) => line.length * approxCharWidth), fontSize * 2)
+    );
+    const estimatedHeight = Math.max(fontSize * lineHeight + 8, lines.length * fontSize * lineHeight + 8);
+
+    return {
+      x: overlay.transform.x,
+      y: overlay.transform.y,
+      width: estimatedWidth,
+      height: estimatedHeight,
+    };
+  };
+
+  const getOverlayBounds = (overlay: Overlay, scaleX: number, scaleY: number): OverlayBounds => {
+    const element = overlayRefs.current[overlay.id];
+    const container = overlayEditContainerRef.current;
+
+    if (element && container) {
+      const rect = element.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+
+      return {
+        x: (rect.left - containerRect.left) / scaleX,
+        y: (rect.top - containerRect.top) / scaleY,
+        width: rect.width / scaleX,
+        height: rect.height / scaleY,
+      };
+    }
+
+    return estimateOverlayBounds(overlay);
+  };
+
+  const buildAxisCandidates = (
+    axis: Axis,
+    size: number,
+    stageSize: number,
+    otherBounds: OverlayBounds[]
+  ): SnapCandidate[] => {
+    const candidates: SnapCandidate[] = [];
+
+    const lineTargets = [
+      { position: 0, label: axis === "x" ? "Left edge" : "Top edge", kind: "edge" as const },
+      { position: stageSize / 2, label: axis === "x" ? "Center" : "Middle", kind: "center" as const },
+      { position: stageSize, label: axis === "x" ? "Right edge" : "Bottom edge", kind: "edge" as const },
+    ];
+
+    for (const target of lineTargets) {
+      const candidatePosition =
+        target.kind === "center" ? target.position - size / 2 : target.position - (target.position === stageSize ? size : 0);
+
+      candidates.push({
+        position: candidatePosition,
+        guide: {
+          position: target.position,
+          label: target.label,
+          kind: target.kind,
+        },
+      });
+    }
+
+    for (const other of otherBounds) {
+      const otherSize = axis === "x" ? other.width : other.height;
+      const otherStart = axis === "x" ? other.x : other.y;
+      const otherCenter = otherStart + otherSize / 2;
+      const otherEnd = otherStart + otherSize;
+
+      const positions = [
+        {
+          position: otherStart,
+          guidePosition: otherStart,
+          label: axis === "x" ? "Align left" : "Align top",
+          kind: "edge" as const,
+        },
+        {
+          position: otherCenter - size / 2,
+          guidePosition: otherCenter,
+          label: axis === "x" ? "Center align" : "Middle align",
+          kind: "center" as const,
+        },
+        {
+          position: otherEnd - size,
+          guidePosition: otherEnd,
+          label: axis === "x" ? "Align right" : "Align bottom",
+          kind: "edge" as const,
+        },
+      ];
+
+      for (const candidate of positions) {
+        candidates.push({
+          position: candidate.position,
+          guide: {
+            position: candidate.guidePosition,
+            label: candidate.label,
+            kind: candidate.kind,
+          },
+        });
       }
     }
 
-    if (minDiff <= threshold) {
-      return { value: closest, guide: closest };
+    const sorted = [...otherBounds].sort((a, b) => (axis === "x" ? a.x - b.x : a.y - b.y));
+    for (let i = 0; i < sorted.length - 1; i += 1) {
+      const first = sorted[i];
+      const second = sorted[i + 1];
+      const firstEnd = axis === "x" ? first.x + first.width : first.y + first.height;
+      const secondStart = axis === "x" ? second.x : second.y;
+      const gap = secondStart - firstEnd - size;
+
+      if (gap > 0) {
+        const candidatePosition = firstEnd + gap / 2;
+        candidates.push({
+          position: candidatePosition,
+          guide: {
+            position: candidatePosition,
+            label: "Equal spacing",
+            kind: "distribution",
+          },
+        });
+      }
     }
 
-    return { value, guide: null as number | null };
+    return candidates;
+  };
+
+  const snapAxis = (value: number, candidates: SnapCandidate[], threshold: number) => {
+    let snappedValue = value;
+    let activeGuide: SnapGuide | null = null;
+    let closestDistance = Number.POSITIVE_INFINITY;
+
+    for (const candidate of candidates) {
+      const distance = Math.abs(candidate.position - value);
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        snappedValue = candidate.position;
+        activeGuide = candidate.guide;
+      }
+    }
+
+    if (closestDistance > threshold) {
+      return { value, guide: null as SnapGuide | null };
+    }
+
+    return { value: snappedValue, guide: activeGuide };
+  };
+
+  const snapMove = (
+    proposedX: number,
+    proposedY: number,
+    movingBounds: OverlayBounds,
+    otherBounds: OverlayBounds[]
+  ) => {
+    const xCandidates = buildAxisCandidates("x", movingBounds.width, stageWidth, otherBounds);
+    const yCandidates = buildAxisCandidates("y", movingBounds.height, stageHeight, otherBounds);
+
+    const snappedX = snapAxis(proposedX, xCandidates, SNAP_THRESHOLD_PX);
+    const snappedY = snapAxis(proposedY, yCandidates, SNAP_THRESHOLD_PX);
+
+    return {
+      x: clamp(snappedX.value, 0, Math.max(0, stageWidth - movingBounds.width)),
+      y: clamp(snappedY.value, 0, Math.max(0, stageHeight - movingBounds.height)),
+      guideX: snappedX.guide,
+      guideY: snappedY.guide,
+    };
+  };
+
+  const snapResizeWidth = (proposedWidth: number, leftEdge: number, otherBounds: OverlayBounds[]) => {
+    const widthCandidates = buildAxisCandidates("x", 0, stageWidth, otherBounds).map((candidate) => ({
+      position: candidate.guide.position,
+      guide: candidate.guide,
+    }));
+
+    let snappedWidth = proposedWidth;
+    let closestDistance = Number.POSITIVE_INFINITY;
+    let activeGuide: SnapGuide | null = null;
+    const rightEdge = leftEdge + proposedWidth;
+
+    for (const candidate of widthCandidates) {
+      const distance = Math.abs(candidate.position - rightEdge);
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        snappedWidth = Math.max(80, candidate.position - leftEdge);
+        activeGuide = candidate.guide;
+      }
+    }
+
+    if (closestDistance > DISTRIBUTION_THRESHOLD_PX) {
+      return { width: proposedWidth, guide: null as SnapGuide | null };
+    }
+
+    return { width: snappedWidth, guide: activeGuide };
   };
 
   useEffect(() => {
@@ -94,21 +303,19 @@ export function OverlayLayer({
   return (
     <div ref={overlayEditContainerRef} className="absolute inset-0 pointer-events-none z-30">
       {/* Overlay position indicators (visible overlays as draggable chips) */}
-      {overlays
-        .filter(
-          (o) =>
-            timelineTime >= o.timelineStartMs &&
-            timelineTime <= o.timelineStartMs + o.durationMs
-        )
-        .map((overlay) => {
+      {visibleOverlays.map((overlay) => {
           if (!overlay.id) return null;
           const scaleX = containerSize.width / stageWidth;
           const scaleY = containerSize.height / stageHeight;
           const isSelected = selectedOverlayId === overlay.id;
+          const overlayBounds = getOverlayBounds(overlay, scaleX, scaleY);
 
           return (
             <div
               key={overlay.id}
+              ref={(el) => {
+                overlayRefs.current[overlay.id] = el;
+              }}
               className={`absolute pointer-events-auto cursor-move select-none transition-all duration-100
                 ${isSelected
                   ? "ring-2 ring-[#f5a623] ring-offset-1 ring-offset-transparent rounded"
@@ -146,6 +353,10 @@ export function OverlayLayer({
                 const startY = e.clientY;
                 const origX = overlay.transform.x;
                 const origY = overlay.transform.y;
+                const movingBounds = overlayBounds;
+                const otherBounds = visibleOverlays
+                  .filter((o) => o.id !== overlay.id)
+                  .map((o) => getOverlayBounds(o, scaleX, scaleY));
 
                 const handleMove = (moveE: MouseEvent) => {
                   const dx = (moveE.clientX - startX) / scaleX;
@@ -155,24 +366,15 @@ export function OverlayLayer({
                   const unclampedX = origX + dx;
                   const unclampedY = origY + dy;
 
-                  const nextX = Math.max(0, Math.min(stageWidth, unclampedX));
-                  const nextY = Math.max(0, Math.min(stageHeight, unclampedY));
+                  const snapped = snapMove(unclampedX, unclampedY, movingBounds, otherBounds);
 
-                  // snap candidates: stage edges/center + other overlay anchors
-                  const others = overlays.filter((o) => o.id !== overlay.id);
-                  const xCandidates = [0, stageWidth / 2, stageWidth, ...others.map((o) => o.transform.x)];
-                  const yCandidates = [0, stageHeight / 2, stageHeight, ...others.map((o) => o.transform.y)];
-
-                  const snappedX = snapValue(nextX, xCandidates, SNAP_THRESHOLD_PX);
-                  const snappedY = snapValue(nextY, yCandidates, SNAP_THRESHOLD_PX);
-
-                  setActiveGuides({ x: snappedX.guide, y: snappedY.guide });
+                  setActiveGuides({ x: snapped.guideX, y: snapped.guideY });
 
                   handleUpdateOverlay(overlay.id!, {
                     transform: {
                       ...overlay.transform,
-                      x: snappedX.value,
-                      y: snappedY.value,
+                      x: snapped.x,
+                      y: snapped.y,
                     },
                   });
                 };
@@ -211,13 +413,16 @@ export function OverlayLayer({
 
                     const startX = e.clientX;
                     const initialWidth = overlay.style?.maxWidth || 320;
+                      const otherBounds = visibleOverlays
+                        .filter((o) => o.id !== overlay.id)
+                        .map((o) => getOverlayBounds(o, scaleX, scaleY));
 
                     const onMove = (moveE: MouseEvent) => {
                       const delta = (moveE.clientX - startX) / scaleX;
                       const raw = Math.max(80, Math.min(1200, Math.round(initialWidth + delta)));
-                      const snapPoints = [120, 180, 240, 320, 480, 640, 800, 960];
-                      const snapped = snapValue(raw, snapPoints, 12);
-                      const next = snapped.value;
+                        const snapped = snapResizeWidth(raw, overlay.transform.x, otherBounds);
+                        const next = snapped.width;
+                        setActiveGuides({ x: snapped.guide, y: null });
                       handleUpdateOverlay(overlay.id!, {
                         style: {
                           ...overlay.style,
@@ -229,6 +434,7 @@ export function OverlayLayer({
                     const onUp = () => {
                       window.removeEventListener("mousemove", onMove);
                       window.removeEventListener("mouseup", onUp);
+                      setActiveGuides({ x: null, y: null });
                     };
 
                     window.addEventListener("mousemove", onMove);
@@ -255,12 +461,15 @@ export function OverlayLayer({
                     const startY = e.clientY;
                     const initialWidth = overlay.style?.maxWidth || 320;
                     const initialSize = overlay.style?.fontSize || 24;
+                      const otherBounds = visibleOverlays
+                        .filter((o) => o.id !== overlay.id)
+                        .map((o) => getOverlayBounds(o, scaleX, scaleY));
 
                     const onMove = (moveE: MouseEvent) => {
                       const deltaW = (moveE.clientX - startX) / scaleX;
                       const deltaS = (moveE.clientY - startY) / scaleY;
                       const rawWidth = Math.max(80, Math.min(1200, Math.round(initialWidth + deltaW)));
-                      const nextWidth = snapValue(rawWidth, [120, 180, 240, 320, 480, 640, 800, 960], 12).value;
+                        const nextWidth = snapResizeWidth(rawWidth, overlay.transform.x, otherBounds).width;
                       const nextSize = Math.max(12, Math.min(140, Math.round(initialSize + deltaS * 0.2)));
                       handleUpdateOverlay(overlay.id!, {
                         style: {
@@ -274,6 +483,7 @@ export function OverlayLayer({
                     const onUp = () => {
                       window.removeEventListener("mousemove", onMove);
                       window.removeEventListener("mouseup", onUp);
+                      setActiveGuides({ x: null, y: null });
                     };
 
                     window.addEventListener("mousemove", onMove);
@@ -296,15 +506,29 @@ export function OverlayLayer({
         <>
           {activeGuides.x !== null && (
             <div
-              className="absolute top-0 bottom-0 z-40 border-l border-dashed border-[#22d3ee]/90 pointer-events-none"
-              style={{ left: activeGuides.x * (containerSize.width / stageWidth) }}
-            />
+              className={`absolute top-0 bottom-0 z-40 pointer-events-none ${activeGuides.x.kind === "distribution" ? "border-l-2 border-dotted border-[#f5a623]/95" : "border-l border-dashed border-[#22d3ee]/90"}`}
+              style={{ left: activeGuides.x.position * (containerSize.width / stageWidth) }}
+            >
+              <div
+                className={`absolute top-2 rounded px-1.5 py-0.5 text-[10px] font-medium shadow ${activeGuides.x.kind === "distribution" ? "bg-[#f5a623] text-black" : "bg-[#22d3ee] text-black"}`}
+                style={{ left: 8 }}
+              >
+                {activeGuides.x.label}
+              </div>
+            </div>
           )}
           {activeGuides.y !== null && (
             <div
-              className="absolute left-0 right-0 z-40 border-t border-dashed border-[#22d3ee]/90 pointer-events-none"
-              style={{ top: activeGuides.y * (containerSize.height / stageHeight) }}
-            />
+              className={`absolute left-0 right-0 z-40 pointer-events-none ${activeGuides.y.kind === "distribution" ? "border-t-2 border-dotted border-[#f5a623]/95" : "border-t border-dashed border-[#22d3ee]/90"}`}
+              style={{ top: activeGuides.y.position * (containerSize.height / stageHeight) }}
+            >
+              <div
+                className={`absolute left-2 rounded px-1.5 py-0.5 text-[10px] font-medium shadow ${activeGuides.y.kind === "distribution" ? "bg-[#f5a623] text-black" : "bg-[#22d3ee] text-black"}`}
+                style={{ top: 8 }}
+              >
+                {activeGuides.y.label}
+              </div>
+            </div>
           )}
         </>
       )}
