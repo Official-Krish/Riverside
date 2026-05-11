@@ -18,9 +18,10 @@ interface TransitionControlsProps {
   onUpdate: (updates: Partial<Transition>) => void;
   onDelete?: () => void;
   onClose?: () => void;
+  onBackToList?: () => void;
 }
 
-export function TransitionControls({ transition, onUpdate, onDelete, onClose }: TransitionControlsProps) {
+export function TransitionControls({ transition, onUpdate, onDelete, onClose, onBackToList }: TransitionControlsProps) {
   const [localDuration, setLocalDuration] = useState(transition?.durationMs || DEFAULT_TRANSITION_DURATION);
 
   useEffect(() => {
@@ -42,7 +43,7 @@ export function TransitionControls({ transition, onUpdate, onDelete, onClose }: 
   const def = getTransitionDefinition(transition.type);
 
   return (
-    <div className="flex h-full flex-col bg-[#0a0a08]">
+    <div className="flex h-full flex-col bg-[#0a0a08] overflow-y-auto">
       {/* Header */}
       <div className="border-b border-[#f5a623]/10 px-4 py-3">
         <div className="flex items-center justify-between">
@@ -51,6 +52,17 @@ export function TransitionControls({ transition, onUpdate, onDelete, onClose }: 
             <p className="text-[10px] text-[#8d7850] capitalize">{transition.category} • {transition.position}</p>
           </div>
           <div className="flex items-center gap-2">
+            {onBackToList && (
+              <button
+                onClick={onBackToList}
+                className="rounded p-1.5 text-[#f5a623] transition-colors hover:bg-[#f5a623]/10"
+                title="Back to transition list"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                </svg>
+              </button>
+            )}
             {onDelete && (
               <button
                 onClick={onDelete}
@@ -217,9 +229,8 @@ export function TransitionControls({ transition, onUpdate, onDelete, onClose }: 
   );
 }
 
-// ──────────────────────────────────────────────────────────────────────────
 // Easing Preview Component
-// ──────────────────────────────────────────────────────────────────────────
+
 
 function EasingPreview({ easing }: { easing: TransitionEasing }) {
   const getPath = () => {
@@ -263,9 +274,6 @@ function EasingPreview({ easing }: { easing: TransitionEasing }) {
   );
 }
 
-// ──────────────────────────────────────────────────────────────────────────
-// Helpers
-// ──────────────────────────────────────────────────────────────────────────
 
 function isValidDirection(type: string, dir: string): boolean {
   const validDirections: Record<string, string[]> = {

@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import type { Overlay } from "./types";
-import { TextStyleControls } from "./overlays";
-import { DEFAULT_TEXT_OVERLAY_STYLE } from "./overlays/types";
 
 type SnapGuideKind = "edge" | "center" | "distribution";
 
@@ -554,9 +552,6 @@ export function OverlayLayer({
         const scaleX = containerSize.width / stageWidth;
         const scaleY = containerSize.height / stageHeight;
 
-        const applyStyleUpdate = (updates: Partial<NonNullable<Overlay["style"]>>) =>
-          handleUpdateOverlay(overlay.id!, { style: { ...overlay.style, ...updates } });
-
         return (
           <>
             <div
@@ -567,62 +562,6 @@ export function OverlayLayer({
                 handleCommitTextEdit();
               }}
             />
-
-            {/* Rich text style controls */}
-            <div
-              className="absolute z-60 pointer-events-auto rounded-lg border border-[#f5a623]/20 bg-black/90 px-2 py-2 shadow-xl"
-              style={{
-                left: "50%",
-                transform: "translateX(-50%)",
-                top: 8,
-                zIndex: 100,
-                maxWidth: "90vw",
-              }}
-            >
-              <TextStyleControls
-                style={{ ...DEFAULT_TEXT_OVERLAY_STYLE, ...overlay.style }}
-                onStyleChange={applyStyleUpdate}
-                animation={
-                  overlay.animation
-                    ? {
-                        type: overlay.animation.type,
-                        durationMs: overlay.animation.durationMs,
-                        delayMs: overlay.animation.delayMs || 0,
-                        easing: overlay.animation.easing || "ease-out",
-                      }
-                    : {
-                        type: "none" as const,
-                        durationMs: 500,
-                        delayMs: 0,
-                        easing: "ease-out" as const,
-                      }
-                }
-                onAnimationChange={(anim) => {
-                  if (anim.type === "none") {
-                    handleUpdateOverlay(overlay.id!, { animation: undefined });
-                  } else {
-                    handleUpdateOverlay(overlay.id!, {
-                      animation: {
-                        type: anim.type,
-                        durationMs: anim.durationMs,
-                        delayMs: anim.delayMs,
-                        easing: anim.easing,
-                      },
-                    });
-                  }
-                }}
-              />
-              <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#f5a623]/20">
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => setEditingOverlayId(null)}
-                    className="rounded px-3 py-1 bg-green-500/20 text-green-400 hover:bg-green-500/30 text-xs"
-                  >
-                    Done
-                  </button>
-                </div>
-              </div>
-            </div>
 
             {/* Textarea for editing */}
             <textarea
@@ -667,76 +606,6 @@ export function OverlayLayer({
               }}
             />
           </>
-        );
-      })()}
-
-{/* Selected overlay style toolbar - fixed at top center */}
-      {selectedOverlayId && !editingOverlayId && !isPlaying && (() => {
-        const overlay = overlays.find(o => o.id === selectedOverlayId);
-        if (!overlay) return null;
-
-        return (
-          <div
-            className="absolute z-50 pointer-events-auto rounded-lg border border-[#f5a623]/30 bg-black/90 px-2 py-2 shadow-xl"
-            style={{
-              left: "50%",
-              transform: "translateX(-50%)",
-              top: 8,
-              maxWidth: "90vw",
-            }}
-          >
-            <TextStyleControls
-              style={{ ...DEFAULT_TEXT_OVERLAY_STYLE, ...overlay.style }}
-              onStyleChange={(updates) =>
-                handleUpdateOverlay(overlay.id!, {
-                  style: { ...overlay.style, ...updates },
-                })
-              }
-              animation={
-                overlay.animation
-                  ? {
-                      type: overlay.animation.type,
-                      durationMs: overlay.animation.durationMs,
-                      delayMs: overlay.animation.delayMs || 0,
-                      easing: overlay.animation.easing || "ease-out",
-                    }
-                  : {
-                      type: "none" as const,
-                      durationMs: 500,
-                      delayMs: 0,
-                      easing: "ease-out" as const,
-                    }
-              }
-              onAnimationChange={(anim) => {
-                if (anim.type === "none") {
-                  handleUpdateOverlay(overlay.id!, { animation: undefined });
-                } else {
-                  handleUpdateOverlay(overlay.id!, {
-                    animation: {
-                      type: anim.type,
-                      durationMs: anim.durationMs,
-                      delayMs: anim.delayMs,
-                      easing: anim.easing,
-                    },
-                  });
-                }
-              }}
-            />
-            <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#f5a623]/20">
-              <button
-                className="rounded px-2 py-1 text-xs bg-red-500/20 text-red-400 hover:bg-red-500/30"
-                onClick={() => handleDeleteOverlay(overlay.id!)}
-              >
-                Delete
-              </button>
-              <button
-                onClick={() => setSelectedOverlayId(null)}
-                className="rounded px-3 py-1 text-xs bg-[#f5a623]/20 text-[#f5a623] hover:bg-[#f5a623]/30"
-              >
-                Close
-              </button>
-            </div>
-          </div>
         );
       })()}
     </div>

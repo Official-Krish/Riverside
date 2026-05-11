@@ -1,16 +1,14 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
-import type { Track, Overlay, Asset, ClipTransition, PresetType } from "./types";
+import type { Track, Overlay, Asset, PresetType } from "./types";
 import type { TransitionType } from "./transitions/types";
 import { Timeline } from "./Timeline";
-import { Toolbar } from "./Toolbar";
 import { ExportDialog } from "./ExportDialog";
 import { Loader2, Film } from "lucide-react";
 import { CanvasPlayer, useCanvasVideo } from "./CanvasPlayer";
 import { OverlayLayer } from "./OverlayLayer";
 import { TimelineInfoBar } from "./TimelineInfoBar";
-import { TransitionPanel } from "./transitions/TransitionPanel";
-import { TransitionControls } from "./transitions/TransitionControls";
+import { EditorPanel, type PanelTab } from "./EditorPanel";
 import { toast } from "sonner";
 import { useTransitions } from "./hooks/useTransitions";
 import { useActiveTransition } from "./hooks/useActiveTransition";
@@ -70,8 +68,8 @@ export function Editor() {
 
   const [containerSize, setContainerSize] = useState({ width: 1280, height: 720 });
 
-  // Transition state
-  const [showTransitionPanel, setShowTransitionPanel] = useState(false);
+  // Panel state
+  const [activePanelTab, setActivePanelTab] = useState<PanelTab>("controls");
   const [shouldResetAfterExport, setShouldResetAfterExport] = useState(false);
 
   // Preset state
@@ -90,6 +88,16 @@ export function Editor() {
     });
     setDurationMs(maxMs > 0 ? maxMs + 2000 : 0);
   }, [tracks, overlays]);
+
+  // Auto-open panel with controls tab when text overlay is selected
+  useEffect(() => {
+    if (selectedOverlayId) {
+      const overlay = overlays.find((o) => o.id === selectedOverlayId);
+      if (overlay?.type === "TEXT" && !activePanelTab) {
+        setActivePanelTab("controls");
+      }
+    }
+  }, [selectedOverlayId, overlays, activePanelTab]);
 
   // Cleanup: revoke blob URLs for assets that are no longer referenced in tracks
   // This prevents memory bloat from accumulated blob:// URLs
@@ -175,11 +183,33 @@ export function Editor() {
     selectedTransitionId,
     selectedTransitionLocation,
     setSelectedTransition,
-    clearSelectedTransition,
     addTransition,
     updateTransition,
     removeTransition,
+    clearSelectedTransition,
   } = useTransitions(tracks, setTracks);
+
+  const handleUpdateSelectedTransition = useCallback((updates: any) => {
+    if (selectedTransitionLocation) {
+      updateTransition(
+        selectedTransitionLocation.trackIndex,
+        selectedTransitionLocation.clipId,
+        selectedTransitionLocation.position,
+        updates
+      );
+    }
+  }, [selectedTransitionLocation, updateTransition]);
+
+  const handleDeleteSelectedTransition = useCallback(() => {
+    if (selectedTransitionLocation) {
+      removeTransition(
+        selectedTransitionLocation.trackIndex,
+        selectedTransitionLocation.clipId,
+        selectedTransitionLocation.position
+      );
+      clearSelectedTransition();
+    }
+  }, [selectedTransitionLocation, removeTransition, clearSelectedTransition]);
 
   const { handleSeek, handleTimeUpdate, handlePlayPause, handlePlayStateChange } = usePlaybackState(
     tracks, assetsById, activeAssetId, setActiveAssetId, setSourceUrl, setTimelineTime, setVideoTime, setIsPlaying
@@ -332,28 +362,6 @@ export function Editor() {
     }
   }, [selectedTransitionLocation, addTransition]);
 
-  const handleUpdateSelectedTransition = useCallback((updates: Partial<ClipTransition>) => {
-    if (selectedTransitionLocation) {
-      updateTransition(
-        selectedTransitionLocation.trackIndex,
-        selectedTransitionLocation.clipId,
-        selectedTransitionLocation.position,
-        updates
-      );
-    }
-  }, [selectedTransitionLocation, updateTransition]);
-
-  const handleDeleteSelectedTransition = useCallback(() => {
-    if (selectedTransitionLocation) {
-      removeTransition(
-        selectedTransitionLocation.trackIndex,
-        selectedTransitionLocation.clipId,
-        selectedTransitionLocation.position
-      );
-      clearSelectedTransition();
-    }
-  }, [selectedTransitionLocation, removeTransition, clearSelectedTransition]);
-
   const handleSplitAtPlayhead = useCallback(() => {
     const currentMs = timelineTime;
     let foundTrackIndex = -1;
@@ -467,69 +475,66 @@ export function Editor() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-4">
-            <Toolbar
-              onExport={handleExport}
-              isPlaying={isPlaying}
-              currentTime={timelineTime}
-              durationMs={durationMs}
-              onSeek={handleSeek}
-              saving={saving}
-              tracks={tracks}
-              onAddClip={handleAddClip}
-              onAddAudio={handleAddAudio}
-              onPlayPause={handlePlayPause}
-              onSplitAtPlayhead={handleSplitAtPlayhead}
-              onUndo={handleUndoWithToast}
-              onRedo={handleRedoWithToast}
-              canUndo={canUndo}
-              canRedo={canRedo}
-              canvasTransform={canvasTransform}
-              activePreset={activePreset}
-              onApplyPreset={handleApplyPreset}
-            />
-
-            {showTransitionPanel ? (
-              <div className="flex-1 min-h-75 overflow-hidden rounded-2xl border border-[#f5a623]/20 bg-[#0a0a08] shadow-lg">
-                <TransitionPanel
-                  onSelectTransition={handleSelectTransition}
-                  selectedTransition={selectedTransitionId ? (() => {
-                    if (!selectedTransitionLocation) return null;
-                    const track = tracks[selectedTransitionLocation.trackIndex];
-                    if (!track) return null;
-                    const clip = track.clips.find(c => (c.id ?? c.sourceAssetId) === selectedTransitionLocation.clipId);
-                    if (!clip) return null;
-                    const trans = selectedTransitionLocation.position === "start" ? clip.transitionStart : clip.transitionEnd;
-                    return trans?.type || null;
-                  })() : null}
-                  onClose={() => setShowTransitionPanel(false)}
+          <div className="flex flex-col gap-4 w-[420px] max-h-[calc(100vh-150px)]">
+            <div className="flex-1 overflow-hidden rounded-2xl border border-[#f5a623]/20 bg-[#0a0a08] shadow-lg max-h-full">
+              <EditorPanel
+                  activeTab={activePanelTab}
+                  onTabChange={setActivePanelTab}
+                  activePreset={activePreset}
+                  onApplyPreset={handleApplyPreset}
+                  canvasTransform={canvasTransform}
+                  textOverlayStyle={selectedOverlayId ? overlays.find(o => o.id === selectedOverlayId)?.style : undefined}
+                  onTextStyleChange={selectedOverlayId ? (updates) => {
+                    const overlay = overlays.find(o => o.id === selectedOverlayId);
+                    if (overlay) {
+                      handleUpdateOverlay(selectedOverlayId, { style: { ...overlay.style, ...updates } });
+                    }
+                  } : undefined}
+                  textAnimation={selectedOverlayId ? overlays.find(o => o.id === selectedOverlayId)?.animation : undefined}
+                  onTextAnimationChange={selectedOverlayId ? (anim) => {
+                    if (anim.type === "none") {
+                      handleUpdateOverlay(selectedOverlayId, { animation: undefined });
+                    } else {
+                      handleUpdateOverlay(selectedOverlayId, { animation: anim });
+                    }
+                  } : undefined}
+                  transitionProps={{
+                    onSelectTransition: handleSelectTransition,
+                    selectedTransition: selectedTransitionId ? (() => {
+                      if (!selectedTransitionLocation) return null;
+                      const track = tracks[selectedTransitionLocation.trackIndex];
+                      if (!track) return null;
+                      const clip = track.clips.find(c => (c.id ?? c.sourceAssetId) === selectedTransitionLocation.clipId);
+                      if (!clip) return null;
+                      const trans = selectedTransitionLocation.position === "start" ? clip.transitionStart : clip.transitionEnd;
+                      return trans?.type || null;
+                    })() : null,
+                    onClose: () => setActivePanelTab("controls"),
+                    selectedTransitionId,
+                    selectedTransitionLocation,
+                    tracks,
+                    onUpdateTransition: handleUpdateSelectedTransition,
+                    onDeleteTransition: handleDeleteSelectedTransition,
+                    onClearSelection: clearSelectedTransition,
+                  }}
+                  // Toolbar props
+                  isPlaying={isPlaying}
+                  onPlayPause={handlePlayPause}
+                  currentTime={timelineTime}
+                  durationMs={durationMs}
+                  onSeek={handleSeek}
+                  onAddClip={handleAddClip}
+                  onAddAudio={handleAddAudio}
+                  onSplitAtPlayhead={handleSplitAtPlayhead}
+                  onUndo={handleUndoWithToast}
+                  onRedo={handleRedoWithToast}
+                  canUndo={canUndo}
+                  canRedo={canRedo}
+                  onExport={handleExport}
+                  saving={saving}
+                  tracks={tracks}
                 />
               </div>
-            ) : selectedTransitionId && selectedTransitionLocation ? (
-              <div className="flex-1 min-h-75 overflow-hidden rounded-2xl border border-[#f5a623]/20 bg-[#0a0a08] shadow-lg">
-                <TransitionControls
-                  transition={(() => {
-                    const track = tracks[selectedTransitionLocation.trackIndex];
-                    if (!track) return null;
-                    const clip = track.clips.find(c => (c.id ?? c.sourceAssetId) === selectedTransitionLocation.clipId);
-                    if (!clip) return null;
-                    const trans = selectedTransitionLocation.position === "start" ? clip.transitionStart : clip.transitionEnd;
-                    if (!trans) return null;
-                    return {
-                      ...trans,
-                      id: selectedTransitionId,
-                      type: trans.type,
-                      category: "basic",
-                      name: trans.type,
-                      position: selectedTransitionLocation.position,
-                    };
-                  })()}
-                  onUpdate={handleUpdateSelectedTransition}
-                  onDelete={handleDeleteSelectedTransition}
-                  onClose={clearSelectedTransition}
-                />
-              </div>
-            ) : null}
           </div>
         </div>
 
@@ -569,9 +574,12 @@ export function Editor() {
           onZoomOut={() => setTimelineZoom((prev) => Math.max(0.5, +(prev - 0.25).toFixed(2)))}
           onZoomReset={() => setTimelineZoom(1)}
           selectedTransitionId={selectedTransitionId}
-          onSelectTransition={setSelectedTransition}
-          onToggleTransitionPanel={() => setShowTransitionPanel((prev) => !prev)}
-          showTransitionPanel={showTransitionPanel}
+          onSelectTransition={(trackIndex, clipId, position) => {
+            setSelectedTransition(trackIndex, clipId, position);
+            setActivePanelTab("transition");
+          }}
+          onToggleTransitionPanel={() => setActivePanelTab((prev) => prev === "transition" ? "controls" : "transition")}
+          showTransitionPanel={activePanelTab === "transition"}
         />
 
         <input
