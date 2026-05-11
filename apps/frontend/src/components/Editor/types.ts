@@ -1,8 +1,11 @@
 import type { TransitionType, TransitionEasing, TransitionDirection } from "./transitions/types";
+import type { TextOverlayStyle, AnimationType, AnimationEasing } from "./overlays/types";
 
 export type TrackType = "VIDEO" | "AUDIO" | "TEXT";
 export type OverlayType = "TEXT";
 export type ActiveTool = "select" | "split" | "text" | "transition";
+
+export type { TextOverlayStyle, AnimationType, AnimationEasing };
 
 /**
  * Transition between two clips
@@ -50,34 +53,7 @@ export interface Track {
   clips: Clip[];
 }
 
-export interface OverlayStyle {
-  fontSize?: number;
-  fontFamily?: string;
-  color?: string;
-  fontWeight?: "normal" | "bold";
-  fontStyle?: "normal" | "italic";
-  textAlign?: "left" | "center" | "right";
-  direction?: "ltr" | "rtl";
-  textShadow?:
-    | boolean
-    | {
-        color?: string;
-        blur?: number;
-        x?: number;
-        y?: number;
-        opacity?: number;
-      };
-  backgroundColor?: string;
-  backgroundOpacity?: number;
-  backgroundRadius?: number;
-  letterSpacing?: number;
-  lineHeight?: number;
-  underline?: boolean;
-  strikeThrough?: boolean;
-  strokeWidth?: number;
-  strokeColor?: string;
-  maxWidth?: number;
-}
+export type OverlayStyle = Partial<TextOverlayStyle>;
 
 export interface Overlay {
   id: string;
@@ -99,9 +75,11 @@ export interface Overlay {
   style?: OverlayStyle;
   /** Animation for overlay appearance */
   animation?: {
-    type: "fade-in" | "slide-in" | "typewriter" | "bounce" | "none";
+    type: AnimationType;
     durationMs: number;
     delayMs?: number;
+    easing?: AnimationEasing;
+    direction?: "in" | "out" | "both";
   };
 }
 
@@ -203,7 +181,11 @@ export type PresetType =
   | "intro-template"
   | "meme-format"
   | "podcast-layout"
-
+  | "gaming-edit"
+  | "lower-third"
+  | "cta-button"
+  | "chapter-title"
+  
 export interface PresetConfig {
   durationMs?: number;
   intensity?: number;

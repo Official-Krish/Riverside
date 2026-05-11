@@ -208,7 +208,7 @@ export function Timeline({
             zIndex: overlays.length,
             content: { text: "New Text" },
             transform: { x: 100, y: 100 },
-            style: { fontSize: 24, direction: "ltr", textAlign: "left" },
+            style: { fontSize: 24, textDirection: "ltr", textAlign: "left" },
           })}
           className="rounded bg-[#a855f7]/10 px-2 py-1 text-xs text-[#c084fc] hover:bg-[#a855f7]/20"
         >

@@ -6,7 +6,7 @@ import {
   Undo2, Redo2, RotateCcw, Check,
   ChevronDown, ChevronUp, Move, Maximize, Music2,
   ZoomIn, Activity, Zap, Film, Palette, PlayCircle,
-  Sparkles, Mic, Gamepad2, Sparkle,
+  Sparkles, Mic, Sparkle,
 } from "lucide-react";
 import { formatTime } from "./helpers";
 import { PRESET_DEFINITIONS, type PresetType } from "./types";
@@ -396,7 +396,6 @@ export function Toolbar({
                     {preset.type === "intro-template" && <PlayCircle className="h-4 w-4 mb-1 text-[#22c55e]" />}
                     {preset.type === "meme-format" && <Sparkles className="h-4 w-4 mb-1 text-yellow-400" />}
                     {preset.type === "podcast-layout" && <Mic className="h-4 w-4 mb-1 text-pink-400" />}
-                    {preset.type === "gaming-edit" && <Gamepad2 className="h-4 w-4 mb-1 text-red-400" />}
                     <span className="text-[#bfa873]">{preset.name}</span>
                   </Button>
                 ))}
