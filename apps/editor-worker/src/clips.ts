@@ -37,6 +37,8 @@ export function normalizeClip(clip: any, trackType: RenderClip["trackType"], sou
     transitionEnd: normalizeTransitionMetadata(metadata.transitionEnd),
     transitionIn: clip.transitionIn ?? null,
     transitionOut: clip.transitionOut ?? null,
+    preset: clip.preset ?? null,
+    presetConfig: clip.presetConfig ?? undefined,
   };
 }
 

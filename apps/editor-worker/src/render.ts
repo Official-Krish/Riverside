@@ -12,6 +12,7 @@ import { buildOverlayFilter } from "./overlay";
 import { buildAudioMixArgs, buildConcatArgs } from "./audio";
 import { promoteRenderedVideo, refreshMeetingRecordingArtifacts } from "./artifacts";
 import { downloadSourceToLocal } from "./storage";
+import { generateTemplateOverlays, type GeneratedOverlay } from "./presets";
 
 function buildOverlayBurnInArgs(inputPath: string, overlays: any[], outputPath: string, width: number, height: number): string[] {
   const overlay = buildOverlayFilter(overlays, 0, width, height);
@@ -138,9 +139,18 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
       await updateProgress(jobId, 90);
     }
 
-    if (project.overlays.length > 0) {
-      log("debug", "Burning overlay timeline into composed video", { jobId, overlays: project.overlays.length });
-      await runBinary(CONFIG.FFMPEG_BIN, buildOverlayBurnInArgs(videoOnlyPath, project.overlays, overlayedPath, width, height));
+    const allOverlays = [...project.overlays];
+    for (const clip of videoClips) {
+      if (clip.preset && ["intro-template", "meme-format", "podcast-layout", "gaming-edit"].includes(clip.preset)) {
+        const templateOverlays = generateTemplateOverlays(clip.preset, clip.durationMs, width, height);
+        allOverlays.push(...templateOverlays);
+        log("debug", `Generated ${templateOverlays.length} template overlays for preset ${clip.preset}`, { jobId });
+      }
+    }
+
+    if (allOverlays.length > 0) {
+      log("debug", "Burning overlay timeline into composed video", { jobId, overlays: allOverlays.length });
+      await runBinary(CONFIG.FFMPEG_BIN, buildOverlayBurnInArgs(videoOnlyPath, allOverlays, overlayedPath, width, height));
       await updateProgress(jobId, 93);
     } else {
       await fs.copyFile(videoOnlyPath, overlayedPath);
