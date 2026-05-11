@@ -1,5 +1,5 @@
 import { prisma } from "@repo/db/client";
-import { redisPublisher } from "./redis";
+import { redisPublisher, clearChatHistory } from "./redis";
 import { Resend } from "resend";
 import {
   toPublicRecordingLink,
@@ -318,6 +318,8 @@ export async function finalizeMeetingRoom(roomId: string, hostUserId?: string) {
         processingStartedAt: shouldProcessRecording ? endTime : null,
       },
     });
+
+    await clearChatHistory(roomId);
 
     if (shouldProcessRecording) {
       await redisPublisher.rpush(

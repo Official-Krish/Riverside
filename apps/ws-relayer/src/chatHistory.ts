@@ -30,7 +30,7 @@ export async function storeChatMessage(roomId: string, message: any) {
   if (!roomId || !message || !redisClient) return;
 
   try {
-    const key = `chat:messages:${roomId}`;
+    const key = `chat:${roomId}`;
     const score = message.timestamp || Date.now();
     const value = JSON.stringify(message);
 
@@ -57,8 +57,7 @@ export async function getChatHistory(roomId: string, limit: number = 50): Promis
   if (!roomId || !redisClient) return [];
 
   try {
-    const key = `chat:messages:${roomId}`;
-    // Get the most recent messages (highest scores = newest timestamps)
+    const key = `chat:${roomId}`;
     const messages = await redisClient.zrevrange(key, 0, limit - 1);
     const parsed = messages.map((msg) => {
       try {
@@ -83,7 +82,7 @@ export async function clearChatHistory(roomId: string): Promise<void> {
   if (!roomId || !redisClient) return;
 
   try {
-    const key = `chat:messages:${roomId}`;
+    const key = `chat:${roomId}`;
     await redisClient.del(key);
   } catch (error) {
     console.error(`Failed to clear chat history for room ${roomId}:`, error);
