@@ -305,8 +305,7 @@ export async function finalizeMeetingRoom(roomId: string, hostUserId?: string) {
 
   const shouldProcessRecording =
     meeting.recordingState === "RECORDING" ||
-    meeting.recordingState === "UPLOADING" ||
-    meeting.recordingState === "PROCESSING";
+    meeting.recordingStartedAt !== null;
 
   if (!alreadyEnded) {
     await prisma.meeting.update({

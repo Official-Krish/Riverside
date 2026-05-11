@@ -180,12 +180,17 @@ editorRouter.get("/projects/:id", authMiddleware, async (req, res) => {
                         };
                     }),
                 })),
-                assets: project.assets.map((asset) => ({
-                    ...asset,
-                    url: toPublicRecordingLink(asset.url),
-                    waveformUrl: asset.waveformUrl ? toPublicRecordingLink(asset.waveformUrl) : null,
-                    thumbUrl: asset.thumbUrl ? toPublicRecordingLink(asset.thumbUrl) : null,
-                })),
+                assets: project.assets.map((asset) => {
+                    const fixedUrl = asset.url.includes("meeting-grid.mp4")
+                        ? asset.url.replace("meeting-grid.mp4", "meeting_grid_recording.mp4")
+                        : asset.url;
+                    return {
+                        ...asset,
+                        url: toPublicRecordingLink(fixedUrl),
+                        waveformUrl: asset.waveformUrl ? toPublicRecordingLink(asset.waveformUrl) : null,
+                        thumbUrl: asset.thumbUrl ? toPublicRecordingLink(asset.thumbUrl) : null,
+                    };
+                }),
                 exports: project.exports.map((job) => ({
                     ...job,
                     outputUrl: job.outputUrl ? toPublicRecordingLink(job.outputUrl) : null,
