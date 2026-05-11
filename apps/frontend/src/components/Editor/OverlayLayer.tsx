@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import type { Overlay } from "./types";
-import { X, Check } from "lucide-react";
 
 type SnapGuideKind = "edge" | "center" | "distribution";
 
@@ -40,6 +39,7 @@ interface OverlayLayerProps {
   handleDeleteOverlay: (id: string) => void;
   handleStartTextEdit: (overlay: Overlay) => void;
   handleCommitTextEdit: () => void;
+  isPlaying: boolean;
 }
 
 export function OverlayLayer({
@@ -58,6 +58,7 @@ export function OverlayLayer({
   handleDeleteOverlay,
   handleStartTextEdit,
   handleCommitTextEdit,
+  isPlaying,
 }: OverlayLayerProps) {
   const overlayEditContainerRef = useRef<HTMLDivElement | null>(null);
   const overlayRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -335,11 +336,18 @@ export function OverlayLayer({
                 maxWidth: overlay.style?.maxWidth ? overlay.style.maxWidth * scaleX : undefined,
                 lineHeight: overlay.style?.lineHeight || 1.2,
                 letterSpacing: overlay.style?.letterSpacing || 0,
-                background: isSelected ? "rgba(245,166,35,0.1)" : "rgba(0,0,0,0.2)",
+                background: editingOverlayId === overlay.id ? "transparent" : (isSelected ? "rgba(245,166,35,0.1)" : "rgba(0,0,0,0.2)"),
                 border: isSelected ? "1px solid rgba(245,166,35,0.45)" : "1px dashed rgba(245,166,35,0.2)",
                 borderRadius: 6,
                 whiteSpace: "pre-wrap",
-                backdropFilter: "blur(2px)",
+                direction: overlay.style?.textDirection || "ltr",
+                unicodeBidi: "plaintext",
+                // Hide interactive DOM overlays while the video is playing to avoid
+                // duplicate rendering (canvas already draws overlays during playback).
+                // Keep the overlay interactive when editing.
+                opacity: editingOverlayId === overlay.id ? 0 : (isPlaying ? 0 : 1),
+                visibility: editingOverlayId === overlay.id ? "hidden" : (isPlaying ? "hidden" : "visible"),
+                pointerEvents: editingOverlayId === overlay.id ? "none" : (isPlaying ? "none" : "auto"),
               }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -389,19 +397,22 @@ export function OverlayLayer({
                 window.addEventListener("mouseup", handleUp);
               }}
             >
-              {/* Live preview text */}
-              <span
-                style={{
-                  whiteSpace: "pre-wrap",
-                  textShadow: overlay.style?.textShadow ? "0 1px 3px rgba(0,0,0,0.65)" : undefined,
-                  WebkitTextStroke:
-                    overlay.style?.strokeWidth && overlay.style?.strokeWidth > 0
-                      ? `${Math.max(0.5, overlay.style.strokeWidth * 0.4)}px ${overlay.style.strokeColor || "#000"}`
-                      : undefined,
-                }}
-              >
-                {overlay.content.text}
-              </span>
+              {/* Live preview text - hide when editing */}
+              {!editingOverlayId && (
+                <span
+                  style={{
+                    whiteSpace: "pre-wrap",
+                    direction: overlay.style?.textDirection || "ltr",
+                    textShadow: overlay.style?.textShadow ? "0 1px 3px rgba(0,0,0,0.65)" : undefined,
+                    WebkitTextStroke:
+                      overlay.style?.strokeWidth && overlay.style?.strokeWidth > 0
+                        ? `${Math.max(0.5, overlay.style.strokeWidth * 0.4)}px ${overlay.style.strokeColor || "#000"}`
+                        : undefined,
+                  }}
+                >
+                  {overlay.content.text}
+                </span>
+              )}
 
               {/* Width resize handle for quick wrapping */}
               {isSelected && !editingOverlayId && (
@@ -541,9 +552,6 @@ export function OverlayLayer({
         const scaleX = containerSize.width / stageWidth;
         const scaleY = containerSize.height / stageHeight;
 
-        const applyStyleUpdate = (updates: Partial<NonNullable<Overlay["style"]>>) =>
-          handleUpdateOverlay(overlay.id!, { style: { ...overlay.style, ...updates } });
-
         return (
           <>
             <div
@@ -555,148 +563,26 @@ export function OverlayLayer({
               }}
             />
 
-            {/* Rich inline toolbar */}
-            <div
-              className="absolute z-60 pointer-events-auto flex items-center gap-2 rounded-lg border border-[#f5a623]/20 bg-black/85 px-3 py-1.5 text-xs text-[#fff5de] shadow-xl backdrop-blur-md"
-              style={{
-                left: Math.min(overlay.transform.x * scaleX, containerSize.width - 300),
-                top: Math.max(8, overlay.transform.y * scaleY - 48),
-                zIndex: 100,
-              }}
-            >
-              <button
-                className={`rounded px-2 py-0.5 font-bold transition-colors ${overlay.style?.fontWeight === "bold" ? "bg-[#f5a623]/30 text-[#f5a623]" : "bg-[#f5a623]/10 hover:bg-[#f5a623]/20"}`}
-                onClick={() => applyStyleUpdate({ fontWeight: overlay.style?.fontWeight === "bold" ? "normal" : "bold" })}
-              >
-                B
-              </button>
-              <button
-                className={`rounded px-2 py-0.5 italic transition-colors ${overlay.style?.fontStyle === "italic" ? "bg-[#f5a623]/30 text-[#f5a623]" : "bg-[#f5a623]/10 hover:bg-[#f5a623]/20"}`}
-                onClick={() => applyStyleUpdate({ fontStyle: overlay.style?.fontStyle === "italic" ? "normal" : "italic" })}
-              >
-                I
-              </button>
-              <button
-                className={`rounded px-2 py-0.5 transition-colors ${overlay.style?.underline ? "bg-[#f5a623]/30 text-[#f5a623]" : "bg-[#f5a623]/10 hover:bg-[#f5a623]/20"}`}
-                onClick={() => applyStyleUpdate({ underline: !overlay.style?.underline })}
-                title="Underline"
-              >
-                U
-              </button>
-              <button
-                className={`rounded px-2 py-0.5 transition-colors ${overlay.style?.strikeThrough ? "bg-[#f5a623]/30 text-[#f5a623]" : "bg-[#f5a623]/10 hover:bg-[#f5a623]/20"}`}
-                onClick={() => applyStyleUpdate({ strikeThrough: !overlay.style?.strikeThrough })}
-                title="Strike"
-              >
-                S
-              </button>
-
-              <div className="h-4 w-px bg-[#f5a623]/20" />
-
-              <select
-                value={overlay.style?.fontFamily || "Inter, system-ui, sans-serif"}
-                onChange={(e) => applyStyleUpdate({ fontFamily: e.target.value })}
-                className="rounded border border-[#f5a623]/20 bg-black/60 px-2 py-0.5 text-[11px] cursor-pointer"
-                title="Font family"
-              >
-                <option value="Inter, system-ui, sans-serif">Inter</option>
-                <option value="Arial, Helvetica, sans-serif">Arial</option>
-                <option value="Georgia, serif">Georgia</option>
-                <option value="Courier New, monospace">Courier</option>
-              </select>
-
-              <div className="h-4 w-px bg-[#f5a623]/20" />
-
-              <input
-                type="color"
-                value={overlay.style?.color || "#ffffff"}
-                onChange={(e) => applyStyleUpdate({ color: e.target.value })}
-                className="h-6 w-7 rounded border border-[#f5a623]/20 bg-transparent p-0 cursor-pointer"
-                title="Text color"
-              />
-
-              <input
-                type="range"
-                min={12}
-                max={96}
-                value={overlay.style?.fontSize || 24}
-                onChange={(e) => applyStyleUpdate({ fontSize: Number(e.target.value) })}
-                className="w-20 accent-[#f5a623]"
-                title="Font size"
-              />
-              <span className="text-[10px] text-[#8d7850] w-6 text-center">{overlay.style?.fontSize || 24}</span>
-
-              <div className="h-4 w-px bg-[#f5a623]/20" />
-
-              <input
-                type="color"
-                value={overlay.style?.strokeColor || "#000000"}
-                onChange={(e) => applyStyleUpdate({ strokeColor: e.target.value })}
-                className="h-6 w-7 rounded border border-[#f5a623]/20 bg-transparent p-0 cursor-pointer"
-                title="Stroke color"
-              />
-              <input
-                type="range"
-                min={0}
-                max={8}
-                value={overlay.style?.strokeWidth || 0}
-                onChange={(e) => applyStyleUpdate({ strokeWidth: Number(e.target.value) })}
-                className="w-20 accent-[#f5a623]"
-                title="Stroke width"
-              />
-
-              <div className="h-4 w-px bg-[#f5a623]/20" />
-
-              <input
-                type="range"
-                min={80}
-                max={1000}
-                step={10}
-                value={overlay.style?.maxWidth || 320}
-                onChange={(e) => applyStyleUpdate({ maxWidth: Number(e.target.value) })}
-                className="w-20 accent-[#f5a623]"
-                title="Wrap width"
-              />
-              <span className="w-10 text-[10px] text-[#8d7850] text-right">{overlay.style?.maxWidth || 320}</span>
-
-              <input
-                type="range"
-                min={0.8}
-                max={2.4}
-                step={0.05}
-                value={overlay.style?.lineHeight || 1.2}
-                onChange={(e) => applyStyleUpdate({ lineHeight: Number(e.target.value) })}
-                className="w-16 accent-[#f5a623]"
-                title="Line height"
-              />
-              <span className="w-8 text-[10px] text-[#8d7850] text-right">{(overlay.style?.lineHeight || 1.2).toFixed(2)}</span>
-
-              <div className="h-4 w-px bg-[#f5a623]/20" />
-
-              <button
-                className="rounded px-1.5 py-0.5 bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors"
-                onClick={() => setEditingOverlayId(null)}
-                title="Done editing"
-              >
-                Done
-              </button>
-            </div>
-
-            {/* contentEditable editing box */}
-            <div
-              contentEditable
-              suppressContentEditableWarning
-              onInput={(e) => setEditText((e.target as HTMLDivElement).innerText)}
+            {/* Textarea for editing */}
+            <textarea
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
                   setEditingOverlayId(null);
                 }
                 if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                  e.preventDefault();
                   handleCommitTextEdit();
+                }
+                if (e.key === "Backspace" && editText === "") {
+                  handleDeleteOverlay(overlay.id!);
                 }
               }}
               onBlur={() => handleCommitTextEdit()}
-              className="pointer-events-auto rounded px-2 py-1"
+              className="pointer-events-auto resize-none rounded px-2 py-1"
+              autoFocus
+              placeholder="Type text..."
               style={{
                 position: "absolute",
                 left: overlay.transform.x * scaleX,
@@ -704,163 +590,22 @@ export function OverlayLayer({
                 fontSize: (overlay.style?.fontSize || 24) * scaleX,
                 fontFamily: overlay.style?.fontFamily || "Inter, system-ui, sans-serif",
                 color: overlay.style?.color || "#ffffff",
-                background: "rgba(0,0,0,0.6)",
+                background: "rgba(0,0,0,0.8)",
                 border: "2px solid #f5a623",
-                borderRadius: overlay.style?.backgroundRadius || 6,
+                borderRadius: overlay.style?.background?.radius || 6,
                 padding: "6px 10px",
                 outline: "none",
                 minWidth: 120,
                 zIndex: 61,
-                backdropFilter: "blur(6px)",
                 whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                direction: overlay.style?.textDirection || "ltr",
+                unicodeBidi: "plaintext",
+                width: (overlay.style?.maxWidth || 320) * scaleX,
+                minHeight: "1.5em",
               }}
-            >
-              {editText}
-            </div>
+            />
           </>
-        );
-      })()}
-
-      {/* Selected overlay style toolbar */}
-      {selectedOverlayId && !editingOverlayId && (() => {
-        const overlay = overlays.find(o => o.id === selectedOverlayId);
-        if (!overlay) return null;
-        const scaleX = containerSize.width / stageWidth;
-        const scaleY = containerSize.height / stageHeight;
-        const toolbarLeft = overlay.transform.x * scaleX;
-        const toolbarTop = Math.max(8, overlay.transform.y * scaleY - 48);
-
-        return (
-          <div
-            className="absolute z-50 pointer-events-auto flex items-center gap-2 rounded-lg border border-[#f5a623]/30 bg-black/80 px-3 py-1.5 text-xs text-[#fff5de] shadow-xl backdrop-blur-md"
-            style={{
-              left: Math.min(toolbarLeft, containerSize.width - 300),
-              top: toolbarTop,
-            }}
-          >
-            <button
-              className={`rounded px-2 py-0.5 font-bold transition-colors ${overlay.style?.fontWeight === "bold" ? "bg-[#f5a623]/30 text-[#f5a623]" : "bg-[#f5a623]/10 hover:bg-[#f5a623]/20"}`}
-              onClick={() =>
-                handleUpdateOverlay(overlay.id!, {
-                  style: {
-                    ...overlay.style,
-                    fontWeight: overlay.style?.fontWeight === "bold" ? "normal" : "bold",
-                  },
-                })
-              }
-            >
-              B
-            </button>
-            <button
-              className={`rounded px-2 py-0.5 italic transition-colors ${overlay.style?.fontStyle === "italic" ? "bg-[#f5a623]/30 text-[#f5a623]" : "bg-[#f5a623]/10 hover:bg-[#f5a623]/20"}`}
-              onClick={() =>
-                handleUpdateOverlay(overlay.id!, {
-                  style: {
-                    ...overlay.style,
-                    fontStyle: overlay.style?.fontStyle === "italic" ? "normal" : "italic",
-                  },
-                })
-              }
-            >
-              I
-            </button>
-            <div className="h-4 w-px bg-[#f5a623]/20" />
-            <input
-              type="color"
-              value={overlay.style?.color || "#ffffff"}
-              onChange={(e) =>
-                handleUpdateOverlay(overlay.id!, {
-                  style: { ...overlay.style, color: e.target.value },
-                })
-              }
-              className="h-6 w-7 rounded border border-[#f5a623]/20 bg-transparent p-0 cursor-pointer"
-              title="Text color"
-            />
-            <div className="h-4 w-px bg-[#f5a623]/20" />
-            <input
-              type="range"
-              min={12}
-              max={96}
-              value={overlay.style?.fontSize || 24}
-              onChange={(e) =>
-                handleUpdateOverlay(overlay.id!, {
-                  style: { ...overlay.style, fontSize: Number(e.target.value) },
-                })
-              }
-              className="w-20 accent-[#f5a623]"
-              title="Font size"
-            />
-            <span className="text-[10px] text-[#8d7850] w-6 text-center">{overlay.style?.fontSize || 24}</span>
-            <div className="h-4 w-px bg-[#f5a623]/20" />
-            <select
-              value={overlay.style?.textAlign || "left"}
-              onChange={(e) =>
-                handleUpdateOverlay(overlay.id!, {
-                  style: {
-                    ...overlay.style,
-                    textAlign: e.target.value as "left" | "center" | "right",
-                  },
-                })
-              }
-              className="rounded border border-[#f5a623]/20 bg-black/60 px-1.5 py-0.5 text-[11px] cursor-pointer"
-            >
-              <option value="left">Left</option>
-              <option value="center">Center</option>
-              <option value="right">Right</option>
-            </select>
-            <div className="h-4 w-px bg-[#f5a623]/20" />
-            <input
-              type="range"
-              min={80}
-              max={1000}
-              step={10}
-              value={overlay.style?.maxWidth || 320}
-              onChange={(e) =>
-                handleUpdateOverlay(overlay.id!, {
-                  style: {
-                    ...overlay.style,
-                    maxWidth: Number(e.target.value),
-                  },
-                })
-              }
-              className="w-20 accent-[#f5a623]"
-              title="Wrap width"
-            />
-            <span className="text-[10px] text-[#8d7850] w-9 text-right">{overlay.style?.maxWidth || 320}</span>
-            <input
-              type="range"
-              min={0.8}
-              max={2.4}
-              step={0.05}
-              value={overlay.style?.lineHeight || 1.2}
-              onChange={(e) =>
-                handleUpdateOverlay(overlay.id!, {
-                  style: {
-                    ...overlay.style,
-                    lineHeight: Number(e.target.value),
-                  },
-                })
-              }
-              className="w-16 accent-[#f5a623]"
-              title="Line height"
-            />
-            <span className="text-[10px] text-[#8d7850] w-8 text-right">{(overlay.style?.lineHeight || 1.2).toFixed(2)}</span>
-            <div className="h-4 w-px bg-[#f5a623]/20" />
-            <button
-              className="rounded px-1.5 py-0.5 bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors"
-              onClick={() => setSelectedOverlayId(null)}
-              title="Deselect overlay"
-            >
-              <Check className="h-3 w-3" />
-            </button>
-            <button
-              className="rounded px-1.5 py-0.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
-              onClick={() => handleDeleteOverlay(overlay.id!)}
-              title="Delete overlay"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </div>
         );
       })()}
     </div>

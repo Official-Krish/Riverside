@@ -202,7 +202,7 @@ RecordingRouter.get("/page/:id", authMiddleware, async (req, res) => {
     const canExposeUrls = canViewRecording && meeting.recordingState === "READY";
     const finalVideoUrl = canExposeUrls ? normalizedFinalRecording?.videoLink ?? null : null;
 
-    const hlsBasePath = canExposeUrls && meeting.roomId ? `${process.env.CDN_BASE_URL || "https://cdn.krishlabs.tech"}/${meeting.roomId}/hls` : null;
+    const hlsBasePath = canExposeUrls && meeting.roomId ? `${process.env.CDN_BASE_URL || "https://cdn.krishlabs.tech"}/weave-recordings/${meeting.roomId}/hls` : null;
 
     let response: any = {
       id: meeting.id,
@@ -415,7 +415,7 @@ RecordingRouter.post("/stop/:id", authMiddleware, async (req, res) => {
     await prisma.meeting.update({
       where: { id: meeting.id },
       data: {
-        recordingState: "UPLOADING",
+        recordingState: "IDLE",
         recordingStoppedAt,
       },
     });
@@ -423,7 +423,7 @@ RecordingRouter.post("/stop/:id", authMiddleware, async (req, res) => {
     return res.status(200).json({
       roomId: meeting.roomId,
       isRecording: false,
-      recordingState: "UPLOADING",
+      recordingState: "IDLE",
       recordingStoppedAt,
     });
   } catch (error) {

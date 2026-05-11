@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { http } from "../https";
 import type { RecordingStatusResponse } from "@repo/types/api";
-import { encryptMeetingChunk } from "../lib/meetingCrypto";
+import { encryptMeetingChunk, generateMeetingCek, persistMeetingCek, readMeetingCek, wrapMeetingCek } from "../lib/meetingCrypto";
 
 type ConnectionState = "idle" | "loading-lib" | "connecting" | "connected" | "failed";
 
@@ -513,8 +513,49 @@ export function useMeetingRecording({
     setIsUploadingChunks(false);
   }, [cleanupRecorder]);
 
+  const serverPublicKeyQuery = useQuery({
+    queryKey: ["server-public-key"],
+    queryFn: async () => {
+      const { data } = await http.get<{ algorithm: string; publicKey: JsonWebKey }>("/keys/public");
+      return data.publicKey;
+    },
+    staleTime: Infinity,
+  });
+
+  const uploadWrappedCekMutation = useMutation({
+    mutationFn: async (wrappedCek: number[]) => {
+      await http.post(`/keys/meeting/${meetingId}/wrapped-cek`, {
+        wrappedCek,
+      });
+    },
+  });
+
+  const initializeMeetingCek = useCallback(async (): Promise<void> => {
+    const existingCek = readMeetingCek(meetingId);
+    if (existingCek) {
+      return;
+    }
+
+    if (!serverPublicKeyQuery.data) {
+      throw new Error("Server public key not loaded");
+    }
+
+    try {
+      const cek = generateMeetingCek();
+      persistMeetingCek(meetingId, cek);
+
+      const wrappedCek = await wrapMeetingCek(serverPublicKeyQuery.data, cek);
+
+      await uploadWrappedCekMutation.mutateAsync(wrappedCek);
+    } catch (error) {
+      console.error("Failed to initialize meeting encryption:", error);
+      throw new Error("Failed to initialize encryption for recording");
+    }
+  }, [meetingId, serverPublicKeyQuery.data, uploadWrappedCekMutation]);
+
   const startRecordingMutation = useMutation({
     mutationFn: async () => {
+      await initializeMeetingCek();
       await http.post(`/recording/start/${meetingId}`);
       await startLocalRecording({ resetSession: true });
     },

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Maximize2 } from "lucide-react";
+import type { PresetType } from "../types";
 
 type Props = {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -8,6 +9,7 @@ type Props = {
   isLoaded?: boolean;
   onClickToggle?: () => void;
   onDoubleClickFullscreen?: () => void;
+  preset?: PresetType | null;
 };
 
 export default function CanvasPlayer({
@@ -17,6 +19,7 @@ export default function CanvasPlayer({
   isLoaded = true,
   onClickToggle,
   onDoubleClickFullscreen,
+  preset,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showControls, setShowControls] = useState(false);
@@ -139,6 +142,79 @@ export default function CanvasPlayer({
       {/* Subtle top/bottom bars */}
       <div className="absolute inset-x-0 top-0 h-6 bg-linear-to-b from-black/20 to-transparent pointer-events-none z-1" />
       <div className="absolute inset-x-0 bottom-0 h-8 bg-linear-to-t from-black/30 to-transparent pointer-events-none z-1" />
+
+      {/* Preset Effects Overlay */}
+      {preset && (
+        <div className="absolute inset-0 pointer-events-none z-5">
+          {/* Cinematic Bars (Letterbox) */}
+          {preset === "cinematic-bars" && (
+            <>
+              <div className="absolute inset-x-0 top-0 h-1/4 bg-black" />
+              <div className="absolute inset-x-0 bottom-0 h-1/4 bg-black" />
+            </>
+          )}
+
+          {/* VHS Effect */}
+          {preset === "vhs" && (
+            <div className="absolute inset-0 animate-pulse"
+              style={{
+                background: "repeating-linear-gradient(0deg, rgba(0,0,0,0.1) 0px, rgba(0,0,0,0.1) 1px, transparent 1px, transparent 2px)",
+                mixBlendMode: "overlay",
+              }}
+            />
+          )}
+
+          {/* Glitch Effect - RGB Split */}
+          {preset === "glitch" && (
+            <>
+              <div className="absolute inset-0 bg-red-500/10 mix-blend-screen animate-pulse" style={{ animationDuration: "0.1s" }} />
+              <div className="absolute inset-0 bg-blue-500/10 mix-blend-screen animate-pulse" style={{ animationDuration: "0.15s", animationDelay: "0.05s" }} />
+              <div className="absolute inset-0 bg-green-500/5 mix-blend-screen animate-pulse" style={{ animationDuration: "0.12s", animationDelay: "0.02s" }} />
+            </>
+          )}
+
+          {/* Shake Effect - Border Animation */}
+          {preset === "shake" && (
+            <div className="absolute inset-0 border-4 border-orange-500/30 animate-pulse" />
+          )}
+
+          {/* Zoom Pop Effect - Subtle scale pulse */}
+          {preset === "zoom-pop" && (
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-yellow-500/10 to-transparent animate-pulse" />
+          )}
+
+          {/* Chromakey Indicator */}
+          {preset === "chromakey" && (
+            <div className="absolute inset-0 border-4 border-emerald-500/40">
+              <div className="absolute top-2 left-2 px-2 py-1 bg-emerald-500/80 text-white text-[10px] rounded">Green Screen</div>
+            </div>
+          )}
+
+          {/* Intro Template */}
+          {preset === "intro-template" && (
+            <div className="absolute inset-0 border-4 border-green-500/30">
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 py-2 bg-green-500/20 text-green-400 text-xs rounded">INTRO</div>
+            </div>
+          )}
+
+          {/* Meme Format */}
+          {preset === "meme-format" && (
+            <div className="absolute inset-0 border-4 border-yellow-500/30">
+              <div className="absolute top-2 right-2 px-2 py-1 bg-yellow-500/80 text-black text-[10px] rounded font-bold">TOP TEXT</div>
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-yellow-500/80 text-black text-[10px] rounded font-bold">BOTTOM TEXT</div>
+            </div>
+          )}
+
+          {/* Podcast Layout */}
+          {preset === "podcast-layout" && (
+            <div className="absolute inset-0 border-4 border-pink-500/30">
+              <div className="absolute top-2 left-2 w-20 h-20 bg-pink-500/20 rounded-lg" />
+              <div className="absolute bottom-2 right-2 w-16 h-16 bg-pink-500/20 rounded-lg" />
+              <div className="absolute top-2 right-2 px-2 py-1 bg-pink-500/80 text-white text-[10px] rounded">PODCAST</div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Fullscreen button (appears on hover) */}
       <button

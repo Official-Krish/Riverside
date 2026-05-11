@@ -19,6 +19,8 @@ export type RenderClip = {
   transitionEnd?: Record<string, unknown> | null;
   transitionIn?: "fade" | "cut" | null;
   transitionOut?: "fade" | "cut" | null;
+  preset?: PresetType | null;
+  presetConfig?: PresetConfig;
 };
 
 export type AudioClipPlan = {
@@ -29,3 +31,22 @@ export type AudioClipPlan = {
   volume: number;
   audioMode: "replace" | "layer";
 };
+
+export type PresetType =
+  | "zoom-pop"
+  | "shake"
+  | "glitch"
+  | "cinematic-bars"
+  | "vhs"
+  | "chromakey"
+  | "intro-template"
+  | "meme-format"
+  | "podcast-layout"
+  | "gaming-edit";
+
+export interface PresetConfig {
+  durationMs?: number;
+  intensity?: number;
+  color?: string;
+  threshold?: number;
+}

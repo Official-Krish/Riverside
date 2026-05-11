@@ -6,6 +6,8 @@ import {
 } from "@repo/amazons3";
 import { type UserChunk } from "./types";
 import { resolveStorageContext } from "@repo/amazons3";
+import { decryptUserChunks } from "./decryption";
+import { prisma } from "@repo/db/client";
 
 export function parseChunkTimestamp(filename: string): number | null {
     const match = filename.match(/chunk-(?:\d+-)?(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z)\./);
@@ -41,6 +43,40 @@ export async function collectUserChunks(
         keyFilter: (key) => /chunk-.*\.(webm|mp4|ogg)$/i.test(key),
     });
 
+    const meetingRecord = await prisma.meeting.findUnique({
+        where: { roomId: meetingId },
+        select: { id: true },
+    });
+
+    let metadataByPath: Map<string, { isEncrypted: boolean; sourceMimeType: string | null; encryptionAlgorithm: string | null; encryptionIv: string | null; encryptionTagBits: number | null }> = new Map();
+
+    if (meetingRecord) {
+        const mediaChunks = await prisma.mediaChunk.findMany({
+            where: { meetingId: meetingRecord.id },
+            select: {
+                bucketLink: true,
+                isEncrypted: true,
+                sourceMimeType: true,
+                encryptionAlgorithm: true,
+                encryptionIv: true,
+                encryptionTagBits: true,
+            },
+        });
+
+        metadataByPath = new Map(
+            mediaChunks.map((record) => [
+                record.bucketLink,
+                {
+                    isEncrypted: record.isEncrypted,
+                    sourceMimeType: record.sourceMimeType,
+                    encryptionAlgorithm: record.encryptionAlgorithm,
+                    encryptionIv: record.encryptionIv,
+                    encryptionTagBits: record.encryptionTagBits,
+                },
+            ])
+        );
+    }
+
     for (const key of keys) {
         const relativeKey = key.startsWith(prefix) ? key.slice(prefix.length) : key;
         const pathParts = relativeKey.split("/").filter(Boolean);
@@ -65,10 +101,21 @@ export async function collectUserChunks(
 
         await fs.writeFile(localPath, bytes);
 
+        const metadata = metadataByPath.get(key);
+
         const item: UserChunk = {
             userId,
             localPath,
             timestamp: parseChunkTimestamp(fileName) ?? Date.now(),
+            metadata: metadata
+                ? {
+                    isEncrypted: metadata.isEncrypted,
+                    sourceMimeType: metadata.sourceMimeType,
+                    encryptionAlgorithm: metadata.encryptionAlgorithm,
+                    encryptionIv: metadata.encryptionIv,
+                    encryptionTagBits: metadata.encryptionTagBits,
+                }
+                : null,
         };
 
         const existing = userChunks.get(userId) || [];
@@ -82,7 +129,9 @@ export async function collectUserChunks(
 
     for (const [userId, chunks] of userChunks.entries()) {
         chunks.sort((a, b) => a.timestamp - b.timestamp);
-        userChunks.set(userId, chunks);
+        
+        const decryptedChunks = await decryptUserChunks(chunks, meetingId, tempDir);
+        userChunks.set(userId, decryptedChunks);
     }
 
     return userChunks;

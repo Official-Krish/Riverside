@@ -1,4 +1,5 @@
 import type { RenderClip } from "./types";
+import { buildPresetFilter } from "./presets";
 
 export function getXFadeTransition(type: string | null | undefined): string {
   switch (type) {
@@ -88,6 +89,8 @@ export function getTransitionPlan(clip: RenderClip, position: "start" | "end") {
 export function buildClipRenderArgs(clip: RenderClip, outputPath: string, width: number, height: number, fps: number): string[] {
   const startTransition = getTransitionPlan(clip, "start");
   const endTransition = getTransitionPlan(clip, "end");
+  const presetFilter = buildPresetFilter(clip.preset, clip.presetConfig);
+
   const args = [
     "-y",
     "-ss", (clip.sourceStartMs / 1000).toFixed(3),
@@ -97,9 +100,14 @@ export function buildClipRenderArgs(clip: RenderClip, outputPath: string, width:
   const hasTransition = Boolean(startTransition || endTransition);
 
   if (!hasTransition) {
+    let filterChain = `scale=${width}:${height}`;
+    if (presetFilter) {
+      filterChain += `,${presetFilter}`;
+    }
+
     args.push(
       "-t", (clip.durationMs / 1000).toFixed(3),
-      "-vf", `scale=${width}:${height}`,
+      "-vf", filterChain,
       "-r", String(fps),
       "-c:v", "libx264",
       "-preset", "fast",
@@ -142,6 +150,17 @@ export function buildClipRenderArgs(clip: RenderClip, outputPath: string, width:
     const endOffset = Math.max(0, (clip.durationMs - endTransition.durationMs) / 1000).toFixed(3);
     filterParts.push(`[${outputLabel}][blackend]xfade=transition=${endTransition.type}:duration=${(endTransition.durationMs / 1000).toFixed(3)}:offset=${endOffset}[outv]`);
     outputLabel = "outv";
+  }
+
+  if (presetFilter) {
+    if (outputLabel === "outv") {
+      filterParts.push(`[outv]${presetFilter}[finalv]`);
+    } else if (outputLabel === "afterstart") {
+      filterParts.push(`[afterstart]${presetFilter}[finalv]`);
+    } else {
+      filterParts.push(`[clipv]${presetFilter}[finalv]`);
+    }
+    outputLabel = "finalv";
   }
 
   args.push(

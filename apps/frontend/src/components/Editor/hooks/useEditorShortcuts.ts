@@ -1,5 +1,18 @@
 import { useEffect } from "react";
-import type { Overlay } from "../types";
+import type { Overlay, PresetType } from "../types";
+
+const PRESET_SHORTCUTS: Record<string, PresetType> = {
+  "1": "zoom-pop",
+  "2": "shake",
+  "3": "glitch",
+  "4": "cinematic-bars",
+  "5": "vhs",
+  "6": "chromakey",
+  "i": "intro-template",
+  "m": "meme-format",
+  "p": "podcast-layout",
+  "g": "gaming-edit",
+};
 
 export function useEditorShortcuts(
   overlays: Overlay[],
@@ -10,7 +23,8 @@ export function useEditorShortcuts(
   handleAddOverlay: (overlay: Overlay) => void,
   handleUndo: () => void,
   handleRedo: () => void,
-  setTimelineZoom: (zoom: number | ((prev: number) => number)) => void
+  setTimelineZoom: (zoom: number | ((prev: number) => number)) => void,
+  onApplyPreset?: (preset: PresetType | null) => void
 ) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -110,4 +124,30 @@ export function useEditorShortcuts(
     window.addEventListener("keydown", onZoomHotkeys);
     return () => window.removeEventListener("keydown", onZoomHotkeys);
   }, [handleRedo, handleUndo, setTimelineZoom]);
+
+  useEffect(() => {
+    if (!onApplyPreset) return;
+
+    const onPresetHotkeys = (e: KeyboardEvent) => {
+      const isMeta = e.ctrlKey || e.metaKey;
+      if (!isMeta) return;
+
+      const key = e.key.toLowerCase();
+
+      if (PRESET_SHORTCUTS[key]) {
+        e.preventDefault();
+        onApplyPreset(PRESET_SHORTCUTS[key]);
+        return;
+      }
+
+      if (key === "0") {
+        e.preventDefault();
+        onApplyPreset(null);
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", onPresetHotkeys);
+    return () => window.removeEventListener("keydown", onPresetHotkeys);
+  }, [onApplyPreset]);
 }

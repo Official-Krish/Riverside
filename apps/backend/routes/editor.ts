@@ -180,12 +180,17 @@ editorRouter.get("/projects/:id", authMiddleware, async (req, res) => {
                         };
                     }),
                 })),
-                assets: project.assets.map((asset) => ({
-                    ...asset,
-                    url: toPublicRecordingLink(asset.url),
-                    waveformUrl: asset.waveformUrl ? toPublicRecordingLink(asset.waveformUrl) : null,
-                    thumbUrl: asset.thumbUrl ? toPublicRecordingLink(asset.thumbUrl) : null,
-                })),
+                assets: project.assets.map((asset) => {
+                    const fixedUrl = asset.url.includes("meeting-grid.mp4")
+                        ? asset.url.replace("meeting-grid.mp4", "meeting_grid_recording.mp4")
+                        : asset.url;
+                    return {
+                        ...asset,
+                        url: toPublicRecordingLink(fixedUrl),
+                        waveformUrl: asset.waveformUrl ? toPublicRecordingLink(asset.waveformUrl) : null,
+                        thumbUrl: asset.thumbUrl ? toPublicRecordingLink(asset.thumbUrl) : null,
+                    };
+                }),
                 exports: project.exports.map((job) => ({
                     ...job,
                     outputUrl: job.outputUrl ? toPublicRecordingLink(job.outputUrl) : null,
@@ -318,6 +323,7 @@ editorRouter.put("/projects/:id", authMiddleware, async (req, res) => {
                         transform: o.transform,
                         style: o.style,
                         zIndex: o.zIndex ?? 0,
+                        animation: o.animation ?? null,
                     })),
                 });
             }
@@ -387,11 +393,11 @@ editorRouter.post("/projects/:id/assets/upload", authMiddleware, upload.single("
             return res.status(404).json({ message: "Project not found" });
         }
 
-        // Save asset to S3: <roomId>/editor-assets/<uuid>.<ext>
+        // Save asset to S3: weave-recordings/<roomId>/editor/<uuid>.<ext>
         const extMatch = (file.originalname || "").match(/\.([a-zA-Z0-9]+)$/);
         const ext = extMatch ? `.${extMatch[1]}` : ".mp4";
         const fileId = crypto.randomUUID();
-        const objectKey = buildS3Key(project.meeting.roomId, "editor-assets", `${fileId}${ext}`);
+        const objectKey = buildS3Key("weave-recordings", project.meeting.roomId, "editor", `${fileId}${ext}`);
         await putObjectToS3({
             key: objectKey,
             body: file.buffer,

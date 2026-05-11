@@ -130,8 +130,9 @@ export function startRenderLoop(
     // Draw overlays
     if (getOverlays) {
       const items = getOverlays();
+      const currentTimeMs = video.currentTime * 1000;
       for (const item of items) {
-        drawTextOverlay(ctx, item.overlay, canvas.width, canvas.height);
+        drawTextOverlay(ctx, item.overlay, canvas.width, canvas.height, currentTimeMs);
       }
     }
 
@@ -207,8 +208,9 @@ export function drawSingleFrame(
   }
 
   if (overlays) {
+    const currentTimeMs = video.currentTime * 1000;
     for (const item of overlays) {
-      drawTextOverlay(ctx, item.overlay, canvas.width, canvas.height);
+      drawTextOverlay(ctx, item.overlay, canvas.width, canvas.height, currentTimeMs);
     }
   }
 }
@@ -220,14 +222,28 @@ function drawTextOverlay(
   ctx: CanvasRenderingContext2D,
   overlay: Overlay,
   canvasW: number,
-  canvasH: number
+  canvasH: number,
+  currentTimeMs: number = 0
 ) {
   const { content, transform, style } = overlay;
   const text = content.text;
   if (!text) return;
 
+  // Calculate animation state
+  const animState = calculateOverlayAnimation(overlay, currentTimeMs);
+  if (!animState.shouldRender) return;
+
   const scaleX = canvasW / 1280;
   const scaleY = canvasH / 720;
+
+  ctx.save();
+  ctx.scale(scaleX, scaleY);
+
+  ctx.globalAlpha = animState.alpha;
+  ctx.translate(animState.offsetX, animState.offsetY);
+  if (animState.scale !== 1) {
+    ctx.scale(animState.scale, animState.scale);
+  }
 
   const fontSize = style?.fontSize || 24;
   const fontFamily = style?.fontFamily || "Inter, system-ui, sans-serif";
@@ -243,11 +259,17 @@ function drawTextOverlay(
   const strokeColor = style?.strokeColor || "#000000";
   const maxWidth = style?.maxWidth || null;
 
+  // Background style from new structure
+  const bgStyle = style?.background;
+  const bgColor = bgStyle?.color || "#000000";
+  const bgOpacity = bgStyle?.opacity ?? 0;
+  const bgRadius = bgStyle?.radius ?? 6;
+  const bgPaddingX = bgStyle?.paddingX ?? 8;
+  const bgPaddingY = bgStyle?.paddingY ?? 4;
+
   // Prepare lines (support explicit newlines + optional soft wrapping)
   const rawLines = String(text).split("\n");
 
-  ctx.save();
-  ctx.scale(scaleX, scaleY);
   ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
   ctx.fillStyle = color;
   ctx.textAlign = textAlign as CanvasTextAlign;
@@ -259,26 +281,23 @@ function drawTextOverlay(
       : rawLines;
 
   // background box
-  if (style?.backgroundColor) {
-    const bgOpacity = style.backgroundOpacity ?? 0.5;
+  if (bgOpacity > 0) {
     // compute width by longest line
     let widest = 0;
     for (const ln of wrappedLines) {
       const m = ctx.measureText(ln).width + (letterSpacing * Math.max(0, ln.length - 1));
       if (m > widest) widest = m;
     }
-    const paddingX = 8;
-    const paddingY = 6;
-    const bgX = transform.x - paddingX;
-    const bgY = transform.y - paddingY;
-    const bgW = widest + paddingX * 2;
-    const bgH = wrappedLines.length * (fontSize * lineHeight) + paddingY * 2;
+    const bgX = transform.x - bgPaddingX;
+    const bgY = transform.y - bgPaddingY;
+    const bgW = widest + bgPaddingX * 2;
+    const bgH = wrappedLines.length * (fontSize * lineHeight) + bgPaddingY * 2;
 
     ctx.save();
     ctx.globalAlpha = bgOpacity;
-    ctx.fillStyle = style.backgroundColor;
-    if (style.backgroundRadius) {
-      const r = Number(style.backgroundRadius || 6);
+    ctx.fillStyle = bgColor;
+    if (bgRadius > 0) {
+      const r = bgRadius;
       // rounded rect
       roundRect(ctx, bgX, bgY, bgW, bgH, r);
       ctx.fill();
@@ -402,4 +421,77 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.arcTo(x, y + h, x, y, r);
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
+}
+
+/**
+ * Calculate animation state based on current time
+ */
+export function calculateOverlayAnimation(
+  overlay: Overlay,
+  currentTimeMs: number
+): { offsetX: number; offsetY: number; alpha: number; scale: number; shouldRender: boolean } {
+  const anim = overlay.animation;
+  if (!anim || anim.type === "none") {
+    return { offsetX: 0, offsetY: 0, alpha: 1, scale: 1, shouldRender: true };
+  }
+
+  const startMs = overlay.timelineStartMs;
+  const animStartMs = startMs + (anim.delayMs || 0);
+  const animEndMs = animStartMs + anim.durationMs;
+  const endMs = startMs + overlay.durationMs;
+  const exitStartMs = endMs - anim.durationMs;
+
+  if (currentTimeMs < animStartMs) {
+    return { offsetX: 0, offsetY: 0, alpha: 0, scale: 1, shouldRender: false };
+  }
+
+  if (currentTimeMs >= animStartMs && currentTimeMs < animEndMs) {
+    const progress = (currentTimeMs - animStartMs) / anim.durationMs;
+    const easedProgress = easeOutCubic(Math.min(1, Math.max(0, progress)));
+    return applyAnimationTransform(anim.type, easedProgress, 1);
+  }
+
+  if (currentTimeMs >= animEndMs && currentTimeMs < exitStartMs) {
+    return { offsetX: 0, offsetY: 0, alpha: 1, scale: 1, shouldRender: true };
+  }
+
+  if (currentTimeMs >= exitStartMs && currentTimeMs < endMs && anim.direction === "both") {
+    const exitProgress = (currentTimeMs - exitStartMs) / anim.durationMs;
+    const easedProgress = easeOutCubic(Math.min(1, Math.max(0, exitProgress)));
+    return applyAnimationTransform(anim.type, easedProgress, 0);
+  }
+
+  return { offsetX: 0, offsetY: 0, alpha: 0, scale: 1, shouldRender: false };
+}
+
+function applyAnimationTransform(type: string, progress: number, direction: 1 | 0): { offsetX: number; offsetY: number; alpha: number; scale: number; shouldRender: boolean } {
+  const p = direction === 1 ? progress : (1 - progress);
+  
+  switch (type) {
+    case "fade-in":
+      return { offsetX: 0, offsetY: 0, alpha: p, scale: 1, shouldRender: true };
+    case "slide-in":
+    case "slide-left":
+      return { offsetX: (1 - p) * -200, offsetY: 0, alpha: 1, scale: 1, shouldRender: true };
+    case "slide-right":
+      return { offsetX: (1 - p) * 200, offsetY: 0, alpha: 1, scale: 1, shouldRender: true };
+    case "slide-up":
+      return { offsetX: 0, offsetY: (1 - p) * -100, alpha: 1, scale: 1, shouldRender: true };
+    case "slide-down":
+      return { offsetX: 0, offsetY: (1 - p) * 100, alpha: 1, scale: 1, shouldRender: true };
+    case "scale-in":
+      return { offsetX: 0, offsetY: 0, alpha: 1, scale: 0.5 + p * 0.5, shouldRender: true };
+    case "bounce": {
+      const bounce = Math.sin(p * Math.PI * 2) * (1 - p) * 50;
+      return { offsetX: 0, offsetY: bounce, alpha: 1, scale: 1, shouldRender: true };
+    }
+    case "typewriter":
+      return { offsetX: 0, offsetY: 0, alpha: 1, scale: 1, shouldRender: true };
+    default:
+      return { offsetX: 0, offsetY: 0, alpha: 1, scale: 1, shouldRender: true };
+  }
+}
+
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
 }
