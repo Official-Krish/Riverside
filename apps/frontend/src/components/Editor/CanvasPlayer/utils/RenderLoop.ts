@@ -235,6 +235,7 @@ function drawTextOverlay(
   const fontStyle = style?.fontStyle === "italic" ? "italic" : "normal";
   const color = style?.color || "#ffffff";
   const textAlign = style?.textAlign || "left";
+  const textDirection = style?.direction || "ltr";
   const lineHeight = style?.lineHeight || 1.2;
   const letterSpacing = style?.letterSpacing || 0;
   const underline = Boolean(style?.underline);

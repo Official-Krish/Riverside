@@ -36,6 +36,8 @@ export interface Clip {
   /** Transition at the end of the clip (fade out to next or black) */
   transitionEnd?: ClipTransition;
   name?: string;
+  /** Applied motion graphics preset */
+  preset?: PresetType | null;
 }
 
 export interface Track {
@@ -55,6 +57,7 @@ export interface OverlayStyle {
   fontWeight?: "normal" | "bold";
   fontStyle?: "normal" | "italic";
   textAlign?: "left" | "center" | "right";
+  direction?: "ltr" | "rtl";
   textShadow?:
     | boolean
     | {
@@ -189,3 +192,48 @@ export type TrimState = {
   start: number;
   end: number;
 };
+
+export type PresetType =
+  | "zoom-pop"
+  | "shake"
+  | "glitch"
+  | "cinematic-bars"
+  | "vhs"
+  | "chromakey"
+  | "intro-template"
+  | "meme-format"
+  | "podcast-layout"
+
+export interface PresetConfig {
+  durationMs?: number;
+  intensity?: number;
+  color?: string;
+  threshold?: number;
+}
+
+export interface Preset {
+  id: string;
+  type: PresetType;
+  name: string;
+  shortcut: string;
+  icon: string;
+  config?: PresetConfig;
+}
+
+export interface ClipPreset {
+  clipId: string;
+  preset: Preset | null;
+  appliedAt: number;
+}
+
+export const PRESET_DEFINITIONS: Omit<Preset, "id">[] = [
+  { type: "zoom-pop", name: "Zoom Pop", shortcut: "Ctrl+1", icon: "ZoomIn" },
+  { type: "shake", name: "Shake", shortcut: "Ctrl+2", icon: "Activity" },
+  { type: "glitch", name: "Glitch", shortcut: "Ctrl+3", icon: "Zap" },
+  { type: "cinematic-bars", name: "Cinematic Bars", shortcut: "Ctrl+4", icon: "Maximize2" },
+  { type: "vhs", name: "VHS Effect", shortcut: "Ctrl+5", icon: "Film" },
+  { type: "chromakey", name: "Green Screen", shortcut: "Ctrl+6", icon: "Palette" },
+  { type: "intro-template", name: "Intro", shortcut: "Ctrl+I", icon: "PlayCircle" },
+  { type: "meme-format", name: "Meme", shortcut: "Ctrl+M", icon: "Sparkles" },
+  { type: "podcast-layout", name: "Podcast", shortcut: "Ctrl+P", icon: "Mic" },
+];

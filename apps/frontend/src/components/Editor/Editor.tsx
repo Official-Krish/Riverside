@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
-import type { Track, Overlay, Asset, ClipTransition } from "./types";
+import type { Track, Overlay, Asset, ClipTransition, PresetType } from "./types";
 import type { TransitionType } from "./transitions/types";
 import { Timeline } from "./Timeline";
 import { Toolbar } from "./Toolbar";
@@ -73,6 +73,9 @@ export function Editor() {
   // Transition state
   const [showTransitionPanel, setShowTransitionPanel] = useState(false);
   const [shouldResetAfterExport, setShouldResetAfterExport] = useState(false);
+
+  // Preset state
+  const [activePreset, setActivePreset] = useState<PresetType | null>(null);
 
   // Automatically recalculate duration when clips/overlays are added, deleted, or split
   useEffect(() => {
@@ -208,6 +211,27 @@ export function Editor() {
     project, tracks, setTracks, setAssetsById, setDurationMs, sourceUrl, setSourceUrl, setActiveAssetId, extractThumbnailsForAsset
   );
 
+  const handleApplyPreset = useCallback((preset: PresetType | null) => {
+    if (preset === null) {
+      setActivePreset(null);
+      setTracks((prev) => prev.map((track) => ({
+        ...track,
+        clips: track.clips.map((clip) => ({ ...clip, preset: null })),
+      })));
+    } else {
+      setActivePreset(preset);
+      setTracks((prev) => prev.map((track, trackIndex) => ({
+        ...track,
+        clips: track.clips.map((clip, clipIndex) => {
+          if (trackIndex === 0 && clipIndex === 0) {
+            return { ...clip, preset };
+          }
+          return clip;
+        }),
+      })));
+    }
+  }, []);
+
   useEditorShortcuts(
     overlays,
     selectedOverlayId,
@@ -217,7 +241,8 @@ export function Editor() {
     handleAddOverlay,
     handleUndo,
     handleRedo,
-    setTimelineZoom
+    setTimelineZoom,
+    handleApplyPreset
   );
 
   const stageWidth = project?.width || 1280;
@@ -409,6 +434,7 @@ export function Editor() {
                     isLoaded={canvasState.isLoaded}
                     onClickToggle={() => setSelectedOverlayId(null)}
                     onDoubleClickFullscreen={() => canvasRef.current?.requestFullscreen?.()}
+                    preset={activePreset}
                   />
 
                   <OverlayLayer
@@ -427,6 +453,7 @@ export function Editor() {
                     handleDeleteOverlay={handleDeleteOverlay}
                     handleStartTextEdit={handleStartTextEdit}
                     handleCommitTextEdit={handleCommitTextEdit}
+                    isPlaying={isPlaying}
                   />
                 </div>
               ) : (
@@ -458,6 +485,8 @@ export function Editor() {
               canUndo={canUndo}
               canRedo={canRedo}
               canvasTransform={canvasTransform}
+              activePreset={activePreset}
+              onApplyPreset={handleApplyPreset}
             />
 
             {showTransitionPanel ? (

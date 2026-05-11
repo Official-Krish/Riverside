@@ -5,8 +5,12 @@ import {
   Play, Pause, Download, Plus, Scissors,
   Undo2, Redo2, RotateCcw, Check,
   ChevronDown, ChevronUp, Move, Maximize, Music2,
+  ZoomIn, Activity, Zap, Film, Palette, PlayCircle,
+  Sparkles, Mic, Gamepad2, Sparkle,
 } from "lucide-react";
 import { formatTime } from "./helpers";
+import { PRESET_DEFINITIONS, type PresetType } from "./types";
+import { toast } from "sonner";
 
 interface CanvasTransform {
   stretchX: number;
@@ -37,6 +41,8 @@ interface ToolbarProps {
   canUndo: boolean;
   canRedo: boolean;
   canvasTransform?: CanvasTransform;
+  activePreset?: PresetType | null;
+  onApplyPreset?: (presetType: PresetType) => void;
 }
 
 export function Toolbar({
@@ -56,8 +62,11 @@ export function Toolbar({
   canUndo,
   canRedo,
   canvasTransform,
+  activePreset,
+  onApplyPreset,
 }: ToolbarProps) {
   const [showTransform, setShowTransform] = useState(false);
+  const [showPresets, setShowPresets] = useState(false);
 
   const handleSliderChange = (value: number[]) => {
     onSeek(value[0]);
@@ -315,6 +324,106 @@ export function Toolbar({
           )}
         </div>
       )}
+
+      {/* Motion Graphics Presets */}
+      <div className="mt-4 pt-4 border-t border-[#f5a623]/5">
+        <button
+          onClick={() => setShowPresets(!showPresets)}
+          className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-xs font-medium text-[#bfa873] transition-colors hover:bg-[#f5a623]/5"
+        >
+          <div className="flex items-center gap-2">
+            <Sparkle className="h-3.5 w-3.5 text-[#f5a623]" />
+            <span>Motion Presets</span>
+            {activePreset && (
+              <span className="flex h-1.5 w-1.5 rounded-full bg-[#f5a623] animate-pulse" />
+            )}
+          </div>
+          {showPresets ? (
+            <ChevronUp className="h-3.5 w-3.5 text-[#8d7850]" />
+          ) : (
+            <ChevronDown className="h-3.5 w-3.5 text-[#8d7850]" />
+          )}
+        </button>
+
+        {showPresets && (
+          <div className="mt-3 space-y-3">
+            {/* Effect Presets */}
+            <div className="space-y-2">
+              <div className="text-[10px] text-[#8d7850] uppercase tracking-wider">Effects</div>
+              <div className="grid grid-cols-3 gap-2">
+                {PRESET_DEFINITIONS.slice(0, 6).map((preset) => (
+                  <Button
+                    key={preset.type}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      onApplyPreset?.(preset.type);
+                      toast.success(`${preset.name} applied`);
+                    }}
+                    className={`flex flex-col h-auto py-2 text-[10px] border-[#f5a623]/20 bg-[#f5a623]/5 hover:bg-[#f5a623]/10 hover:border-[#f5a623]/30 ${
+                      activePreset === preset.type ? "ring-1 ring-[#f5a623]" : ""
+                    }`}
+                    title={`${preset.name} (${preset.shortcut})`}
+                  >
+                    {preset.type === "zoom-pop" && <ZoomIn className="h-4 w-4 mb-1 text-[#f5a623]" />}
+                    {preset.type === "shake" && <Activity className="h-4 w-4 mb-1 text-orange-400" />}
+                    {preset.type === "glitch" && <Zap className="h-4 w-4 mb-1 text-purple-400" />}
+                    {preset.type === "cinematic-bars" && <Maximize className="h-4 w-4 mb-1 text-blue-400" />}
+                    {preset.type === "vhs" && <Film className="h-4 w-4 mb-1 text-green-400" />}
+                    {preset.type === "chromakey" && <Palette className="h-4 w-4 mb-1 text-emerald-400" />}
+                    <span className="text-[#bfa873]">{preset.name}</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Template Presets */}
+            <div className="space-y-2">
+              <div className="text-[10px] text-[#8d7850] uppercase tracking-wider">Templates</div>
+              <div className="grid grid-cols-2 gap-2">
+                {PRESET_DEFINITIONS.slice(6).map((preset) => (
+                  <Button
+                    key={preset.type}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      onApplyPreset?.(preset.type);
+                      toast.success(`${preset.name} applied`);
+                    }}
+                    className="flex flex-col h-auto py-2 text-[10px] border-[#22c55e]/20 bg-[#22c55e]/5 hover:bg-[#22c55e]/10 hover:border-[#22c55e]/30"
+                    title={`${preset.name} (${preset.shortcut})`}
+                  >
+                    {preset.type === "intro-template" && <PlayCircle className="h-4 w-4 mb-1 text-[#22c55e]" />}
+                    {preset.type === "meme-format" && <Sparkles className="h-4 w-4 mb-1 text-yellow-400" />}
+                    {preset.type === "podcast-layout" && <Mic className="h-4 w-4 mb-1 text-pink-400" />}
+                    {preset.type === "gaming-edit" && <Gamepad2 className="h-4 w-4 mb-1 text-red-400" />}
+                    <span className="text-[#bfa873]">{preset.name}</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Active preset indicator */}
+            {activePreset && (
+              <div className="flex items-center justify-between px-2 py-1.5 bg-[#f5a623]/10 rounded-md border border-[#f5a623]/20">
+                <span className="text-[10px] text-[#bfa873]">
+                  Active: <span className="text-[#f5a623] font-medium">
+                    {PRESET_DEFINITIONS.find(p => p.type === activePreset)?.name}
+                  </span>
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onApplyPreset?.(null as any)}
+                  className="h-5 text-[10px] text-[#8d7850] hover:text-[#f5a623]"
+                >
+                  Clear
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

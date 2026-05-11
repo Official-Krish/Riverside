@@ -40,6 +40,7 @@ interface OverlayLayerProps {
   handleDeleteOverlay: (id: string) => void;
   handleStartTextEdit: (overlay: Overlay) => void;
   handleCommitTextEdit: () => void;
+  isPlaying: boolean;
 }
 
 export function OverlayLayer({
@@ -58,6 +59,7 @@ export function OverlayLayer({
   handleDeleteOverlay,
   handleStartTextEdit,
   handleCommitTextEdit,
+  isPlaying,
 }: OverlayLayerProps) {
   const overlayEditContainerRef = useRef<HTMLDivElement | null>(null);
   const overlayRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -335,11 +337,18 @@ export function OverlayLayer({
                 maxWidth: overlay.style?.maxWidth ? overlay.style.maxWidth * scaleX : undefined,
                 lineHeight: overlay.style?.lineHeight || 1.2,
                 letterSpacing: overlay.style?.letterSpacing || 0,
-                background: isSelected ? "rgba(245,166,35,0.1)" : "rgba(0,0,0,0.2)",
+                background: editingOverlayId === overlay.id ? "transparent" : (isSelected ? "rgba(245,166,35,0.1)" : "rgba(0,0,0,0.2)"),
                 border: isSelected ? "1px solid rgba(245,166,35,0.45)" : "1px dashed rgba(245,166,35,0.2)",
                 borderRadius: 6,
                 whiteSpace: "pre-wrap",
-                backdropFilter: "blur(2px)",
+                direction: overlay.style?.direction || "ltr",
+                unicodeBidi: "plaintext",
+                // Hide interactive DOM overlays while the video is playing to avoid
+                // duplicate rendering (canvas already draws overlays during playback).
+                // Keep the overlay interactive when editing.
+                opacity: editingOverlayId === overlay.id ? 0 : (isPlaying ? 0 : 1),
+                visibility: editingOverlayId === overlay.id ? "hidden" : (isPlaying ? "hidden" : "visible"),
+                pointerEvents: editingOverlayId === overlay.id ? "none" : (isPlaying ? "none" : "auto"),
               }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -389,19 +398,22 @@ export function OverlayLayer({
                 window.addEventListener("mouseup", handleUp);
               }}
             >
-              {/* Live preview text */}
-              <span
-                style={{
-                  whiteSpace: "pre-wrap",
-                  textShadow: overlay.style?.textShadow ? "0 1px 3px rgba(0,0,0,0.65)" : undefined,
-                  WebkitTextStroke:
-                    overlay.style?.strokeWidth && overlay.style?.strokeWidth > 0
-                      ? `${Math.max(0.5, overlay.style.strokeWidth * 0.4)}px ${overlay.style.strokeColor || "#000"}`
-                      : undefined,
-                }}
-              >
-                {overlay.content.text}
-              </span>
+              {/* Live preview text - hide when editing */}
+              {!editingOverlayId && (
+                <span
+                  style={{
+                    whiteSpace: "pre-wrap",
+                    direction: overlay.style?.direction || "ltr",
+                    textShadow: overlay.style?.textShadow ? "0 1px 3px rgba(0,0,0,0.65)" : undefined,
+                    WebkitTextStroke:
+                      overlay.style?.strokeWidth && overlay.style?.strokeWidth > 0
+                        ? `${Math.max(0.5, overlay.style.strokeWidth * 0.4)}px ${overlay.style.strokeColor || "#000"}`
+                        : undefined,
+                  }}
+                >
+                  {overlay.content.text}
+                </span>
+              )}
 
               {/* Width resize handle for quick wrapping */}
               {isSelected && !editingOverlayId && (
@@ -557,10 +569,11 @@ export function OverlayLayer({
 
             {/* Rich inline toolbar */}
             <div
-              className="absolute z-60 pointer-events-auto flex items-center gap-2 rounded-lg border border-[#f5a623]/20 bg-black/85 px-3 py-1.5 text-xs text-[#fff5de] shadow-xl backdrop-blur-md"
+              className="absolute z-60 pointer-events-auto flex items-center gap-2 rounded-lg border border-[#f5a623]/20 bg-black/85 px-3 py-1.5 text-xs text-[#fff5de] shadow-xl "
               style={{
-                left: Math.min(overlay.transform.x * scaleX, containerSize.width - 300),
-                top: Math.max(8, overlay.transform.y * scaleY - 48),
+                left: "50%",
+                transform: "translateX(-50%)",
+                top: 8,
                 zIndex: 100,
               }}
             >
@@ -590,6 +603,18 @@ export function OverlayLayer({
               >
                 S
               </button>
+
+              <div className="h-4 w-px bg-[#f5a623]/20" />
+
+              <select
+                value={overlay.style?.direction || "ltr"}
+                onChange={(e) => applyStyleUpdate({ direction: e.target.value as "ltr" | "rtl" })}
+                className="rounded border border-[#f5a623]/20 bg-black/60 px-2 py-0.5 text-[11px] cursor-pointer"
+                title="Text direction"
+              >
+                <option value="ltr">LTR</option>
+                <option value="rtl">RTL</option>
+              </select>
 
               <div className="h-4 w-px bg-[#f5a623]/20" />
 
@@ -682,21 +707,26 @@ export function OverlayLayer({
               </button>
             </div>
 
-            {/* contentEditable editing box */}
-            <div
-              contentEditable
-              suppressContentEditableWarning
-              onInput={(e) => setEditText((e.target as HTMLDivElement).innerText)}
+            {/* Textarea for editing */}
+            <textarea
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
                   setEditingOverlayId(null);
                 }
                 if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                  e.preventDefault();
                   handleCommitTextEdit();
+                }
+                if (e.key === "Backspace" && editText === "") {
+                  handleDeleteOverlay(overlay.id!);
                 }
               }}
               onBlur={() => handleCommitTextEdit()}
-              className="pointer-events-auto rounded px-2 py-1"
+              className="pointer-events-auto resize-none rounded px-2 py-1"
+              autoFocus
+              placeholder="Type text..."
               style={{
                 position: "absolute",
                 left: overlay.transform.x * scaleX,
@@ -704,38 +734,37 @@ export function OverlayLayer({
                 fontSize: (overlay.style?.fontSize || 24) * scaleX,
                 fontFamily: overlay.style?.fontFamily || "Inter, system-ui, sans-serif",
                 color: overlay.style?.color || "#ffffff",
-                background: "rgba(0,0,0,0.6)",
+                background: "rgba(0,0,0,0.8)",
                 border: "2px solid #f5a623",
                 borderRadius: overlay.style?.backgroundRadius || 6,
                 padding: "6px 10px",
                 outline: "none",
                 minWidth: 120,
                 zIndex: 61,
-                backdropFilter: "blur(6px)",
                 whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                direction: overlay.style?.direction || "ltr",
+                unicodeBidi: "plaintext",
+                width: (overlay.style?.maxWidth || 320) * scaleX,
+                minHeight: "1.5em",
               }}
-            >
-              {editText}
-            </div>
+            />
           </>
         );
       })()}
 
-      {/* Selected overlay style toolbar */}
-      {selectedOverlayId && !editingOverlayId && (() => {
+      {/* Selected overlay style toolbar - fixed at top center */}
+      {selectedOverlayId && !editingOverlayId && !isPlaying && (() => {
         const overlay = overlays.find(o => o.id === selectedOverlayId);
         if (!overlay) return null;
-        const scaleX = containerSize.width / stageWidth;
-        const scaleY = containerSize.height / stageHeight;
-        const toolbarLeft = overlay.transform.x * scaleX;
-        const toolbarTop = Math.max(8, overlay.transform.y * scaleY - 48);
 
         return (
           <div
-            className="absolute z-50 pointer-events-auto flex items-center gap-2 rounded-lg border border-[#f5a623]/30 bg-black/80 px-3 py-1.5 text-xs text-[#fff5de] shadow-xl backdrop-blur-md"
+            className="absolute z-50 pointer-events-auto flex items-center gap-2 rounded-lg border border-[#f5a623]/30 bg-black/80 px-3 py-1.5 text-xs text-[#fff5de] shadow-xl "
             style={{
-              left: Math.min(toolbarLeft, containerSize.width - 300),
-              top: toolbarTop,
+              left: "50%",
+              transform: "translateX(-50%)",
+              top: 8,
             }}
           >
             <button

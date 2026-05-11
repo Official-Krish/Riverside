@@ -231,12 +231,19 @@ export function LiveMeetingPage() {
         "Please be aware that your audio and video may be recorded during this meeting.",
       duration: 4000,
     });
-    startRecordingMutation.mutate(undefined, {
-      onSuccess: () => {
+
+    if (isHost) {
+      startRecordingMutation.mutate(undefined, {
+        onSuccess: () => {
+          sendRecordingState(true);
+        },
+      });
+    } else {
+      void startLocalRecording({ resetSession: true }).then(() => {
         sendRecordingState(true);
-      },
-    });
-  }, [initialRecordingState, sendRecordingState, startRecordingMutation]);
+      });
+    }
+  }, [initialRecordingState, sendRecordingState, startRecordingMutation, startLocalRecording, isHost]);
 
   const allTiles = useMemo<MeetingTile[]>(() => {
     const remoteTiles = participants.flatMap((participant) => {
@@ -780,19 +787,31 @@ export function LiveMeetingPage() {
           }
 
           if (isRecording) {
-            stopRecordingMutation.mutate(undefined, {
-              onSuccess: () => {
+            if (isHost) {
+              stopRecordingMutation.mutate(undefined, {
+                onSuccess: () => {
+                  sendRecordingState(false);
+                },
+              });
+            } else {
+              stopLocalChunkRecorder().then(() => {
                 sendRecordingState(false);
-              },
-            });
+              });
+            }
             return;
           }
 
-          startRecordingMutation.mutate(undefined, {
-            onSuccess: () => {
+          if (isHost) {
+            startRecordingMutation.mutate(undefined, {
+              onSuccess: () => {
+                sendRecordingState(true);
+              },
+            });
+          } else {
+            startLocalRecording({ resetSession: true }).then(() => {
               sendRecordingState(true);
-            },
-          });
+            });
+          }
         }}
         onEndForAll={handleEndForAll}
         onLeaveCall={handleExit}
