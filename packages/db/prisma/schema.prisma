@@ -260,6 +260,7 @@ model EditorOverlay {
   transform       Json
   style           Json
   zIndex          Int @default(0)
+  animation       Json?
 
   project         EditorProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
 

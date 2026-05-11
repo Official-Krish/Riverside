@@ -176,6 +176,7 @@ export const SaveEditorProjectSchema = z.object({
             transform: z.any(),
             style: z.any(),
             zIndex: z.number().optional(),
+            animation: z.any().optional(),
         })
     ),
     durationMs: z.number(),
