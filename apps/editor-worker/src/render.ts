@@ -15,7 +15,7 @@ import { downloadSourceToLocal } from "./storage";
 import { generateTemplateOverlays, type GeneratedOverlay } from "./presets";
 
 function buildOverlayBurnInArgs(inputPath: string, overlays: any[], outputPath: string, width: number, height: number): string[] {
-  const overlay = buildOverlayFilter(overlays, 0, width, height);
+  const overlay = buildOverlayFilter(overlays, 0);
   if (!overlay) {
     return ["-y", "-i", inputPath, "-c", "copy", outputPath];
   }
@@ -143,7 +143,7 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
     for (const clip of videoClips) {
       if (clip.preset && ["intro-template", "meme-format", "podcast-layout", "gaming-edit"].includes(clip.preset)) {
         const templateOverlays = generateTemplateOverlays(clip.preset, clip.durationMs, width, height);
-        allOverlays.push(...templateOverlays);
+        allOverlays.push(...templateOverlays as any);
         log("debug", `Generated ${templateOverlays.length} template overlays for preset ${clip.preset}`, { jobId });
       }
     }

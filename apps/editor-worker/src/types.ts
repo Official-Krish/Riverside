@@ -42,7 +42,9 @@ export type PresetType =
   | "intro-template"
   | "meme-format"
   | "podcast-layout"
-  | "gaming-edit";
+  | "lower-third"
+  | "cta-button"
+  | "chapter-title";
 
 export interface PresetConfig {
   durationMs?: number;

@@ -32,7 +32,7 @@ export function normalizeClip(clip: any, trackType: RenderClip["trackType"], sou
     timelineStartMs: clip.timelineStartMs,
     durationMs: clip.durationMs,
     name: clip.name ?? null,
-    audioMode: typeof metadata.audioMode === "string" ? (metadata.audioMode as "replace" | "layer") : undefined,
+    audioMode: typeof clip.audioMode === "string" ? (clip.audioMode as "replace" | "layer") : undefined,
     transitionStart: normalizeTransitionMetadata(metadata.transitionStart),
     transitionEnd: normalizeTransitionMetadata(metadata.transitionEnd),
     transitionIn: clip.transitionIn ?? null,
