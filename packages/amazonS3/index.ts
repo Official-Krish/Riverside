@@ -89,7 +89,14 @@ export function tryExtractS3Key(value: string | null | undefined, options: Pick<
 
 	if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
 		try {
-			return normalizeS3Key(new URL(trimmed).pathname);
+			const key = normalizeS3Key(new URL(trimmed).pathname);
+			const cdnBaseEnv = process.env.CDN_BASE_URL || DEFAULT_CDN_BASE_URL;
+			const hasCorrectBase = cdnBaseEnv.endsWith("weave-recordings");
+			if (hasCorrectBase && key.startsWith("weave-recordings/")) {
+				const cleaned = key.replace(/^weave-recordings\/weave-recordings\//, "weave-recordings/");
+				return cleaned;
+			}
+			return key;
 		} catch {
 			return null;
 		}

@@ -1,12 +1,8 @@
-import { CalendarDays, ChevronRight, Clock3, Users, Video } from "lucide-react";
+import { CalendarDays, Clock3, Users } from "lucide-react";
 import { motion } from "motion/react";
-import type { ReactNode } from "react";
-import { useState } from "react";
-import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { useNavigate } from "react-router-dom";
 import type { MeetingDetails, MeetingSchedule } from "@repo/types/api";
 import { findDuration } from "@/lib/utils";
-import { UpcomingMeetings } from "./UpcomingMeetings";
 import { getMeetingDate, getMeetingParticipantCount } from "./types";
 import { toast } from "sonner";
 
@@ -14,170 +10,187 @@ export function Overview({
   meetings,
   schedules,
   setSection,
-  onJoinSchedule,
-  joiningScheduleId,
   onScheduleMeeting,
 }: {
   meetings: MeetingDetails[];
   schedules: MeetingSchedule[];
   setSection: (section: "overview" | "meetings" | "recordings" | "upcoming") => void;
-  onJoinSchedule: (scheduleId: string, devices: { micId?: string; cameraId?: string }) => Promise<void>;
+  onJoinSchedule?: (scheduleId: string, devices: { micId?: string; cameraId?: string }) => Promise<void>;
   joiningScheduleId?: string | null;
   onScheduleMeeting: () => void;
 }) {
   const navigate = useNavigate();
-  const [recentPage, setRecentPage] = useState(1);
-  const recentPageSize = 2;
-  const totalRecentPages = Math.ceil(meetings.length / recentPageSize);
-  const paginatedRecentMeetings = meetings.slice((recentPage - 1) * recentPageSize, recentPage * recentPageSize);
-
-  const [readyPage, setReadyPage] = useState(1);
+  
   const readyMeetings = meetings.filter((meeting) => meeting.recordingState === "READY");
-  const readyPageSize = 2;
-  const totalReadyPages = Math.ceil(readyMeetings.length / readyPageSize);
-  const paginatedReadyMeetings = readyMeetings.slice((readyPage - 1) * readyPageSize, readyPage * readyPageSize);
+  const liveMeetings = meetings.filter((meeting) => !meeting.isEnded);
+  const nextScheduledMeeting = schedules
+    .slice()
+    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+    .find((schedule) => new Date(schedule.startTime).getTime() >= Date.now()) ?? null;
+  const endedMeetings = meetings.filter((meeting) => meeting.startedAt && meeting.endedAt);
+  const totalRecordedMinutes = endedMeetings.reduce((total, meeting) => {
+    const startedAt = new Date(meeting.startedAt as string).getTime();
+    const endedAt = new Date(meeting.endedAt as string).getTime();
+    return total + Math.max(0, Math.round((endedAt - startedAt) / 60000));
+  }, 0);
 
   return (
-    <motion.div
-      key="overview"
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.22, ease: "easeOut" }}
-      className="grid gap-4 lg:grid-cols-[1fr_320px]"
-    >
-      <div className="flex flex-col gap-4">
-        <SectionCard title="Recent meetings" linkLabel="View all" onLink={() => setSection("meetings")}>
-          {meetings.length === 0 ? (
-            <p className="rounded-xl border border-white/6 bg-white/3 px-4 py-4 text-sm text-[#a89880]">
-              No meetings yet. Create your first one above.
-            </p>
-          ) : (
-            paginatedRecentMeetings.map((meeting, index) => (
-              <MeetingRow key={meeting.id} meeting={meeting} index={index} onClick={() => {
-                if(meeting.recordingStartedAt === null) {
-                  toast.info("This meeting has no recording, so it cannot be viewed.")
-                  return;
-                }
-                navigate(`/recordings/${meeting.id}`)
-              }} />
-            ))
-          )}
-
-          {totalRecentPages > 1 ? (
-            <Pager page={recentPage} totalPages={totalRecentPages} onChange={setRecentPage} />
-          ) : null}
-        </SectionCard>
-
-        <SectionCard title="Recordings" linkLabel="View all" onLink={() => setSection("recordings")}>
-          {paginatedReadyMeetings.map((meeting) => (
-            <div
-              key={meeting.id}
-              onClick={() => navigate(`/recordings/${meeting.id}`)}
-              className="mb-2 flex cursor-pointer items-center gap-3 rounded-xl border border-[#f5a623]/7 bg-black/18 px-3.5 py-2.5 transition last:mb-0 hover:bg-black/30"
-            >
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-[#f5a623]/12 bg-[#f5a623]/8">
-                <Video className="size-4 text-[#f5a623]/60" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-bold text-[#fff5de]">
-                  {meeting.roomName?.trim() || `Meeting ${meeting.roomId.slice(0, 8)}`}
-                </p>
-                <p className="mt-0.5 text-[11px] text-[#b49650]/60">
-                  {new Date(getMeetingDate(meeting)).toLocaleDateString()} · {getMeetingParticipantCount(meeting)} tracks
-                </p>
-              </div>
-              <span className="shrink-0 rounded-full border border-green-500/20 bg-green-500/10 px-2.5 py-1 text-[10px] font-bold text-green-300/90">
-                Ready
-              </span>
+    <div className="grid grid-cols-[1fr_240px] px-8">
+      <div className="pr-8 border-r border-white/6">
+        <div className="flex gap-0 mb-10">
+          <div className="flex-1 pr-7 border-r border-white/7">
+            <div className="text-[48px] font-normal text-white leading-none tracking-tight font-serif">{meetings.length}</div>
+            <div className="text-[11px] font-medium uppercase tracking-[0.06em] text-white/50 mt-1.5">Total meetings</div>
+          </div>
+          <div className="flex-1 px-7 border-r border-white/7">
+            <div className="text-[48px] font-normal text-white leading-none tracking-tight font-serif">
+              {liveMeetings.length}<span className="text-[14px] font-sans font-normal text-white/30 ml-1">live</span>
             </div>
-          ))}
+            <div className="text-[11px] font-medium uppercase tracking-[0.06em] text-white/50 mt-1.5">Right now</div>
+          </div>
+          <div className="flex-1 px-7 border-r border-white/7">
+            <div className="text-[48px] font-normal text-white leading-none tracking-tight font-serif">{schedules.length}</div>
+            <div className="text-[11px] font-medium uppercase tracking-[0.06em] text-white/50 mt-1.5">Upcoming</div>
+          </div>
+          <div className="flex-1 pl-7">
+            <div className="text-[48px] font-normal text-white leading-none tracking-tight font-serif">
+              {totalRecordedMinutes >= 60 ? `${(totalRecordedMinutes / 60).toFixed(0)}h` : `${totalRecordedMinutes}min`}
+            </div>
+            <div className="text-[11px] font-medium uppercase tracking-[0.06em] text-white/50 mt-1.5">Recorded</div>
+          </div>
+        </div>
 
-          {readyMeetings.length === 0 ? (
-            <p className="rounded-xl border border-white/6 bg-white/3 px-4 py-4 text-sm text-[#a89880]">
-              No ready recordings yet.
-            </p>
-          ) : null}
-
-          {totalReadyPages > 1 ? (
-            <Pager page={readyPage} totalPages={totalReadyPages} onChange={setReadyPage} />
-          ) : null}
-        </SectionCard>
-      </div>
-
-      <div className="flex flex-col gap-4">
-        <UpcomingMeetings
-          schedules={schedules}
-          joiningScheduleId={joiningScheduleId}
-          onJoinSchedule={onJoinSchedule}
-          onScheduleMeeting={onScheduleMeeting}
-          compact
-          isDashboard={true}
-        />
-      </div>
-    </motion.div>
-  );
-}
-
-function SectionCard({
-  title,
-  linkLabel,
-  onLink,
-  extra,
-  children,
-}: {
-  title: string;
-  linkLabel?: string;
-  onLink?: () => void;
-  extra?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-[#f5a623]/10 bg-white/[0.022] p-5">
-      <div className="mb-4 flex items-center justify-between">
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#f5a623]/55">{title}</p>
-        <div className="flex items-center gap-2">
-          {extra}
-          {linkLabel ? (
-            <button onClick={onLink} className="flex items-center gap-1 text-[12px] font-semibold text-[#f5a623]/70 transition hover:text-[#f5a623]">
-              {linkLabel} <ChevronRight className="size-3" />
+        <div className="mb-10">
+          <div className="flex items-center gap-4 mb-5">
+            <span className="text-[10px] uppercase tracking-[0.12em] text-white/50 font-medium">Recent meetings</span>
+            <div className="flex-1 h-px bg-white/6" />
+            <button onClick={() => setSection("meetings")} className="text-[10px] text-[#f5a623]/70 font-medium tracking-wider hover:text-[#f5a623] transition-colors cursor-pointer">
+              View all
             </button>
-          ) : null}
+          </div>
+          
+          {meetings.length === 0 ? (
+            <div className="py-8">
+              <EmptyRow />
+              <EmptyRow width="55%" />
+              <EmptyRow width="40%" />
+              <p className="text-[12px] text-white/40 font-light mt-5">No meetings yet — create your first room above</p>
+            </div>
+          ) : (
+            <div className="space-y-0">
+              {meetings.slice(0, 5).map((meeting, index) => (
+                <MeetingRow 
+                  key={meeting.id} 
+                  meeting={meeting} 
+                  index={index} 
+                  onClick={() => {
+                    if(meeting.recordingStartedAt === null) {
+                      toast.info("This meeting has no recording, so it cannot be viewed.")
+                      return;
+                    }
+                    navigate(`/recordings/${meeting.id}`)
+                  }} 
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <div className="flex items-center gap-4 mb-5">
+            <span className="text-[10px] uppercase tracking-[0.12em] text-white/50 font-medium">Recordings</span>
+            <div className="flex-1 h-px bg-white/6" />
+            <button onClick={() => setSection("recordings")} className="text-[10px] text-[#f5a623]/70 font-medium tracking-wider hover:text-[#f5a623] transition-colors cursor-pointer">
+              View all
+            </button>
+          </div>
+          
+          {readyMeetings.length === 0 ? (
+            <div className="py-8">
+              <EmptyRow />
+              <EmptyRow width="45%" />
+              <p className="text-[12px] text-white/50 font-light mt-5">Finished sessions will appear here</p>
+            </div>
+          ) : (
+            <div className="space-y-0">
+              {readyMeetings.slice(0, 3).map((meeting, index) => (
+                <div 
+                  key={meeting.id}
+                  onClick={() => navigate(`/recordings/${meeting.id}`)}
+                  className="flex items-center gap-3 py-3.5 hover:bg-white/2 transition-colors cursor-pointer px-4 rounded-lg border-b-amber-300"
+                >
+                  <div className="size-4 rounded-full border border-white/40 flex items-center justify-center">
+                    <div className="size-1.5 bg-white/60" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-medium text-white/80 truncate">
+                      {meeting.roomName?.trim() || `Meeting ${meeting.roomId.slice(0, 8)}`}
+                    </p>
+                  </div>
+                  <div className="h-px bg-white/20" style={{ width: `${40 + (index * 10)}%` }} />
+                  <span className="text-[11px] text-white/25">
+                    {new Date(getMeetingDate(meeting)).toLocaleDateString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
-      {children}
+
+      <div className="pl-6 flex flex-col">
+        <div className="mb-6">
+          <div className="text-[9.5px] uppercase tracking-[0.13em] text-white/40 font-semibold my-4">Upcoming</div>
+          <p className="text-[22px] font-normal text-white/70 leading-tight font-serif">
+            Rooms ready<br />
+            when your<br />
+            team <em className="not-italic text-[#f5a623]">is</em>
+          </p>
+          <p className="text-[11px] text-white/40 font-light leading-relaxed mt-3">
+            {nextScheduledMeeting 
+              ? `Next session: ${nextScheduledMeeting.title}` 
+              : "No sessions scheduled yet. Book a time and your team will see it here."}
+          </p>
+          <button 
+            onClick={onScheduleMeeting}
+            className="mt-3 text-[11px] text-[#f5a623] font-medium tracking-wider flex items-center gap-1.5 hover:text-[#f5c86a] transition-colors cursor-pointer hover:underline"
+          >
+            <CalendarDays className="size-3.5" />
+            Schedule a session
+          </button>
+        </div>
+
+        <div className="pt-6 border-t border-white/6">
+          <div className="text-[9.5px] uppercase tracking-[0.13em] text-white/40 font-semibold mb-4">Quick actions</div>
+          <div className="space-y-0">
+            {[
+              { icon: "+", label: "New room", onClick: () => navigate("/meetingSetup") },
+              { icon: "→", label: "Join a room", onClick: () => navigate("/meetingSetup") },
+              { icon: "📅", label: "Schedule session", onClick: () => navigate("/meeting/schedule") },
+              { icon: "▶", label: "Browse recordings", onClick: () => navigate("/dashboard?section=recordings") },
+            ].map((action) => (
+              <button 
+                key={action.label}
+                onClick={action.onClick}
+                className="w-full flex items-center gap-2.5 py-2.5 border-b border-white/4 hover:bg-white/3 transition-colors cursor-pointer"
+              >
+                <span className="text-[15px] text-white/50 w-5 text-center">{action.icon}</span>
+                <span className="text-[12.5px] text-white/40 font-medium hover:text-white/80 transition-colors">{action.label}</span>
+                <span className="ml-auto text-[12px] text-white/10">→</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
-function Pager({
-  page,
-  totalPages,
-  onChange,
-}: {
-  page: number;
-  totalPages: number;
-  onChange: (page: number) => void;
-}) {
+function EmptyRow({ width = "60%" }: { width?: string }) {
   return (
-    <div className="pt-4 flex justify-center">
-      <Pagination>
-        <PaginationContent>
-          <PaginationItem>
-            <PaginationPrevious onClick={() => onChange(Math.max(1, page - 1))} aria-disabled={page === 1} tabIndex={page === 1 ? -1 : 0} />
-          </PaginationItem>
-          {Array.from({ length: totalPages }).map((_, index) => (
-            <PaginationItem key={index}>
-              <PaginationLink isActive={page === index + 1} onClick={() => onChange(index + 1)}>
-                {index + 1}
-              </PaginationLink>
-            </PaginationItem>
-          ))}
-          <PaginationItem>
-            <PaginationNext onClick={() => onChange(Math.min(totalPages, page + 1))} aria-disabled={page === totalPages} tabIndex={page === totalPages ? -1 : 0} />
-          </PaginationItem>
-        </PaginationContent>
-      </Pagination>
+    <div className="flex items-center gap-3 py-3.5 border-b border-white/4 opacity-25">
+      <div className="size-4 rounded-full border border-white/50" />
+      <div className="h-px bg-white/40" style={{ width }} />
     </div>
   );
 }
@@ -200,27 +213,36 @@ function MeetingRow({ meeting, index, onClick }: { meeting: MeetingDetails; inde
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.2, delay: index * 0.04 }}
       onClick={onClick}
-      className="mb-2 flex w-full cursor-pointer items-center gap-3 rounded-xl border border-[#f5a623]/7 bg-black/20 px-3.5 py-2.5 text-left transition last:mb-0 hover:border-[#f5a623]/18 hover:bg-black/35"
+      className="w-full flex items-center gap-3 py-3.5 border-amber-300 text-left hover:bg-white/3 transition-colors cursor-pointer rounded-lg px-4"
     >
-      <span className={`inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br ${gradient} ${textCol} text-[13px] font-extrabold`}>
+      <span className={`inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-br ${gradient} ${textCol} text-[12px] font-extrabold`}>
         {initial}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-bold text-[#fff5de]">
+        <p className="text-[13px] font-medium text-white/80 truncate">
           {meeting.roomName?.trim() || `Meeting ${meeting.roomId.slice(0, 8)}`}
         </p>
-        <div className="mt-1 flex flex-wrap items-center gap-2.5 text-[11px] text-[#b49650]/60">
-          <span className="flex items-center gap-1"><CalendarDays className="size-2.5" />{new Date(getMeetingDate(meeting)).toLocaleDateString()}</span>
-          <span className="flex items-center gap-1"><Users className="size-2.5" />{getMeetingParticipantCount(meeting)}</span>
-          <span className="flex items-center gap-1"><Clock3 className="size-2.5" />{durationLabel}</span>
+        <div className="mt-1 flex items-center gap-3 text-[11px] text-white/35">
+          <span className="flex items-center gap-1">
+            <CalendarDays className="size-2.5" />
+            {new Date(getMeetingDate(meeting)).toLocaleDateString()}
+          </span>
+          <span className="flex items-center gap-1">
+            <Users className="size-2.5" />
+            {getMeetingParticipantCount(meeting)}
+          </span>
+          <span className="flex items-center gap-1">
+            <Clock3 className="size-2.5" />
+            {durationLabel}
+          </span>
         </div>
       </div>
       {isLive ? (
-        <span className="flex items-center gap-1.5 rounded-full border border-red-500/20 bg-red-500/12 px-2.5 py-0.5 text-[10px] font-bold text-red-400/90">
+        <span className="flex items-center gap-1.5 text-[10px] text-red-400/90">
           <span className="inline-block size-1.5 animate-pulse rounded-full bg-red-400" /> Live
         </span>
       ) : (
-        <span className="rounded-full border border-green-500/20 bg-green-500/12 px-2.5 py-0.5 text-[10px] font-bold text-green-400/85">Ended</span>
+        <span className="text-[10px] text-green-400/85">Ended</span>
       )}
     </motion.button>
   );

@@ -5,6 +5,7 @@ import { TimelineRuler } from "./TimelineRuler";
 import { Plus, RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
 import { OverlayTrack } from "./OverlayTrack";
 import { Button } from "../ui/button";
+import { TRANSITION_DEFINITIONS } from "./transitions/types";
 
 interface TimelineProps {
   tracks: Track[];
@@ -23,6 +24,10 @@ interface TimelineProps {
   onDeleteOverlay: (overlayId: string) => void;
   onSeek: (timeMs: number) => void;
   onSplitClip: (trackIndex: number, clipId: string, timelineMs: number) => void;
+  onAddTransitionAtPosition: (trackIndex: number, clipId: string, timelineMs: number, position: "start" | "end" | "middle", transitionType?: string) => void;
+  onPlaceTransitionAtTime: (trackIndex: number, timelineMs: number, transitionType?: string) => void;
+  transitionMode: boolean;
+  onToggleTransitionMode: () => void;
   splitMode: boolean;
   thumbnailsByAsset: Record<string, string[]>;
   extractingAssets: Record<string, boolean>;
@@ -52,6 +57,10 @@ export function Timeline({
   onDeleteClip,
   onSeek,
   onSplitClip,
+  onAddTransitionAtPosition,
+  onPlaceTransitionAtTime,
+  transitionMode,
+  onToggleTransitionMode,
   splitMode,
   onAddOverlay,
   onUpdateOverlay,
@@ -73,15 +82,12 @@ export function Timeline({
   const contentWidthPct = useMemo(() => Math.max(100, zoom * 100), [zoom]);
 
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    // Zoom on Ctrl/Cmd + scroll
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
       const delta = e.deltaY > 0 ? -0.2 : 0.2;
       onZoomChange(Math.max(0.5, Math.min(8, +(zoom + delta).toFixed(2))));
       return;
     }
-
-    // Horizontal scroll on normal scroll (no modifier)
     if (scrollRef.current) {
       e.preventDefault();
       scrollRef.current.scrollLeft += e.deltaY;
@@ -90,6 +96,17 @@ export function Timeline({
 
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (durationMs === 0) return;
+
+    if (transitionMode) {
+      e.stopPropagation();
+      const trackIndex = Number((e.currentTarget as HTMLElement).getAttribute("data-track-index") ?? "0");
+      const selectEl = document.getElementById("transition-type-select") as HTMLSelectElement | null;
+      const transitionType = selectEl?.value ?? "cross-dissolve";
+      onPlaceTransitionAtTime(trackIndex, currentTime, transitionType);
+      onToggleTransitionMode();
+      return;
+    }
+
     const lane = e.currentTarget;
     const rect = lane.getBoundingClientRect();
     const scrollContainer = scrollRef.current;
@@ -133,6 +150,20 @@ export function Timeline({
           <span className="rounded-full border border-[#f5a623]/15 bg-[#f5a623]/8 px-2 py-0.5 text-[10px] font-medium text-[#f5a623]">
             {tracks.length} track{tracks.length !== 1 ? "s" : ""}
           </span>
+          <button
+            onClick={onToggleTransitionMode}
+            className={`flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors ${
+              transitionMode
+                ? "border-[#a855f7] bg-[#a855f7]/15 text-[#c084fc]"
+                : "border-[#f5a623]/15 bg-[#f5a623]/5 text-[#8d7850] hover:border-[#a855f7]/30 hover:text-[#a855f7]"
+            }`}
+            title="Drag to place transitions anywhere on the timeline"
+          >
+            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 2v20M2 12h20" />
+            </svg>
+            {transitionMode ? "Placing..." : "Place Transition"}
+          </button>
           {/* Transition button */}
           <button
             onClick={onToggleTransitionPanel}
@@ -232,6 +263,40 @@ export function Timeline({
               tracks={tracks}
             />
 
+            {/* Transition Placement Indicator */}
+            {transitionMode && (
+              <div
+                className="relative flex items-center gap-3 px-3 py-2.5 rounded-lg border border-[#a855f7]/30 bg-[#a855f7]/8"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full bg-[#a855f7] animate-pulse" />
+                  <span className="text-[11px] text-[#c084fc] font-medium">
+                    Place at playhead:
+                  </span>
+                </div>
+                <select
+                  id="transition-type-select"
+                  className="h-7 rounded-lg border border-[#a855f7]/30 bg-[#1a1a16] px-2 text-[11px] text-[#c084fc] cursor-pointer outline-none hover:border-[#a855f7]/50"
+                  defaultValue="cross-dissolve"
+                >
+                  {TRANSITION_DEFINITIONS.map((t) => (
+                    <option key={t.type} value={t.type}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="text-[11px] font-mono text-[#c084fc]/60">
+                  {((currentTime) / 1000).toFixed(1)}s
+                </div>
+                <button
+                  onClick={onToggleTransitionMode}
+                  className="ml-2 text-[10px] text-[#8d7850] hover:text-white transition-colors"
+                >
+                  ✕ cancel
+                </button>
+              </div>
+            )}
+
             {/* Tracks */}
             <div className="space-y-2.5">
               {tracks.map((track, index) => (
@@ -248,12 +313,14 @@ export function Timeline({
                   onDeleteClip={onDeleteClip}
                   onClick={handleTimelineClick}
                   onSplitClip={onSplitClip}
+                  onAddTransitionAtPosition={onAddTransitionAtPosition}
                   splitMode={splitMode}
                   thumbnailsByAsset={thumbnailsByAsset}
                   extractingAssets={extractingAssets}
                   waveformData={waveformData}
                   assetsById={assetsById}
                   onSelectTransition={onSelectTransition}
+                  transitionMode={transitionMode}
                 />
               ))}
 
@@ -281,10 +348,6 @@ export function Timeline({
               )}
             </div>
           </div>
-        </div>
-
-        <div className="pt-2 text-[11px] text-[#8d7850]">
-          Scroll horizontally to navigate timeline.
         </div>
       </div>
     </div>

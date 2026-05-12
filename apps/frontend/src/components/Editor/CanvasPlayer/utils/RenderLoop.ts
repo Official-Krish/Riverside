@@ -258,6 +258,17 @@ function drawTextOverlay(
   const strokeWidth = Number(style?.strokeWidth || 0);
   const strokeColor = style?.strokeColor || "#000000";
   const maxWidth = style?.maxWidth || null;
+  const textTransform = style?.textTransform || "none";
+
+  // Apply text transform
+  const applyTextTransform = (str: string): string => {
+    switch (textTransform) {
+      case "uppercase": return str.toUpperCase();
+      case "lowercase": return str.toLowerCase();
+      case "capitalize": return str.replace(/\b\w/g, (c) => c.toUpperCase());
+      default: return str;
+    }
+  };
 
   // Background style from new structure
   const bgStyle = style?.background;
@@ -268,7 +279,7 @@ function drawTextOverlay(
   const bgPaddingY = bgStyle?.paddingY ?? 4;
 
   // Prepare lines (support explicit newlines + optional soft wrapping)
-  const rawLines = String(text).split("\n");
+  const rawLines = String(text).split("\n").map(applyTextTransform);
 
   ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
   ctx.fillStyle = color;

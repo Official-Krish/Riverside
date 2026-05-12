@@ -60,21 +60,3 @@ export function runBinary(binary: string, args: string[]) {
     });
   });
 }
-
-export function buildOverlayFilter(overlays: any[]) {
-  if (!overlays?.length) return null;
-
-  const filters = overlays.map((o) => {
-    const text = (o.content?.text || "")
-      .replace(/:/g, "\\:")
-      .replace(/'/g, "\\'")
-      .replace(/,/g, "\\,");
-
-    const start = (o.timelineStartMs / 1000).toFixed(2);
-    const end = ((o.timelineStartMs + o.durationMs) / 1000).toFixed(2);
-
-    return `drawtext=text='${text}':x=${o.transform?.x || 100}:y=${o.transform?.y || 100}:fontsize=24:fontcolor=white:enable='between(t,${start},${end})'`;
-  });
-
-  return filters.join(",");
-}

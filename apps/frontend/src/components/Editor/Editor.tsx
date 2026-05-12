@@ -7,7 +7,6 @@ import { ExportDialog } from "./ExportDialog";
 import { Loader2, Film } from "lucide-react";
 import { CanvasPlayer, useCanvasVideo } from "./CanvasPlayer";
 import { OverlayLayer } from "./OverlayLayer";
-import { TimelineInfoBar } from "./TimelineInfoBar";
 import { EditorPanel, type PanelTab } from "./EditorPanel";
 import { toast } from "sonner";
 import { useTransitions } from "./hooks/useTransitions";
@@ -74,6 +73,9 @@ export function Editor() {
 
   // Preset state
   const [activePreset, setActivePreset] = useState<PresetType | null>(null);
+
+  // Transition placement state
+  const [transitionMode, setTransitionMode] = useState(false);
 
   // Automatically recalculate duration when clips/overlays are added, deleted, or split
   useEffect(() => {
@@ -163,10 +165,10 @@ export function Editor() {
     assetsById, sourceUrl, durationMs
   );
 
-  // Global editor busy flag: true while thumbnails or waveform are being extracted
+  // Global editor busy flag: true while thumbnails are being extracted
+  // Waveform extraction happens in the background and doesn't block the editor
   const isEditorBusy = Boolean(
-    Object.values(extractingAssets).some((v) => v) ||
-    (sourceUrl && durationMs > 0 && waveformData.length === 0)
+    Object.values(extractingAssets).some((v) => v)
   );
 
   const { project, loading, saving, accessDenied } = useEditorProject(
@@ -177,7 +179,7 @@ export function Editor() {
 
   const { handleDeleteOverlay, handleUpdateOverlay, handleAddOverlay } = useOverlayOperations(setOverlays);
 
-  const { handleUpdateClip, handleDeleteClip, handleUpdateTrack, handleSplitClip } = useTrackOperations(setTracks, setSplitMode);
+  const { handleUpdateClip, handleDeleteClip, handleUpdateTrack, handleSplitClip, handleAddTransitionAtPosition, handlePlaceTransitionAtTime } = useTrackOperations(setTracks, setSplitMode);
 
   const {
     selectedTransitionId,
@@ -475,7 +477,7 @@ export function Editor() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-4 w-[420px] max-h-[calc(100vh-150px)]">
+          <div className="flex flex-col gap-4 w-105 max-h-[calc(100vh-100px)]">
             <div className="flex-1 overflow-hidden rounded-2xl border border-[#f5a623]/20 bg-[#0a0a08] shadow-lg max-h-full">
               <EditorPanel
                   activeTab={activePanelTab}
@@ -538,15 +540,6 @@ export function Editor() {
           </div>
         </div>
 
-        {/* Timeline Info Bar - Shows all elements (transitions, overlays, effects) */}
-        <TimelineInfoBar
-          tracks={tracks}
-          overlays={overlays}
-          durationMs={durationMs}
-          currentTime={timelineTime}
-          onSeek={handleSeek}
-        />
-
         <Timeline
           tracks={tracks}
           overlays={overlays}
@@ -564,6 +557,10 @@ export function Editor() {
           onDeleteOverlay={handleDeleteOverlay}
           onSeek={handleSeek}
           onSplitClip={handleSplitClip}
+          onAddTransitionAtPosition={handleAddTransitionAtPosition}
+          onPlaceTransitionAtTime={handlePlaceTransitionAtTime}
+          transitionMode={transitionMode}
+          onToggleTransitionMode={() => setTransitionMode(prev => !prev)}
           splitMode={splitMode}
           thumbnailsByAsset={thumbnailsByAsset}
           extractingAssets={extractingAssets}

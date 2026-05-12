@@ -53,6 +53,9 @@ getMeetingsRouter.get("/getAll", authMiddleware, async (req, res) => {
             where: {
                 participants: {
                     some: { userId }
+                },
+                status: {
+                    notIn: ["ENDED", "CANCELLED"]
                 }
             },
             include: {

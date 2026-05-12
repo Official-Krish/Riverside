@@ -120,7 +120,7 @@ export async function notificationWorker() {
         case "Notifications":
           const { type } = parsed;
           switch (type) {
-            case "Gmail":
+            case "GMAIL":
               const { recipientEmails, eventDetails } = parsed;
               if (!recipientEmails || !eventDetails) break;
               try {
@@ -130,7 +130,7 @@ export async function notificationWorker() {
               }
               break;
             
-            case "Slack":
+            case "SLACK":
               const { slackBotToken, slackUserId, eventDetails: slackEventDetails } = parsed;
               if (!slackBotToken || !slackUserId || !slackEventDetails) break;
               try {
@@ -140,7 +140,7 @@ export async function notificationWorker() {
               }
               break;
             
-            case "Discord":
+            case "DISCORD":
               const { discordWebhookUrl, eventDetails: discordEventDetails } = parsed;
               if (!discordWebhookUrl || !discordEventDetails) break;
               try{
@@ -165,9 +165,6 @@ export async function notificationWorker() {
     }
   }
 }
-
-const CHAT_HISTORY_EXPIRY = 30 * 60; // 30 minutes in seconds
-const MAX_MESSAGES_PER_ROOM = 100;
 
 /**
  * Retrieve recent chat messages for a room (last N messages).

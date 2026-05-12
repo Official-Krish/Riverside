@@ -369,12 +369,33 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
       prevSrcRef.current = src;
       video.src = src;
       video.load();
-      if (video.readyState >= 2) {
-        handleLoadedData();
-      }
-    } else if (video.readyState >= 1) {
-      // Source already loaded (e.g. effect re-run with same src)
-      handleLoadedMetadata();
+
+      const handleFirstLoaded = () => {
+        video.removeEventListener("loadeddata", handleFirstLoaded);
+        video.removeEventListener("canplay", handleFirstLoaded);
+        clearTimeout(fallbackTimeout);
+        setDuration(video.duration);
+        setIsLoaded(true);
+        const canvas = canvasRef.current;
+        if (canvas) {
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            drawSingleFrame(ctx, video, canvas, transformRef.current);
+          }
+        }
+      };
+
+      video.addEventListener("loadeddata", handleFirstLoaded);
+      video.addEventListener("canplay", handleFirstLoaded);
+
+      const fallbackTimeout = setTimeout(() => {
+        video.removeEventListener("loadeddata", handleFirstLoaded);
+        video.removeEventListener("canplay", handleFirstLoaded);
+        if (video.readyState >= 1) {
+          setDuration(video.duration);
+          setIsLoaded(true);
+        }
+      }, 3000);
     }
 
     return () => {

@@ -646,68 +646,90 @@ export class TransitionRenderer {
     const { width, height } = this.canvas;
     const direction = transition.direction || "left";
 
-    // Create gradient for smooth transition
-    let gradient: CanvasGradient;
+    let clipRect: { x: number; y: number; w: number; h: number } = { x: 0, y: 0, w: width, h: height };
+    let gradientRect: { x: number; y: number; w: number; h: number } = { x: 0, y: 0, w: width, h: height };
+    let gradientStart = 0;
+    let gradientEnd = 0;
+
     switch (direction) {
       case "left":
-        gradient = this.ctx.createLinearGradient(0, 0, width * progress, 0);
-        gradient.addColorStop(0, "rgba(0,0,0,1)");
-        gradient.addColorStop(1, "rgba(0,0,0,0)");
+        clipRect = { x: width * (1 - progress), y: 0, w: width, h: height };
+        gradientRect = { x: 0, y: 0, w: width, h: height };
+        gradientStart = width * (1 - progress);
+        gradientEnd = width * (1 - progress) + width * progress;
         break;
       case "right":
-        gradient = this.ctx.createLinearGradient(width, 0, width - (width * progress), 0);
-        gradient.addColorStop(0, "rgba(0,0,0,1)");
-        gradient.addColorStop(1, "rgba(0,0,0,0)");
+        clipRect = { x: 0, y: 0, w: width * (1 - progress), h: height };
+        gradientRect = { x: 0, y: 0, w: width, h: height };
+        gradientStart = width * progress;
+        gradientEnd = width - width * progress;
         break;
       case "top":
-        gradient = this.ctx.createLinearGradient(0, 0, 0, height * progress);
-        gradient.addColorStop(0, "rgba(0,0,0,1)");
-        gradient.addColorStop(1, "rgba(0,0,0,0)");
+        clipRect = { x: 0, y: height * (1 - progress), w: width, h: height };
+        gradientRect = { x: 0, y: 0, w: width, h: height };
+        gradientStart = height * (1 - progress);
+        gradientEnd = height * (1 - progress) + height * progress;
         break;
       case "bottom":
-        gradient = this.ctx.createLinearGradient(0, height, 0, height - (height * progress));
-        gradient.addColorStop(0, "rgba(0,0,0,1)");
-        gradient.addColorStop(1, "rgba(0,0,0,0)");
+        clipRect = { x: 0, y: 0, w: width, h: height * (1 - progress) };
+        gradientRect = { x: 0, y: 0, w: width, h: height };
+        gradientStart = height * progress;
+        gradientEnd = height - height * progress;
         break;
-      default:
-        gradient = this.ctx.createLinearGradient(0, 0, width * progress, 0);
-        gradient.addColorStop(0, "rgba(0,0,0,1)");
-        gradient.addColorStop(1, "rgba(0,0,0,0)");
     }
 
-    // Draw target
+    this.ctx.save();
+    this.ctx.beginPath();
+    this.ctx.rect(clipRect.x, clipRect.y, clipRect.w, clipRect.h);
+    this.ctx.clip();
+
+    const gradient = this.ctx.createLinearGradient(
+      direction === "left" || direction === "right" ? gradientStart : 0,
+      direction === "top" || direction === "bottom" ? gradientStart : 0,
+      direction === "left" || direction === "right" ? gradientEnd : width,
+      direction === "top" || direction === "bottom" ? gradientEnd : height
+    );
+    gradient.addColorStop(0, "rgba(0,0,0,0)");
+    gradient.addColorStop(0.5, "rgba(0,0,0,0.3)");
+    gradient.addColorStop(1, "rgba(0,0,0,1)");
+
+    this.ctx.fillStyle = gradient;
+    this.ctx.fillRect(gradientRect.x, gradientRect.y, gradientRect.w, gradientRect.h);
+
     if (target) {
       this.ctx.drawImage(target, 0, 0, width, height);
     }
 
-    // Draw source with gradient mask
+    if (source) {
+      this.ctx.globalAlpha = 1 - progress;
+      this.ctx.drawImage(source, 0, 0, width, height);
+      this.ctx.globalAlpha = 1;
+    }
+
+    this.ctx.restore();
+
     if (source) {
       this.ctx.save();
-
-      // Create mask based on direction
       this.ctx.beginPath();
+      let remainingRect: { x: number; y: number; w: number; h: number };
       switch (direction) {
         case "left":
-          this.ctx.rect(0, 0, width * progress, height);
+          remainingRect = { x: 0, y: 0, w: width * (1 - progress), h: height };
           break;
         case "right":
-          this.ctx.rect(width * (1 - progress), 0, width * progress, height);
+          remainingRect = { x: width * (1 - progress), y: 0, w: width * progress, h: height };
           break;
         case "top":
-          this.ctx.rect(0, 0, width, height * progress);
+          remainingRect = { x: 0, y: 0, w: width, h: height * (1 - progress) };
           break;
         case "bottom":
-          this.ctx.rect(0, height * (1 - progress), width, height * progress);
+          remainingRect = { x: 0, y: height * (1 - progress), w: width, h: height * progress };
           break;
+        default:
+          remainingRect = { x: 0, y: 0, w: width * (1 - progress), h: height };
       }
+      this.ctx.rect(remainingRect.x, remainingRect.y, remainingRect.w, remainingRect.h);
       this.ctx.clip();
-
-      // Apply gradient overlay for smooth blend
-      this.ctx.globalAlpha = 0.5;
-      this.ctx.fillStyle = gradient;
-      this.ctx.fillRect(0, 0, width, height);
-
-      this.ctx.globalAlpha = 1 - progress;
       this.ctx.drawImage(source, 0, 0, width, height);
       this.ctx.restore();
     }

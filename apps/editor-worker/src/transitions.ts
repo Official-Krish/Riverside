@@ -34,6 +34,7 @@ export function getXFadeTransition(type: string | null | undefined): string {
     case "wipe-bottom":
       return "wipedown";
     case "wipe-clock":
+      return "wipeclock";
     case "wipe-radial":
       return "radial";
     case "circle-open":
@@ -67,6 +68,14 @@ export function getXFadeTransition(type: string | null | undefined): string {
   }
 }
 
+function buildXFadeArgs(transition: { type: string; durationMs: number; borderWidth?: number; borderColor?: string; reverse?: boolean }, offsetSec: string): string {
+  let args = `transition=${transition.type}:duration=${(transition.durationMs / 1000).toFixed(3)}:offset=${offsetSec}`;
+  if (transition.borderWidth) args += `:borderw=${transition.borderWidth}`;
+  if (transition.borderColor) args += `:bordercolor=0x${transition.borderColor.replace("#", "")}`;
+  if (transition.reverse) args += ":reverse=1";
+  return args;
+}
+
 export function getTransitionPlan(clip: RenderClip, position: "start" | "end") {
   const transition = position === "start"
     ? (clip.transitionStart ?? (clip.transitionIn ? { type: clip.transitionIn, durationMs: 500 } : null))
@@ -83,6 +92,9 @@ export function getTransitionPlan(clip: RenderClip, position: "start" | "end") {
   return {
     type: getXFadeTransition(transitionType),
     durationMs: Math.max(100, transitionDuration),
+    borderWidth: Number.isFinite(transitionRecord.borderWidth) ? Number(transitionRecord.borderWidth) : undefined,
+    borderColor: typeof transitionRecord.borderColor === "string" ? transitionRecord.borderColor : undefined,
+    reverse: typeof transitionRecord.reverse === "boolean" ? transitionRecord.reverse : undefined,
   };
 }
 
@@ -135,7 +147,7 @@ export function buildClipRenderArgs(clip: RenderClip, outputPath: string, width:
       "-i", `color=c=black:s=${width}x${height}:r=${fps}`,
     );
     filterParts.push(`[${inputIndex}:v]format=rgba[blackstart]`);
-    filterParts.push(`[blackstart][clipv]xfade=transition=${startTransition.type}:duration=${(startTransition.durationMs / 1000).toFixed(3)}:offset=0[afterstart]`);
+    filterParts.push(`[blackstart][clipv]xfade=${buildXFadeArgs(startTransition, "0")}[afterstart]`);
     outputLabel = "afterstart";
     inputIndex += 1;
   }
@@ -148,7 +160,7 @@ export function buildClipRenderArgs(clip: RenderClip, outputPath: string, width:
     );
     filterParts.push(`[${inputIndex}:v]format=rgba[blackend]`);
     const endOffset = Math.max(0, (clip.durationMs - endTransition.durationMs) / 1000).toFixed(3);
-    filterParts.push(`[${outputLabel}][blackend]xfade=transition=${endTransition.type}:duration=${(endTransition.durationMs / 1000).toFixed(3)}:offset=${endOffset}[outv]`);
+    filterParts.push(`[${outputLabel}][blackend]xfade=${buildXFadeArgs(endTransition, endOffset)}[outv]`);
     outputLabel = "outv";
   }
 

@@ -22,7 +22,7 @@ joinMeetingRouter.post("/join/:id", authMiddleware, async (req, res) => {
     });
 
     if (!meeting) {
-      const schedule = await prisma.meetingSchedule.findUnique({
+      const schedule = await prisma.meetingSchedule.findFirst({
         where: { id },
         include: { participants: true },
       });
@@ -31,12 +31,7 @@ joinMeetingRouter.post("/join/:id", authMiddleware, async (req, res) => {
         return res.status(404).json({ message: "Meeting not found" });
       }
 
-      meeting = await prisma.meeting.findFirst({
-        where: { scheduleId: schedule.id },
-        include: { participants: true },
-      });
-
-      if (meeting && schedule.hostId === userId) {
+      if (schedule.hostId === userId) {
         meeting = await prisma.meeting.create({
           data: {
             roomId: generateString().toLowerCase(),
@@ -77,7 +72,7 @@ joinMeetingRouter.post("/join/:id", authMiddleware, async (req, res) => {
           isHost: true,
           recordingState: meeting.recordingState,
         });
-      } else if (meeting && schedule.hostId !== userId) {
+      } else if (schedule && schedule.hostId !== userId) {
         return res.status(201).json({ message: "Waiting for host to start the meeting" });
       }
     }

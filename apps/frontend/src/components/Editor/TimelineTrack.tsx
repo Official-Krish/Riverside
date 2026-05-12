@@ -16,6 +16,7 @@ interface TimelineTrackProps {
   onDeleteClip: (trackIndex: number, clipId: string) => void;
   onClick: (e: React.MouseEvent<HTMLDivElement>) => void;
   onSplitClip: (trackIndex: number, clipId: string, timelineMs: number) => void;
+  onAddTransitionAtPosition: (trackIndex: number, clipId: string, timelineMs: number, position: "start" | "end" | "middle", transitionType?: string) => void;
   splitMode: boolean;
   thumbnailsByAsset: Record<string, string[]>;
   extractingAssets: Record<string, boolean>;
@@ -23,6 +24,8 @@ interface TimelineTrackProps {
   assetsById: Record<string, any>;
   // Transition props
   onSelectTransition: (trackIndex: number, clipId: string, position: "start" | "end") => void;
+  // Drag-to-place transition props
+  transitionMode?: boolean;
 }
 
 export function getTrackIcon(type: Track["type"]) {
@@ -47,12 +50,14 @@ function TimelineTrackComponent({
   onDeleteClip,
   onClick,
   onSplitClip,
+  onAddTransitionAtPosition,
   splitMode,
   thumbnailsByAsset,
   extractingAssets,
   waveformData,
   assetsById,
   onSelectTransition,
+  transitionMode = false,
 }: TimelineTrackProps) {
   const [selectedClip, setSelectedClip] = useState<string | null>(null);
   const [dragging, setDragging] = useState<{
@@ -67,14 +72,15 @@ function TimelineTrackComponent({
   const colors = getTrackColors(track.type);
 
   const handleClipClick = (e: React.MouseEvent, clip: Clip, clipId: string) => {
-    e.stopPropagation();
     if (splitMode && durationMs > 0) {
+      e.stopPropagation();
       const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
       const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
       const splitTime = clip.timelineStartMs + clip.durationMs * ratio;
       onSplitClip(index, clipId, Math.round(splitTime));
       return;
     }
+    if (transitionMode) return;
     setSelectedClip(clipId);
   };
 
@@ -331,9 +337,11 @@ function TimelineTrackComponent({
       {/* Track Lane */}
       <div
         data-track-lane={track.id}
+        data-track-index={index}
         className={`relative overflow-hidden rounded-xl border-2 transition-all duration-200
           ${track.type === "VIDEO" ? "h-18 border-[#eab308]/50 bg-[#1a1a16]/80" : `h-14 ${colors.border} ${colors.bg}`}
-          hover:border-opacity-60 ${splitMode ? "cursor-crosshair" : "cursor-pointer"}`}
+          hover:border-opacity-60 ${splitMode ? "cursor-crosshair" : "cursor-pointer"}
+          ${transitionMode ? "cursor-crosshair border-[#a855f7]/50" : ""}`}
         onClick={onClick}
       >
         {track.type === "AUDIO" && (
@@ -510,15 +518,13 @@ function TimelineTrackComponent({
                 </div>
               )}
 
-              {/* Add Transition Hover Buttons (only when hovering empty edges) */}
+              {/* Add Transition Hover Buttons (zero-gap split for mid-clip) */}
               {!clip.transitionStart && (
                 <button
                   className="absolute left-0.5 top-0.5 z-20 flex h-5 w-5 items-center justify-center rounded text-[7px] shadow-md transition-all hover:scale-110 bg-black/50 text-[#8d7850] opacity-0 group-hover/clip:opacity-100 hover:bg-[#06b6d4]/80 hover:text-white"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onUpdateClip(index, clipId, {
-                      transitionStart: { type: "cross-dissolve", durationMs: 500, easing: "ease-in-out" },
-                    });
+                    onAddTransitionAtPosition(index, clipId, clip.timelineStartMs, "start", "cross-dissolve");
                   }}
                   title="Add start transition"
                 >
@@ -531,9 +537,7 @@ function TimelineTrackComponent({
                   className="absolute right-0.5 top-0.5 z-20 flex h-5 w-5 items-center justify-center rounded text-[7px] shadow-md transition-all hover:scale-110 bg-black/50 text-[#8d7850] opacity-0 group-hover/clip:opacity-100 hover:bg-[#06b6d4]/80 hover:text-white"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onUpdateClip(index, clipId, {
-                      transitionEnd: { type: "cross-dissolve", durationMs: 500, easing: "ease-in-out" },
-                    });
+                    onAddTransitionAtPosition(index, clipId, clip.timelineStartMs + clip.durationMs, "end", "cross-dissolve");
                   }}
                   title="Add end transition"
                 >

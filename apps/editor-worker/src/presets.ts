@@ -106,8 +106,12 @@ export function buildPresetFilter(preset: PresetType | null | undefined, config?
       return buildMemeFormatFilter();
     case "podcast-layout":
       return buildPodcastLayoutFilter();
-    case "gaming-edit":
-      return buildGamingEditFilter();
+    case "lower-third":
+      return buildLowerThirdFilter();
+    case "cta-button":
+      return buildCTAButtonFilter();
+    case "chapter-title":
+      return buildChapterTitleFilter();
     default:
       return null;
   }
@@ -154,7 +158,17 @@ function buildPodcastLayoutFilter(): string | null {
   return null;
 }
 
-function buildGamingEditFilter(): string | null {
+
+function buildLowerThirdFilter(): string | null {
+  const padColor = "0x000000";
+  return `crop=in_w:160:0:ih-160,pad=1280:720:0:(oh-ih)/2:${padColor}`;
+}
+
+function buildCTAButtonFilter(): string | null {
+  return null;
+}
+
+function buildChapterTitleFilter(): string | null {
   return null;
 }
 

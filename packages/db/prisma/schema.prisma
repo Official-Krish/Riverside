@@ -38,6 +38,13 @@ model User {
   @@map("users")
 }
 
+enum ScheduleStatus {
+  SCHEDULED
+  STARTED
+  ENDED
+  CANCELLED
+}
+
 model Notification {
   id        String           @id @default(uuid())
   userId    String
@@ -57,15 +64,16 @@ model Notification {
 
 
 model MeetingSchedule {
-  id             String    @id @default(uuid())
+  id             String            @id @default(uuid())
   hostId         String
   title          String
   description    String?
   startTime      DateTime
   endTime        DateTime?
-  isRecurring    Boolean   @default(false)
+  isRecurring    Boolean           @default(false)
   recurrenceRule String?   
   timezone       String?  
+  status         ScheduleStatus    @default(SCHEDULED)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

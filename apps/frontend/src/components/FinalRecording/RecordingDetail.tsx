@@ -2,9 +2,36 @@ import { findDuration } from "@/lib/utils";
 import type { RecordingPageResponse } from "@repo/types/api"
 import { CalendarDays, Clock3, Users, Video, Download, Pencil } from "lucide-react"
 import { Link } from "react-router-dom"
+import { useState } from "react";
 
 export const RecordingDetail = ({ meeting }: { meeting: RecordingPageResponse;}) => {
     const downloadableMp4Url = meeting?.finalVideoUrl || "";
+    const [isDownloading, setIsDownloading] = useState(false);
+
+    const handleDownload = async () => {
+        if (!downloadableMp4Url || isDownloading) return;
+        
+        setIsDownloading(true);
+        try {
+            const response = await fetch(downloadableMp4Url);
+            if (!response.ok) throw new Error("Download failed");
+            
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `recording-${meeting?.meetingId || "video"}.mp4`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error("Download failed:", error);
+            window.open(downloadableMp4Url, "_blank");
+        } finally {
+            setIsDownloading(false);
+        }
+    };
 
     const startedAt = meeting.startedAt ? new Date(meeting.startedAt) : null;
     const endedAt = meeting.endedAt ? new Date(meeting.endedAt) : null;
@@ -36,15 +63,15 @@ export const RecordingDetail = ({ meeting }: { meeting: RecordingPageResponse;})
             </div>
 
             <div className="flex gap-2 mt-4">
-                {meeting.recordingState === "READY" && meeting.canViewRecording && (
-                <a href={downloadableMp4Url} download className="wrp-download-btn">
-                    <Download size={13} />
-                    Download recording
-                </a>
+{meeting.recordingState === "READY" && meeting.canViewRecording && (
+                    <button onClick={handleDownload} disabled={isDownloading} className="wrp-download-btn">
+                        <Download size={13} />
+                        {isDownloading ? "Downloading..." : "Download recording"}
+                    </button>
                 )}
                 {meeting?.meetingId && (
                     <Link
-                        to={`/editor?meetingId=${meeting.meetingId}`}
+                        to={`/edit/${meeting.id}`}
                         className="wrp-download-btn"
                         style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
                     >

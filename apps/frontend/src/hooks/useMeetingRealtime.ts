@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { WS_RELAYER_URL } from "../lib/config";
+import { http } from "../https";
 import {
   removeParticipantMediaState,
   setParticipantMediaState,
@@ -163,6 +164,39 @@ export function useMeetingRealtime({
     return true;
   }, []);
 
+  const fetchChatHistory = useCallback(async () => {
+    try {
+      const res = await http.get(`/chat/${roomId}/history?limit=50`);
+      const history = res.data.messages || [];
+      
+      if (history.length === 0) return;
+
+      const existingIds = new Set(chatMessages.map((m) => m.id));
+      const newMessages: RealtimeChatMessage[] = history
+        .filter((msg: any) => !existingIds.has(msg.id))
+        .map((msg: any) => ({
+          id: msg.id,
+          text: msg.text,
+          senderId: msg.sender?.participantId || msg.senderId || "",
+          senderName: msg.sender?.displayName || msg.senderName || "Guest",
+          timestamp: msg.timestamp || Date.now(),
+          isOwn: selfParticipantIdRef.current 
+            ? (msg.sender?.participantId || msg.senderId) === selfParticipantIdRef.current 
+            : false,
+        }));
+
+      if (newMessages.length > 0) {
+        setChatMessages((current) => {
+          const seen = new Set(current.map((m) => m.id));
+          const unique = newMessages.filter((m) => !seen.has(m.id));
+          return [...current, ...unique];
+        });
+      }
+    } catch (err) {
+      console.warn("Failed to fetch chat history:", err);
+    }
+  }, [roomId, chatMessages]);
+
   const connect = useCallback(() => {
     if (!enabled || !roomId) {
       return;
@@ -188,6 +222,7 @@ export function useMeetingRealtime({
         isVideoOff: localMediaStateRef.current.isVideoOff,
       });
       safeSend({ type: "get-recording-state", roomId });
+      void fetchChatHistory();
     };
 
     socket.onmessage = (event) => {

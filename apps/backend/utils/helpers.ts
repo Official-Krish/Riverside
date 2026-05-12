@@ -1,5 +1,5 @@
 import { prisma } from "@repo/db/client";
-import { redisPublisher } from "./redis";
+import { redisPublisher, clearChatHistory } from "./redis";
 import { Resend } from "resend";
 import {
   toPublicRecordingLink,
@@ -285,6 +285,7 @@ export async function finalizeMeetingRoom(roomId: string, hostUserId?: string) {
     where: { roomId },
     include: {
       participants: true,
+      schedule: true,
     },
   });
 
@@ -319,6 +320,8 @@ export async function finalizeMeetingRoom(roomId: string, hostUserId?: string) {
       },
     });
 
+    await clearChatHistory(roomId);
+
     if (shouldProcessRecording) {
       await redisPublisher.rpush(
         "ProcessVideo",
@@ -329,6 +332,13 @@ export async function finalizeMeetingRoom(roomId: string, hostUserId?: string) {
         })
       );
       console.log(`[${new Date().toISOString()}] Enqueued ProcessVideo for roomId=${meeting.roomId}`);
+    }
+
+    if (meeting.scheduleId && meeting.schedule) {
+      await prisma.meetingSchedule.update({
+        where: { id: meeting.scheduleId },
+        data: { status: "ENDED" },
+      });
     }
   }
 
