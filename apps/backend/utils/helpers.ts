@@ -285,6 +285,7 @@ export async function finalizeMeetingRoom(roomId: string, hostUserId?: string) {
     where: { roomId },
     include: {
       participants: true,
+      schedule: true,
     },
   });
 
@@ -331,6 +332,13 @@ export async function finalizeMeetingRoom(roomId: string, hostUserId?: string) {
         })
       );
       console.log(`[${new Date().toISOString()}] Enqueued ProcessVideo for roomId=${meeting.roomId}`);
+    }
+
+    if (meeting.scheduleId && meeting.schedule) {
+      await prisma.meetingSchedule.update({
+        where: { id: meeting.scheduleId },
+        data: { status: "ENDED" },
+      });
     }
   }
 

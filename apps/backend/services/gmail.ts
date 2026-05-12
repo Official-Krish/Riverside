@@ -32,7 +32,7 @@ export async function sendGmailMessage(
                 : `<span style="color:#888;">No additional attendees</span>`;
 
         await resend.emails.send({
-            from: "Weave <support@weave.krishdev.xyz>",
+            from: "Weave <support@weave.krishlabs.tech>",
             to: recipientEmail,
             subject: `📅 Meeting Invitation: ${eventDetails.summary}`,
             html: `
@@ -102,7 +102,7 @@ export async function sendGmailMessage(
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center">
-                    <a href="https://weave.krishdev.xyz/dashboard?section=upcoming"
+                    <a href="https://weave.krishlabs.tech/dashboard?section=upcoming"
                        style="display:inline-block;background:linear-gradient(135deg,#ffd166,#f5a623);color:#1b1100;font-size:15px;font-weight:800;padding:14px 36px;border-radius:10px;text-decoration:none;letter-spacing:0.01em;">
                       View Upcoming Meetings
                     </a>
