@@ -181,7 +181,8 @@ editorRouter.get("/projects/:id", authMiddleware, async (req, res) => {
                     }),
                 })),
                 assets: project.assets.map((asset) => {
-                    const fixedUrl = asset.url.includes("meeting-grid.mp4")
+                    const hasWrongFilename = asset.url.includes("meeting-grid.mp4");
+                    const fixedUrl = hasWrongFilename
                         ? asset.url.replace("meeting-grid.mp4", "meeting_grid_recording.mp4")
                         : asset.url;
                     return {
