@@ -71,7 +71,7 @@ export const RecordingDetail = ({ meeting }: { meeting: RecordingPageResponse;})
                 )}
                 {meeting?.meetingId && (
                     <Link
-                        to={`/editor?meetingId=${meeting.meetingId}`}
+                        to={`/edit/${meeting.id}`}
                         className="wrp-download-btn"
                         style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
                     >
