@@ -50,8 +50,8 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
   if (!project) throw new Error(`Project not found: ${projectId}`);
 
   const fps = project.fps ?? 30;
-  const width = project.width ?? 1280;
-  const height = project.height ?? 720;
+  const width = project.width ?? 1920;
+  const height = project.height ?? 1080;
 
   const { videoClips, audioClips } = collectRenderClips(project);
 
@@ -141,8 +141,12 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
 
     const allOverlays = [...project.overlays];
     for (const clip of videoClips) {
-      if (clip.preset && ["intro-template", "meme-format", "podcast-layout", "gaming-edit"].includes(clip.preset)) {
-        const templateOverlays = generateTemplateOverlays(clip.preset, clip.durationMs, width, height);
+      if (clip.preset && ["intro-template", "meme-format", "podcast-layout"].includes(clip.preset)) {
+        const templateOverlays = generateTemplateOverlays(clip.preset, clip.durationMs, width, height)
+          .map((overlay) => ({
+            ...overlay,
+            timelineStartMs: overlay.timelineStartMs + clip.timelineStartMs,
+          }));
         allOverlays.push(...templateOverlays as any);
         log("debug", `Generated ${templateOverlays.length} template overlays for preset ${clip.preset}`, { jobId });
       }

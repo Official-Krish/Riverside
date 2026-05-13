@@ -8,7 +8,7 @@ export interface GeneratedOverlay {
   style?: Record<string, unknown>;
 }
 
-export function generateTemplateOverlays(preset: PresetType, durationMs: number, width = 1280, height = 720): GeneratedOverlay[] {
+export function generateTemplateOverlays(preset: PresetType, durationMs: number, width = 1920, height = 1080): GeneratedOverlay[] {
   switch (preset) {
     case "intro-template":
       return [
@@ -22,8 +22,13 @@ export function generateTemplateOverlays(preset: PresetType, durationMs: number,
             fontWeight: "bold" as const,
             color: "ffffff",
             textAlign: "center" as const,
-            backgroundColor: "#000000",
-            backgroundOpacity: 0.7,
+            background: {
+              color: "#000000",
+              opacity: 0.7,
+              radius: 6,
+              paddingX: 12,
+              paddingY: 8,
+            },
           },
         },
       ];
@@ -69,9 +74,13 @@ export function generateTemplateOverlays(preset: PresetType, durationMs: number,
             fontSize: 18,
             color: "ffffff",
             textAlign: "center" as const,
-            backgroundColor: "#ec4899",
-            backgroundOpacity: 0.8,
-            backgroundRadius: 4,
+            background: {
+              color: "#ec4899",
+              opacity: 0.8,
+              radius: 4,
+              paddingX: 8,
+              paddingY: 4,
+            },
           },
         },
       ];
@@ -81,7 +90,13 @@ export function generateTemplateOverlays(preset: PresetType, durationMs: number,
   }
 }
 
-export function buildPresetFilter(preset: PresetType | null | undefined, config?: PresetConfig): string | null {
+export function buildPresetFilter(
+  preset: PresetType | null | undefined,
+  config?: PresetConfig,
+  width = 1920,
+  height = 1080,
+  fps = 60,
+): string | null {
   if (!preset) return null;
 
   const intensity = config?.intensity ?? 1;
@@ -89,13 +104,13 @@ export function buildPresetFilter(preset: PresetType | null | undefined, config?
 
   switch (preset) {
     case "zoom-pop":
-      return buildZoomPopFilter(intensity);
+      return buildZoomPopFilter(intensity, width, height, fps);
     case "shake":
       return buildShakeFilter(intensity);
     case "glitch":
       return buildGlitchFilter(intensity);
     case "cinematic-bars":
-      return buildCinematicBarsFilter(config?.color ?? "black");
+      return buildCinematicBarsFilter(config?.color ?? "black", width, height);
     case "vhs":
       return buildVHSFilter(intensity);
     case "chromakey":
@@ -107,7 +122,7 @@ export function buildPresetFilter(preset: PresetType | null | undefined, config?
     case "podcast-layout":
       return buildPodcastLayoutFilter();
     case "lower-third":
-      return buildLowerThirdFilter();
+      return buildLowerThirdFilter(width, height);
     case "cta-button":
       return buildCTAButtonFilter();
     case "chapter-title":
@@ -117,9 +132,9 @@ export function buildPresetFilter(preset: PresetType | null | undefined, config?
   }
 }
 
-function buildZoomPopFilter(intensity: number): string | null {
+function buildZoomPopFilter(intensity: number, width: number, height: number, fps: number): string | null {
   const zoomAmount = 1 + (intensity * 0.15);
-  return `zoompan=z='min(zoom+0.005,${zoomAmount})':d=1:s=1280x720:fps=30`;
+  return `zoompan=z='min(zoom+0.005,${zoomAmount})':d=1:s=${width}x${height}:fps=${fps}`;
 }
 
 function buildShakeFilter(intensity: number): string | null {
@@ -132,9 +147,10 @@ function buildGlitchFilter(intensity: number): string | null {
   return `colorbalance=rs=${intensity * 0.1}:gs=0:bs=-${intensity * 0.1},format=yuv420p`;
 }
 
-function buildCinematicBarsFilter(color: string): string | null {
+function buildCinematicBarsFilter(color: string, width: number, height: number): string | null {
   const padColor = color.startsWith("0x") ? color.replace("0x", "") : color.replace("#", "");
-  return `pad=1280:720:0:(ow-ih)/2:0x${padColor || "000000"}`;
+  const barHeight = Math.max(1, Math.round(height * 0.25));
+  return `drawbox=x=0:y=0:w=${width}:h=${barHeight}:color=0x${padColor || "000000"}:t=fill,drawbox=x=0:y=${height - barHeight}:w=${width}:h=${barHeight}:color=0x${padColor || "000000"}:t=fill`;
 }
 
 function buildVHSFilter(intensity: number): string | null {
@@ -159,9 +175,10 @@ function buildPodcastLayoutFilter(): string | null {
 }
 
 
-function buildLowerThirdFilter(): string | null {
+function buildLowerThirdFilter(width: number, height: number): string | null {
   const padColor = "0x000000";
-  return `crop=in_w:160:0:ih-160,pad=1280:720:0:(oh-ih)/2:${padColor}`;
+  const cropHeight = Math.max(1, Math.round(height * 0.22));
+  return `crop=in_w:${cropHeight}:0:ih-${cropHeight},pad=${width}:${height}:0:(oh-ih)/2:${padColor}`;
 }
 
 function buildCTAButtonFilter(): string | null {

@@ -101,7 +101,7 @@ export function getTransitionPlan(clip: RenderClip, position: "start" | "end") {
 export function buildClipRenderArgs(clip: RenderClip, outputPath: string, width: number, height: number, fps: number): string[] {
   const startTransition = getTransitionPlan(clip, "start");
   const endTransition = getTransitionPlan(clip, "end");
-  const presetFilter = buildPresetFilter(clip.preset, clip.presetConfig);
+  const presetFilter = buildPresetFilter(clip.preset, clip.presetConfig, width, height, fps);
 
   const args = [
     "-y",
