@@ -10,6 +10,7 @@ export interface UserChunk {
     userId: string;
     localPath: string;
     timestamp: number;
+    durationSeconds: number;
     hasValidTimestamp?: boolean;
     metadata?: EncryptionMetadata | null;
 }

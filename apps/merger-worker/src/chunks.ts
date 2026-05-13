@@ -108,6 +108,7 @@ export async function collectUserChunks(
             userId,
             localPath,
             timestamp: parsedTimestamp,
+            durationSeconds: 10,
             hasValidTimestamp: parsedTimestamp !== null,
             metadata: metadata
                 ? {

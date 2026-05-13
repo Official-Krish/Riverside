@@ -8,9 +8,22 @@ import { collectUserChunks } from "./chunks";
 import { createUserVideo, createBlackPlaceholderVideo } from "./video-creator";
 import { createGridVideo } from "./grid-builder";
 import { cleanupTempDir, cleanupSourceChunksFromS3, cleanupLegacyLocalChunks, cleanupLegacyRecordingsTmp } from "./cleanup";
-import { getVideoDuration, hasAudioStream, ffprobeBin } from "./ffmpeg";
+import { hasAudioStream, ffprobeBin } from "./ffmpeg";
 import { getPositiveIntegerEnv } from "./config";
 import { type MergerConfig, type ProcessedUser, type FailedUser, type UserChunk } from "./types";
+
+function computeTrueTimelineDuration(chunks: UserChunk[]): number {
+    if (chunks.length === 0) return 0;
+    if (chunks.length === 1) return chunks[0]!.durationSeconds;
+
+    let totalDuration = 0;
+    for (let i = 0; i < chunks.length - 1; i++) {
+        const gap = (chunks[i + 1]!.timestamp - chunks[i]!.timestamp) / 1000;
+        totalDuration += chunks[i]!.durationSeconds + Math.max(0, gap - chunks[i]!.durationSeconds);
+    }
+    totalDuration += chunks[chunks.length - 1]!.durationSeconds;
+    return totalDuration;
+}
 
 export class LocalVideoMerger {
     private readonly meetingId: string;
@@ -109,15 +122,15 @@ export class LocalVideoMerger {
                     this.log(`[phase:createUserVideos] User ${userId} FAILED (${userDuration}ms)`);
                     failedUsers.push({
                         userId,
-                        estimatedDuration: leadingPaddingSeconds + Math.max(1, chunks.length * 5),
+                        estimatedDuration: leadingPaddingSeconds + Math.max(1, computeTrueTimelineDuration(chunks)),
                         joinTimestamp: joinTime,
                     });
                     return;
                 }
 
-                const duration = await getVideoDuration(userVideo, ffprobeBin, this.log.bind(this));
                 const hasAudio = await hasAudioStream(userVideo, ffprobeBin, this.log.bind(this));
-                const finalDuration = duration + leadingPaddingSeconds;
+                const trueTimelineDuration = computeTrueTimelineDuration(chunks);
+                const finalDuration = trueTimelineDuration + leadingPaddingSeconds;
 
                 processedUsers.push({
                     userId,
@@ -130,13 +143,13 @@ export class LocalVideoMerger {
             });
 
             if (failedUsers.length > 0) {
-                const baseDuration = processedUsers.length > 0
+                const maxTotalDuration = processedUsers.length > 0
                     ? Math.max(...processedUsers.map(user => user.duration))
                     : Math.max(...failedUsers.map(user => user.estimatedDuration));
 
                 for (const failedUser of failedUsers) {
                     const leadingPaddingSeconds = Math.max(0, (failedUser.joinTimestamp - recordingStartTime) / 1000);
-                    const placeholderDuration = Math.max(1, baseDuration - leadingPaddingSeconds);
+                    const placeholderDuration = Math.max(1, maxTotalDuration - leadingPaddingSeconds);
 
                     const placeholderPath = await createBlackPlaceholderVideo(
                         failedUser.userId,
