@@ -21,11 +21,11 @@ type UseMeetingRecordingArgs = {
 function buildRecordingAudioConstraints(selectedMicId?: string): MediaTrackConstraints {
   return {
     deviceId: selectedMicId ? { exact: selectedMicId } : undefined,
-    echoCancellation: false,
-    noiseSuppression: false,
-    autoGainControl: false,
-    channelCount: 1,
-    sampleRate: 48000,
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
+    channelCount: { ideal: 1 },
+    sampleRate: { ideal: 48000 },
   };
 }
 
@@ -53,7 +53,6 @@ export function useMeetingRecording({
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
   const lastVideoTrackIdRef = useRef<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const audioGainRef = useRef<GainNode | null>(null);
   const audioTrackRef = useRef<MediaStreamTrack | null>(null);
   const isMutedRef = useRef(isMuted);
   const isVideoOffRef = useRef(isVideoOff);
@@ -78,16 +77,6 @@ export function useMeetingRecording({
       audioTrack.enabled = !isMutedRef.current;
     }
 
-    const audioContext = audioContextRef.current;
-    const gainNode = audioGainRef.current;
-    if (audioContext && gainNode) {
-      const targetGain = isMutedRef.current ? 0 : 1.8;
-      try {
-        gainNode.gain.setTargetAtTime(targetGain, audioContext.currentTime, 0.01);
-      } catch {
-        gainNode.gain.value = targetGain;
-      }
-    }
   }, []);
 
   const recordingStatusQuery = useQuery<RecordingStatusResponse>({
@@ -204,7 +193,6 @@ export function useMeetingRecording({
       recordingStreamRef.current = null;
     }
     audioTrackRef.current = null;
-    audioGainRef.current = null;
 
     if (processedStreamRef.current) {
       processedStreamRef.current.getTracks().forEach((track) => {
@@ -316,53 +304,16 @@ export function useMeetingRecording({
 
       let recorderStream = new MediaStream();
 
-      const audioContext = typeof AudioContext !== "undefined" ? new AudioContext() : null;
-      if (audioContext) {
-        audioContextRef.current = audioContext;
-        if (audioContext.state === "suspended") {
-          try {
-            await audioContext.resume();
-          } catch {
-            // best effort
-          }
+      if (!initialIsMuted) {
+        const rawAudioTrack = stream.getAudioTracks()[0] ?? null;
+        if (rawAudioTrack) {
+          audioTrackRef.current = rawAudioTrack;
+          recorderStream.addTrack(rawAudioTrack);
         }
-
-        if (audioContext.state === "running" && !initialIsMuted) {
-          const source = audioContext.createMediaStreamSource(stream);
-          const highPassFilter = audioContext.createBiquadFilter();
-          highPassFilter.type = "highpass";
-          highPassFilter.frequency.value = 90;
-
-          const compressor = audioContext.createDynamicsCompressor();
-          compressor.threshold.value = -24;
-          compressor.knee.value = 18;
-          compressor.ratio.value = 3;
-          compressor.attack.value = 0.003;
-          compressor.release.value = 0.2;
-
-          const gainNode = audioContext.createGain();
-          gainNode.gain.value = 1.8;
-          audioGainRef.current = gainNode;
-
-          const destination = audioContext.createMediaStreamDestination();
-
-          source.connect(highPassFilter);
-          highPassFilter.connect(compressor);
-          compressor.connect(gainNode);
-          gainNode.connect(destination);
-
-          const audioOutTrack = destination.stream.getAudioTracks()[0] ?? null;
-          if (audioOutTrack) {
-            audioTrackRef.current = audioOutTrack;
-            // Add the processed audio output into the recorder stream
-            // so the MediaRecorder receives the audio from the AudioContext graph.
-            recorderStream.addTrack(audioOutTrack);
-          }
-        } else {
-          const silentAudioTrack = await createSilentAudioTrack();
-          if (silentAudioTrack) {
-            recorderStream.addTrack(silentAudioTrack);
-          }
+      } else {
+        const silentAudioTrack = await createSilentAudioTrack();
+        if (silentAudioTrack) {
+          recorderStream.addTrack(silentAudioTrack);
         }
       }
 
@@ -442,6 +393,7 @@ export function useMeetingRecording({
       try {
         recorder = new MediaRecorder(recorderStream, {
           mimeType: getSupportedMimeType(),
+          audioBitsPerSecond: 256_000,
         });
       } catch {
         recorder = new MediaRecorder(recorderStream);
@@ -635,4 +587,3 @@ export function useMeetingRecording({
     isMeetingEnded: Boolean(recordingStatusQuery.data?.isEnded),
   };
 }
-

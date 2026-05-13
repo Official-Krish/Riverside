@@ -204,8 +204,8 @@ model EditorProject {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   fps              Int           @default(30)
-  width            Int           @default(1280)
-  height           Int           @default(720)
+  width            Int           @default(1920)
+  height           Int           @default(1080)
 
   owner            User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   meeting          Meeting       @relation(fields: [meetingId], references: [id])

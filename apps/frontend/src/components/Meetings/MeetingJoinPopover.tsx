@@ -9,6 +9,27 @@ import { http } from "@/https";
 import { toast } from "sonner";
 import { getHttpErrorMessage } from "@/lib/httpError";
 
+function buildJoinPreviewAudioConstraints(selectedMicId: string): MediaTrackConstraints | boolean {
+  return {
+    deviceId: selectedMicId ? { exact: selectedMicId } : undefined,
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
+    channelCount: { ideal: 1 },
+    sampleRate: { ideal: 48000 },
+  };
+}
+
+function buildJoinPreviewVideoConstraints(selectedCameraId: string): MediaTrackConstraints | boolean {
+  return {
+    deviceId: selectedCameraId ? { exact: selectedCameraId } : undefined,
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+    frameRate: { ideal: 30, max: 60 },
+    aspectRatio: { ideal: 16 / 9 },
+  };
+}
+
 type MeetingJoinPopoverProps = {
   triggerLabel: string;
   cancelMeetingLabel?: string | null;
@@ -64,8 +85,8 @@ export function MeetingJoinPopover({
     const loadDevices = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: selectedCameraId ? { deviceId: { exact: selectedCameraId } } : true,
-          audio: selectedMicId ? { deviceId: { exact: selectedMicId } } : true,
+          video: buildJoinPreviewVideoConstraints(selectedCameraId),
+          audio: buildJoinPreviewAudioConstraints(selectedMicId),
         });
 
         if (!active) {

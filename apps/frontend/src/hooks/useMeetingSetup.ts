@@ -14,11 +14,21 @@ type UseMeetingSetupArgs = {
 function buildPreviewAudioConstraints(selectedMicId: string): MediaTrackConstraints | boolean {
   return {
     deviceId: selectedMicId ? { exact: selectedMicId } : undefined,
-    echoCancellation: false,
-    noiseSuppression: false,
-    autoGainControl: false,
-    channelCount: 1,
-    sampleRate: 48000,
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
+    channelCount: { ideal: 1 },
+    sampleRate: { ideal: 48000 },
+  };
+}
+
+function buildPreviewVideoConstraints(selectedCameraId: string): MediaTrackConstraints | boolean {
+  return {
+    deviceId: selectedCameraId ? { exact: selectedCameraId } : undefined,
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+    frameRate: { ideal: 30, max: 60 },
+    aspectRatio: { ideal: 16 / 9 },
   };
 }
 
@@ -113,9 +123,7 @@ export function useMeetingSetup({ displayNameFallback, navigate }: UseMeetingSet
         setMicLevel(0);
         stopAudioMeter();
         stream = await navigator.mediaDevices.getUserMedia({
-          video: selectedCameraId
-            ? { deviceId: { exact: selectedCameraId } }
-            : true,
+          video: buildPreviewVideoConstraints(selectedCameraId),
           audio: buildPreviewAudioConstraints(selectedMicId),
         });
 

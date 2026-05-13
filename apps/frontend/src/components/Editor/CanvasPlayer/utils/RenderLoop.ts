@@ -39,7 +39,9 @@ export function startRenderLoop(
   canvas: HTMLCanvasElement,
   getState: () => RenderState,
   getOverlays?: () => RenderOverlay[],
-  onFrame?: (videoTimeMs: number) => void
+  onFrame?: (videoTimeMs: number) => void,
+  stageWidth = 1920,
+  stageHeight = 1080,
 ): () => void {
   let animId = 0;
   let running = true;
@@ -132,7 +134,7 @@ export function startRenderLoop(
       const items = getOverlays();
       const currentTimeMs = video.currentTime * 1000;
       for (const item of items) {
-        drawTextOverlay(ctx, item.overlay, canvas.width, canvas.height, currentTimeMs);
+        drawTextOverlay(ctx, item.overlay, canvas.width, canvas.height, currentTimeMs, stageWidth, stageHeight);
       }
     }
 
@@ -158,7 +160,9 @@ export function drawSingleFrame(
   video: HTMLVideoElement,
   canvas: HTMLCanvasElement,
   state: RenderState,
-  overlays?: RenderOverlay[]
+  overlays?: RenderOverlay[],
+  stageWidth = 1920,
+  stageHeight = 1080,
 ) {
   const { stretchX, stretchY, offsetX, offsetY, videoAlpha, activeTransition } = state;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -210,7 +214,7 @@ export function drawSingleFrame(
   if (overlays) {
     const currentTimeMs = video.currentTime * 1000;
     for (const item of overlays) {
-      drawTextOverlay(ctx, item.overlay, canvas.width, canvas.height, currentTimeMs);
+      drawTextOverlay(ctx, item.overlay, canvas.width, canvas.height, currentTimeMs, stageWidth, stageHeight);
     }
   }
 }
@@ -223,7 +227,9 @@ function drawTextOverlay(
   overlay: Overlay,
   canvasW: number,
   canvasH: number,
-  currentTimeMs: number = 0
+  currentTimeMs: number = 0,
+  stageWidth = 1920,
+  stageHeight = 1080,
 ) {
   const { content, transform, style } = overlay;
   const text = content.text;
@@ -233,8 +239,8 @@ function drawTextOverlay(
   const animState = calculateOverlayAnimation(overlay, currentTimeMs);
   if (!animState.shouldRender) return;
 
-  const scaleX = canvasW / 1280;
-  const scaleY = canvasH / 720;
+  const scaleX = canvasW / stageWidth;
+  const scaleY = canvasH / stageHeight;
 
   ctx.save();
   ctx.scale(scaleX, scaleY);

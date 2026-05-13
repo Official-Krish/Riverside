@@ -173,6 +173,8 @@ editorRouter.get("/projects/:id", authMiddleware, async (req, res) => {
                             durationMs: clip.durationMs,
                             name: clip.name ?? undefined,
                             ...(meta.audioMode ? { audioMode: meta.audioMode } : {}),
+                            ...(meta.preset !== undefined ? { preset: meta.preset } : {}),
+                            ...(meta.presetConfig ? { presetConfig: meta.presetConfig } : {}),
                             ...(meta.transitionStart ? { transitionStart: meta.transitionStart } : {}),
                             ...(meta.transitionEnd ? { transitionEnd: meta.transitionEnd } : {}),
                             ...(meta.transitionIn ? { transitionIn: meta.transitionIn } : {}),
@@ -294,6 +296,8 @@ editorRouter.put("/projects/:id", authMiddleware, async (req, res) => {
                                 // Store transitions + deprecated fields as JSON metadata
                                 metadata: {
                                     ...(clipMeta.audioMode ? { audioMode: clipMeta.audioMode } : {}),
+                                    ...(clip.preset !== undefined ? { preset: clip.preset } : {}),
+                                    ...(clip.presetConfig ? { presetConfig: clip.presetConfig } : {}),
                                     ...(clip.transitionStart ? { transitionStart: clip.transitionStart } : {}),
                                     ...(clip.transitionEnd ? { transitionEnd: clip.transitionEnd } : {}),
                                     ...(clip.transitionIn ? { transitionIn: clip.transitionIn } : {}),
