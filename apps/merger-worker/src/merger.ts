@@ -6,7 +6,7 @@ import {
 import { resolveStorageContext } from "@repo/amazons3";
 import { collectUserChunks } from "./chunks";
 import { createUserVideo, createBlackPlaceholderVideo } from "./video-creator";
-import { createGridVideo, normalizeVideoDurations } from "./grid-builder";
+import { createGridVideo } from "./grid-builder";
 import { cleanupTempDir, cleanupSourceChunksFromS3, cleanupLegacyLocalChunks, cleanupLegacyRecordingsTmp } from "./cleanup";
 import { getVideoDuration, hasAudioStream, ffprobeBin } from "./ffmpeg";
 import { getPositiveIntegerEnv } from "./config";
@@ -164,9 +164,7 @@ export class LocalVideoMerger {
 
             processedUsers.sort((a, b) => a.joinTimestamp - b.joinTimestamp);
 
-            const normalized = normalizeVideoDurations(processedUsers, this.log.bind(this));
-
-            const gridVideo = await createGridVideo(normalized, this.tempDir, this.config, this.log.bind(this));
+            const gridVideo = await createGridVideo(processedUsers, this.tempDir, this.config, this.log.bind(this));
 
             const finalPath = await this.persistFinal(gridVideo);
 

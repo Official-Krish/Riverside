@@ -22,11 +22,21 @@ async function shouldConcatenateWebmFragments(chunks: UserChunk[]): Promise<bool
     if (chunks.length < 2 || !chunks.every((chunk) => chunk.localPath.toLowerCase().endsWith(".webm"))) {
         return false;
     }
-    const [firstChunk, secondChunk] = chunks;
-    if (!firstChunk || !secondChunk) {
+    const firstChunk = chunks[0];
+    if (!firstChunk) {
         return false;
     }
-    return (await hasWebmHeader(firstChunk.localPath)) && !(await hasWebmHeader(secondChunk.localPath));
+    const firstHasHeader = await hasWebmHeader(firstChunk.localPath);
+    if (!firstHasHeader) {
+        return false;
+    }
+    for (let i = 1; i < chunks.length; i++) {
+        const hasHeader = await hasWebmHeader(chunks[i]!.localPath);
+        if (hasHeader) {
+            return false;
+        }
+    }
+    return true;
 }
 
 async function concatenateChunksBytewise(chunks: UserChunk[], outputPath: string): Promise<void> {

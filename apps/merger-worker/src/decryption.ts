@@ -5,7 +5,28 @@ import { prisma } from "@repo/db/client";
 import { type UserChunk } from "./types";
 import { getRedisClient } from "./redis";
 
-const userCekCache = new Map<string, Buffer>();
+const userCekCache = new Map<string, { buffer: Buffer; timestamp: number }>();
+const CEK_CACHE_TTL_MS = 30 * 60 * 1000;
+
+function evictExpiredCekEntries(): void {
+    const now = Date.now();
+    for (const [key, entry] of userCekCache.entries()) {
+        if (now - entry.timestamp > CEK_CACHE_TTL_MS) {
+            userCekCache.delete(key);
+        }
+    }
+}
+
+function getCekFromCache(cacheKey: string): Buffer | null {
+    evictExpiredCekEntries();
+    const entry = userCekCache.get(cacheKey);
+    return entry ? entry.buffer : null;
+}
+
+function setCekToCache(cacheKey: string, buffer: Buffer): void {
+    evictExpiredCekEntries();
+    userCekCache.set(cacheKey, { buffer, timestamp: Date.now() });
+}
 
 function getWrappedCekKey(meetingId: string, participantId: string): string {
     return `meeting:wrapped-cek:${meetingId}:${participantId}`;
@@ -69,7 +90,7 @@ function getCekCacheKey(meetingId: string, participantId: string): string {
 
 export async function unwrapMeetingCek(meetingId: string, participantId: string): Promise<Buffer> {
     const cacheKey = getCekCacheKey(meetingId, participantId);
-    const cachedCek = userCekCache.get(cacheKey);
+    const cachedCek = getCekFromCache(cacheKey);
     if (cachedCek) {
         return cachedCek;
     }
@@ -86,7 +107,7 @@ export async function unwrapMeetingCek(meetingId: string, participantId: string)
         wrappedCek
     );
 
-    userCekCache.set(cacheKey, unwrappedCek);
+    setCekToCache(cacheKey, unwrappedCek);
     return unwrappedCek;
 }
 
