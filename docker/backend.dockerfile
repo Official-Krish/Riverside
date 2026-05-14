@@ -12,6 +12,8 @@ RUN bun install
 
 COPY . .
 
+RUN cd packages/db && bunx prisma generate
+
 FROM oven/bun:1 AS runtime
 
 WORKDIR /app/apps/backend

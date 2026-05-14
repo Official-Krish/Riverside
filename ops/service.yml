@@ -29,29 +29,15 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: weave-k8s-worker
+  name: weave-editor-worker
   namespace: weave
 spec:
   selector:
-    app: weave-k8s-worker
+    app: weave-editor-worker
   ports:
     - protocol: TCP
       port: 80
       targetPort: 9000
-  type: ClusterIP
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: weave-worker
-  namespace: weave
-spec:
-  selector:
-    app: weave-worker
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 8080
   type: ClusterIP
 ---
 apiVersion: v1

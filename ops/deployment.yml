@@ -67,96 +67,119 @@ metadata:
   name: weave-worker
   namespace: weave
   labels:
-    app: weave-worker
+    app: weave-merger-worker
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: weave-worker
+      app: weave-merger-worker
   template:
     metadata:
       labels:
-        app: weave-worker
+        app: weave-merger-worker
     spec:
       containers:
-        - name: weave-worker
-          image: krishanand01/weave-worker:v1
+        - name: weave-merger-worker
+          image: krishanand01/weave-merger-worker:v1
           ports:
             - containerPort: 8080
           volumeMounts:
             - name: env-file
-              mountPath: /app/apps/worker/.env
+              mountPath: /app/apps/merger-worker/.env
               subPath: env
-            - name: gcp-key-volume
-              mountPath: /app/apps/worker/gcp-key.json
-              readOnly: true
       volumes:
         - name: env-file
           secret:
-            secretName: weave-worker-env
-        - name: gcp-key-volume
-          secret:
-            secretName: gcp-key-secret
+            secretName: weave-merger-worker-env
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: weave-k8s-worker
+  name: weave-editor-worker
   namespace: weave
   labels:
-    app: weave-k8s-worker
+    app: weave-editor-worker
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: weave-k8s-worker
+      app: weave-editor-worker
   template:
     metadata:
       labels:
-        app: weave-k8s-worker
+        app: weave-editor-worker
     spec:
       containers:
-        - name: weave-k8s-worker
-          image: krishanand01/weave-k8s-worker:v1.1
+        - name: weave-editor-worker
+          image: krishanand01/weave-editor-worker:v1.1
           ports:
             - containerPort: 9000
           volumeMounts:
             - name: env-file
-              mountPath: /app/apps/k8s-worker/.env
+              mountPath: /app/apps/editor-worker/.env
               subPath: env
       volumes:
         - name: env-file
           secret:
-            secretName: weave-k8s-worker-env
+            secretName: weave-editor-worker-env
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: weave-redis-orchastrator
+  name: weave-transcoder
   namespace: weave
   labels:
-    app: weave-redis-orchastrator
+    app: weave-transcoder
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: weave-redis-orchastrator
+      app: weave-transcoder
   template:
     metadata:
       labels:
-        app: weave-redis-orchastrator
+        app: weave-transcoder
     spec:
       containers:
-        - name: weave-redis-orchastrator
-          image: krishanand01/weave-redis-orchastrator:v1
+        - name: weave-transcoder
+          image: krishanand01/weave-transcoder:v1
           volumeMounts:
             - name: env-file
-              mountPath: /app/apps/redis-orchastrator/.env
+              mountPath: /app/apps/transcoder/.env
               subPath: env
       volumes:
         - name: env-file
           secret:
-            secretName: weave-redis-orchastrator-env
+            secretName: weave-transcoder-env
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: weave-ws-relayer
+  namespace: weave
+  labels:
+    app: weave-ws-relayer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: weave-ws-relayer
+  template:
+    metadata:
+      labels:
+        app: weave-ws-relayer
+    spec:
+      containers:
+        - name: weave-ws-relayer
+          image: krishanand01/weave-ws-relayer:v1
+          volumeMounts:
+            - name: env-file
+              mountPath: /app/apps/ws-relayer/.env
+              subPath: env
+      volumes:
+        - name: env-file
+          secret:
+            secretName: weave-ws-relayer-env
 ---
 apiVersion: apps/v1
 kind: Deployment
