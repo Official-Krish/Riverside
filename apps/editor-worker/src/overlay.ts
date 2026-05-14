@@ -40,7 +40,15 @@ function estimateWrappedText(text: string, maxWidth: number | undefined, fontSiz
 
 function buildSingleOverlayFilter(o: any, timelineOffsetMs = 0): string | null {
   let text = o.content?.text ?? "";
-  if (!text) return null;
+  if (!text) {
+    
+    return null;
+  }
+
+  
+  
+  
+  
 
   const textTransform = o.style?.textTransform || "none";
   text = applyTextTransform(text, textTransform);

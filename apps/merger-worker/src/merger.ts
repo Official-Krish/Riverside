@@ -2,6 +2,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import {
     putObjectToS3,
+    deletePrefixFromS3,
 } from "@repo/amazons3";
 import { resolveStorageContext } from "@repo/amazons3";
 import { collectUserChunks } from "./chunks";
@@ -72,6 +73,13 @@ export class LocalVideoMerger {
 
     private async persistFinal(gridVideoPath: string): Promise<string> {
         const finalKey = `weave-recordings/${this.meetingId}/final/meeting_grid_recording.mp4`;
+
+        await deletePrefixFromS3({
+            s3Client: this.s3Client,
+            bucketName: this.bucketName,
+            prefix: `weave-recordings/${this.meetingId}/final/`,
+        });
+
         const body = await fs.readFile(gridVideoPath);
 
         await putObjectToS3({

@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { spawn } from "node:child_process";
-import { toPublicRecordingLink as toPublicS3Url } from "./storage";
+import { toPublicRecordingLink as toPublicS3Url, extractS3Key } from "./storage";
 
 export const recordingsRoot = path.resolve(process.cwd(), "../../recordings");
 
@@ -15,7 +15,8 @@ export function toLocalRecordingPath(value: string) {
   }
 
   if (value.startsWith("http://") || value.startsWith("https://")) {
-    return value;
+  const key = extractS3Key(value);
+  return key ?? value;
   }
 
   if (path.isAbsolute(value)) {

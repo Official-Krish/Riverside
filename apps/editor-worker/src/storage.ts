@@ -3,6 +3,7 @@ import * as path from "node:path";
 import crypto from "node:crypto";
 import {
   deletePrefixFromS3 as sharedDeletePrefixFromS3,
+  deleteObjectFromS3 as sharedDeleteObjectFromS3,
   getObjectBytesFromS3,
   keyToCdnUrl as sharedKeyToCdnUrl,
   normalizeS3Key as sharedNormalizeS3Key,
@@ -77,6 +78,14 @@ export async function uploadLocalFileToS3(localPath: string, key: string, conten
     key: normalizeS3Key(key),
     body,
     contentType,
+  });
+}
+
+export async function deleteObjectFromS3(key: string) {
+  await sharedDeleteObjectFromS3({
+    s3Client: storage.s3Client,
+    bucketName: storage.bucketName,
+    key: normalizeS3Key(key),
   });
 }
 
