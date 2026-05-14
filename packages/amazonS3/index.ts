@@ -25,7 +25,7 @@ type PublicLinkOptions = {
 	apiRecordingsPrefix?: string;
 };
 
-const DEFAULT_CDN_BASE_URL = "https://cdn.krishlabs.tech/weave-recordings";
+const DEFAULT_CDN_BASE_URL = "https://cdn.krishlabs.tech";
 const DEFAULT_API_RECORDINGS_PREFIX = "/api/v1/recordings/";
 
 export function normalizeS3Key(value: string) {
@@ -74,7 +74,15 @@ export function resolveStorageContext(options: StorageContextOptions = {}) {
 }
 
 export function keyToCdnUrl(key: string, cdnBaseUrl = process.env.CDN_BASE_URL || DEFAULT_CDN_BASE_URL) {
-	return `${cdnBaseUrl.replace(/\/$/, "")}/${normalizeS3Key(key)}`;
+	const normalized = normalizeS3Key(key);
+	let base = cdnBaseUrl.replace(/\/$/, "");
+	if (base.endsWith("/weave-recordings")) {
+		base = base.replace(/\/weave-recordings$/, "");
+	}
+	if (normalized.startsWith("weave-recordings/")) {
+		return `${base}/weave-recordings/${normalized.replace(/^weave-recordings\//, "")}`;
+	}
+	return `${base}/${normalized}`;
 }
 
 export function tryExtractS3Key(value: string | null | undefined, options: Pick<PublicLinkOptions, "recordingsRoot" | "apiRecordingsPrefix"> = {}) {
@@ -92,7 +100,8 @@ export function tryExtractS3Key(value: string | null | undefined, options: Pick<
 			const key = normalizeS3Key(new URL(trimmed).pathname);
 			const cdnBaseEnv = process.env.CDN_BASE_URL || DEFAULT_CDN_BASE_URL;
 			const hasCorrectBase = cdnBaseEnv.endsWith("weave-recordings");
-			if (hasCorrectBase && key.startsWith("weave-recordings/")) {
+			const hasCorrectBaseClean = cdnBaseEnv.endsWith("/weave-recordings") || cdnBaseEnv === "https://cdn.krishlabs.tech";
+			if ((hasCorrectBase || hasCorrectBaseClean) && key.startsWith("weave-recordings/")) {
 				const cleaned = key.replace(/^weave-recordings\/weave-recordings\//, "weave-recordings/");
 				return cleaned;
 			}
@@ -136,6 +145,7 @@ export async function putObjectToS3(args: {
 			Key: normalizeS3Key(args.key),
 			Body: args.body,
 			ContentType: args.contentType,
+			CacheControl: "no-cache",
 		})
 	);
 }

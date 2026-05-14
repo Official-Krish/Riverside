@@ -73,6 +73,7 @@ workerRouter.post("/worker/recording-status/:meetingId", serviceAuthMiddleware, 
     meetingId: req.params.meetingId,
     status: req.body?.status,
     finalPath: req.body?.finalPath,
+    version: req.body?.version,
   });
 
   if (!parsedData.success) {
@@ -83,6 +84,7 @@ workerRouter.post("/worker/recording-status/:meetingId", serviceAuthMiddleware, 
   const meetingId = parsedData.data.meetingId;
   const status = parsedData.data.status;
   const finalPath = parsedData.data.finalPath;
+  const version = parsedData.data.version;
 
   if (!meetingId) {
     res.status(400).json({ message: "Missing meetingId" });
@@ -100,14 +102,14 @@ workerRouter.post("/worker/recording-status/:meetingId", serviceAuthMiddleware, 
         await handleProcessingStatus(meetingId);
         res.status(200).json({ message: "Processing status updated" });
         break;
- 
+
       case "FAILED":
         await handleFailedStatus(meetingId);
         res.status(200).json({ message: "Failure status updated" });
         break;
- 
+
       case "READY":
-        await handleReadyStatus(meetingId, finalPath!);
+        await handleReadyStatus(meetingId, finalPath!, version);
         res.status(200).json({ message: "Ready status updated" });
         break;
     }

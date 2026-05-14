@@ -63,6 +63,7 @@ export const workerRecordingStatusSchema = z.object({
     meetingId: z.string(),
     status: z.enum(["PROCESSING", "READY", "FAILED"]),
     finalPath: z.string().optional(),
+    version: z.string().optional(),
 });
 
 export const removeRecordingVisibilitySchema = z.object({

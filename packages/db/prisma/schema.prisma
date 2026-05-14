@@ -183,6 +183,7 @@ model FinalRecording {
   id              String          @id @default(uuid())
   meetingId       String          @unique
   videoLink       String
+  version         String          @default("0")
   audioLink       String?
   visibleToEmails String[]        @default([])
   generatedAt     DateTime        @default(now())

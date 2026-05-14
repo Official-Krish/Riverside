@@ -42,7 +42,6 @@ userRouter.post("/signup", async ( req,res ) => {
         });
 
         await SendVerificationEmail(email, verificationToken);
-        console.log(`Verification token for ${email}: ${verificationToken}`);
 
         res.status(200).json({ message: "User created successfully. Please verify your email."});
     } catch (error) {

@@ -202,7 +202,10 @@ RecordingRouter.get("/page/:id", authMiddleware, async (req, res) => {
     const canExposeUrls = canViewRecording && meeting.recordingState === "READY";
     const finalVideoUrl = canExposeUrls ? normalizedFinalRecording?.videoLink ?? null : null;
 
-    const hlsBasePath = canExposeUrls && meeting.roomId ? `${process.env.CDN_BASE_URL || "https://cdn.krishlabs.tech"}/weave-recordings/${meeting.roomId}/hls` : null;
+    const recordingVersion = meeting.finalRecording?.version ?? "stable";
+    const hlsBasePath = canExposeUrls && meeting.roomId
+      ? `${process.env.CDN_BASE_URL || "https://cdn.krishlabs.tech"}/weave-recordings/${meeting.roomId}/hls_v${recordingVersion}`
+      : null;
 
     let response: any = {
       id: meeting.id,
