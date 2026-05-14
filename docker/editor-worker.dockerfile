@@ -5,6 +5,7 @@ WORKDIR /app
 COPY package.json bun.lock turbo.json ./
 COPY apps/editor-worker/package.json apps/editor-worker/package.json
 COPY packages/db/package.json packages/db/package.json
+COPY packages/amazonS3/package.json packages/amazonS3/package.json
 
 RUN bun install
 

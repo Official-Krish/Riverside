@@ -53,36 +53,7 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
   const width = project.width ?? 1920;
   const height = project.height ?? 1080;
 
-  log("info", "Project loaded", {
-    jobId,
-    projectId,
-    trackCount: project.tracks.length,
-    clipCount: project.tracks.reduce((acc, t) => acc + t.clips.length, 0),
-    overlayCount: project.overlays.length,
-    assetCount: project.assets.length,
-    fps,
-    width,
-    height,
-  });
-
   const { videoClips, audioClips } = collectRenderClips(project);
-
-  log("info", "Clips collected", {
-    jobId,
-    videoClipCount: videoClips.length,
-    audioClipCount: audioClips.length,
-    clips: videoClips.map(c => ({
-      id: c.id,
-      sourceAssetId: c.sourceAssetId,
-      sourcePath: c.sourcePath,
-      sourceStartMs: c.sourceStartMs,
-      timelineStartMs: c.timelineStartMs,
-      durationMs: c.durationMs,
-      preset: c.preset,
-      transitionStart: c.transitionStart,
-      transitionEnd: c.transitionEnd,
-    })),
-  });
 
   if (!videoClips.length) throw new Error("No video clips found in project");
 
@@ -96,14 +67,11 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
   ]);
 
   const sourceMap = new Map<string, string>();
-  log("info", "Downloading sources", { jobId, sourcePathCount: sourcePaths.size });
 
   await Promise.all(
     [...sourcePaths].map(async (sourcePath) => {
-      log("debug", "Resolving source", { jobId, sourcePath });
       try {
         const resolved = await downloadSourceToLocal(sourcePath, sourceCacheDir);
-        log("debug", "Source resolved", { jobId, sourcePath, resolved });
         sourceMap.set(sourcePath, resolved);
         await verifySourceExists(resolved);
       } catch (err: any) {
@@ -112,12 +80,6 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
       }
     })
   );
-
-  log("info", "All sources resolved", {
-    jobId,
-    sourceMapEntries: sourceMap.size,
-    sources: [...sourceMap.entries()].map(([k, v]) => ({ original: k, resolved: v })),
-  });
 
   const resolvedVideoClips = videoClips.map((clip) => ({
     ...clip,
@@ -136,7 +98,6 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
 
   const firstClip = resolvedVideoClips[0]!;
 
-  log("info", "Generating preview", { jobId, previewPath, sourcePath: firstClip.sourcePath, sourceStartMs: firstClip.sourceStartMs, durationMs: firstClip.durationMs });
   await runBinary(CONFIG.FFMPEG_BIN, [
     "-y",
     "-ss", (firstClip.sourceStartMs / 1000).toFixed(3),
@@ -159,9 +120,7 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
   try {
     if (resolvedVideoClips.length === 1) {
       const c = resolvedVideoClips[0]!;
-      log("info", "Single clip encoding", { jobId, clipId: c.id, sourcePath: c.sourcePath, outputPath: videoOnlyPath });
       const args = buildClipRenderArgs(c, videoOnlyPath, width, height, fps);
-      log("debug", "FFmpeg args for single clip", { jobId, args });
       await runBinary(CONFIG.FFMPEG_BIN, args);
 
       const videoOnlyStats = await fs.stat(videoOnlyPath);
@@ -174,16 +133,12 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
 
       await updateProgress(jobId, 75);
     } else {
-      log("info", "Multi-clip encoding", { jobId, clipCount: resolvedVideoClips.length });
       const clipParts: Array<{ path: string; transition?: { type: string; durationMs: number } | null }> = [];
       for (let i = 0; i < resolvedVideoClips.length; i++) {
         const c = resolvedVideoClips[i]!;
         const partPath = path.join(exportDir, `${jobId}_part${i}.mp4`);
 
-        log("debug", `Encoding part ${i + 1}/${resolvedVideoClips.length}`, { jobId, clipId: c.id, sourcePath: c.sourcePath, partPath });
-
         const args = buildClipRenderArgs(c, partPath, width, height, fps);
-        log("debug", `FFmpeg args for part ${i + 1}`, { jobId, args });
 
         try {
           await runBinary(CONFIG.FFMPEG_BIN, args);
@@ -197,20 +152,13 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
           ? getTransitionPlan(c, "end") ?? (getTransitionPlan(nextClip, "start") ? { type: nextClip.transitionIn as string ?? "fade", durationMs: (nextClip.transitionStart as any)?.durationMs ?? 500 } : null)
           : null;
 
-        log("debug", `Transition for part ${i + 1}`, { jobId, hasTransition: !!transition, transition });
-
         clipParts.push({ path: partPath, transition });
         tempFiles.push(partPath);
         await updateProgress(jobId, 10 + Math.round(((i + 1) / resolvedVideoClips.length) * 70));
       }
 
-      log("info", "Concatenating clips", { jobId, clipParts: clipParts.length, transitions: clipParts.filter(p => p.transition).length });
-      log("debug", "Clip parts detail", { jobId, clipParts });
-
       const crossfadeResult = buildCrossfadeConcatArgs(clipParts, videoOnlyPath, fps);
       if (crossfadeResult) {
-        const transitionsUsed = clipParts.filter(p => p.transition).length;
-        log("debug", "Using crossfade concat", { jobId, args: crossfadeResult.args });
         try {
           await runBinary(CONFIG.FFMPEG_BIN, crossfadeResult.args);
         } catch (err: any) {
@@ -220,7 +168,6 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
       } else {
         const { args, listPath } = await buildConcatArgs(clipParts.map(p => p.path), videoOnlyPath);
         concatListPath = listPath;
-        log("debug", "Using simple concat", { jobId, args, listPath });
         try {
           await runBinary(CONFIG.FFMPEG_BIN, args);
         } catch (err: any) {
@@ -232,7 +179,6 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
     }
 
     const allOverlays = [...project.overlays];
-    log("info", "Building overlay list", { jobId, projectOverlays: project.overlays.length, fromPresets: 0 });
 
     for (const clip of videoClips) {
       if (clip.preset && ["intro-template", "meme-format", "podcast-layout"].includes(clip.preset)) {
@@ -242,41 +188,25 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
             timelineStartMs: overlay.timelineStartMs + clip.timelineStartMs,
           }));
         allOverlays.push(...templateOverlays as any);
-        log("debug", `Generated ${templateOverlays.length} template overlays for preset ${clip.preset}`, { jobId });
       }
     }
 
-    log("info", "Final overlay list", { jobId, totalOverlays: allOverlays.length, overlays: allOverlays });
 
     if (allOverlays.length > 0) {
-      log("debug", "Burning overlay timeline into composed video", { jobId, overlays: allOverlays.length });
       const overlayArgs = buildOverlayBurnInArgs(videoOnlyPath, allOverlays, overlayedPath, width, height);
-      log("debug", "Overlay ffmpeg args", { jobId, args: overlayArgs });
       try {
         await runBinary(CONFIG.FFMPEG_BIN, overlayArgs);
-
-        const overlayedStats = await fs.stat(overlayedPath);
-        log("info", "Overlay burn-in complete", {
-          jobId,
-          overlayedPath,
-          sizeBytes: overlayedStats.size,
-          overlaysApplied: allOverlays.length,
-        });
       } catch (err: any) {
         log("error", "Overlay burn-in failed", { jobId, err: err.message });
         throw err;
       }
       await updateProgress(jobId, 93);
     } else {
-      log("info", "No overlays to burn in, copying videoOnlyPath to overlayedPath", { jobId });
       await fs.copyFile(videoOnlyPath, overlayedPath);
-      const overlayedStats = await fs.stat(overlayedPath);
-      log("info", "Copy complete", { jobId, overlayedPath, sizeBytes: overlayedStats.size });
       await updateProgress(jobId, 93);
     }
 
     if (resolvedAudioClips.length > 0) {
-      log("debug", "Mixing external audio tracks", { jobId, audioClips: resolvedAudioClips.length });
       const mixArgs = buildAudioMixArgs(overlayedPath, resolvedAudioClips, outputPath);
       await runBinary(CONFIG.FFMPEG_BIN, mixArgs);
       await updateProgress(jobId, 98);

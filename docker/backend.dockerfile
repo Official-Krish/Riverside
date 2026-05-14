@@ -6,6 +6,7 @@ COPY package.json bun.lock turbo.json ./
 COPY apps/backend/package.json apps/backend/package.json
 COPY packages/db/package.json packages/db/package.json
 COPY packages/types/package.json packages/types/package.json
+COPY packages/amazonS3/package.json packages/amazonS3/package.json
 
 RUN bun install
 
