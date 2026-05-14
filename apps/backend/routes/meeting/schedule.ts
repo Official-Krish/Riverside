@@ -85,7 +85,7 @@ scheduleRouter.post("/create/schedule", authMiddleware, async (req, res) => {
       scheduleId: schedule.id,
       scheduledAt: schedule.startTime,
       message: `You have been invited to join the scheduled meeting "${title}" by ${user.name}. at ${formatTime(schedule.startTime)}. You will be notified again when the meeting is about to start with the join link.`,
-      participants: allUsers.map((u) => ({
+      participants: users.map((u) => ({
         userId: u.id,
       })),
     }));

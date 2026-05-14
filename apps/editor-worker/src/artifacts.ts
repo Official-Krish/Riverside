@@ -1,44 +1,77 @@
-import * as path from "node:path";
+import { getObjectBytesFromS3, resolveStorageContext } from "@repo/amazons3";
 import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import { prisma } from "@repo/db/client";
 import { publishConnection } from "./redis";
 import { CONFIG } from "./config";
-import { log } from "./logger";
 import { recordingsRoot, toPublicRecordingLink } from "./helpers";
 import { deleteS3Prefix, uploadLocalFileToS3 } from "./storage";
+
+const storage = resolveStorageContext();
 
 export function getCanonicalFinalDir(roomId: string) {
   return path.join(recordingsRoot, roomId, "final");
 }
 
-export function getCanonicalFinalKey(roomId: string) {
-  return `weave-recordings/${roomId}/final/meeting_grid_recording.mp4`;
+export function getCanonicalFinalKey(roomId: string, version?: string | number) {
+  const ver = version ?? Date.now();
+  return `weave-recordings/${roomId}/final/meeting_grid_recording_v${ver}.mp4`;
 }
 
-export function getCanonicalHlsPrefix(roomId: string) {
-  return `weave-recordings/${roomId}/hls/`;
+export function getCanonicalHlsPrefix(roomId: string, version?: string | number) {
+  return `weave-recordings/${roomId}/hls_v${version ?? "stable"}/`;
 }
 
-export function getCanonicalHlsDir(roomId: string) {
-  return path.join(recordingsRoot, roomId, "hls");
+export function getCanonicalHlsDir(roomId: string, version?: string | number) {
+  return path.join(recordingsRoot, roomId, `hls_v${version ?? "stable"}`);
+}
+
+export async function deleteAllHlsVersions(roomId: string) {
+  const prefixes: string[] = [
+    `weave-recordings/${roomId}/hls/`,
+    `weave-recordings/${roomId}/hls_vstable/`,
+  ];
+  for (let i = 0; i < 1000; i++) {
+    prefixes.push(`weave-recordings/${roomId}/hls_v${i}/`);
+  }
+  await Promise.allSettled(prefixes.map((p) => deleteS3Prefix(p)));
+}
+
+export async function deleteAllFinalRecordings(roomId: string) {
+  await deleteS3Prefix(`weave-recordings/${roomId}/final/`);
 }
 
 export async function removeIfExists(targetPath: string) {
   await fs.rm(targetPath, { recursive: true, force: true });
 }
 
-export async function promoteRenderedVideo(roomId: string, renderedPath: string) {
-  const finalKey = getCanonicalFinalKey(roomId);
+export async function promoteRenderedVideo(roomId: string, renderedPath: string, version?: string | number) {
+  const finalKey = getCanonicalFinalKey(roomId, version);
+  const stats = await fs.stat(renderedPath);
+
   await uploadLocalFileToS3(renderedPath, finalKey, "video/mp4");
+
+  const newBytes = await getObjectBytesFromS3({
+    s3Client: storage.s3Client,
+    bucketName: storage.bucketName,
+    key: finalKey,
+  });
+  const verified = (newBytes?.length ?? 0) > stats.size * 0.5;
+
+  if (!verified) {
+    throw new Error(`S3 upload verification failed for ${finalKey}`);
+  }
+
   await removeIfExists(renderedPath);
   return finalKey;
 }
 
-export async function refreshMeetingRecordingArtifacts(roomId: string, finalKey: string, jobId: string, projectId: string) {
+export async function refreshMeetingRecordingArtifacts(roomId: string, finalKey: string, jobId: string, projectId: string, version?: string | number) {
   const normalizedPublicFinalPath = toPublicRecordingLink(finalKey);
 
-  await deleteS3Prefix(getCanonicalHlsPrefix(roomId));
-  await removeIfExists(getCanonicalHlsDir(roomId));
+  await deleteAllHlsVersions(roomId);
+  await deleteAllFinalRecordings(roomId);
+  await removeIfExists(getCanonicalHlsDir(roomId, version));
 
   const hostMeeting = await prisma.meeting.findFirst({
     where: {
@@ -74,11 +107,13 @@ export async function refreshMeetingRecordingArtifacts(roomId: string, finalKey:
       },
       create: {
         meetingId: hostMeeting.id,
-        videoLink: normalizedPublicFinalPath,
+        videoLink: finalKey,
+        version: String(version ?? "0"),
         visibleToEmails: hostMeeting.finalRecording?.visibleToEmails ?? [],
       },
       update: {
-        videoLink: normalizedPublicFinalPath,
+        videoLink: finalKey,
+        version: String(version ?? "0"),
       },
     }),
     prisma.meeting.updateMany({
@@ -98,20 +133,17 @@ export async function refreshMeetingRecordingArtifacts(roomId: string, finalKey:
     JSON.stringify({
       meetingId: roomId,
       finalPath: finalKey,
+      version,
     }),
   );
 
   try {
-    await cleanupEditorProjectState(roomId, projectId, normalizedPublicFinalPath);
-  } catch (error) {
-    log("warn", "Editor cleanup failed after export", {
-      roomId,
-      projectId,
-      err: error instanceof Error ? error.message : String(error),
-    });
+    await cleanupEditorProjectState(roomId, projectId, finalKey);
+  } catch {
+    // ignore cleanup errors
   }
 
-  return normalizedPublicFinalPath;
+  return finalKey;
 }
 
 async function cleanupEditorProjectState(roomId: string, projectId: string, finalVideoUrl: string) {
@@ -166,9 +198,16 @@ async function cleanupEditorProjectState(roomId: string, projectId: string, fina
     });
   });
 
+  const prefixesToCleanup = [
+    `weave-recordings/${roomId}/raw/`,
+    `weave-recordings/${roomId}/editor/`,
+    `weave-recordings/${roomId}/tmp/`,
+  ];
+
   await Promise.allSettled([
-    removeIfExists(path.join(recordingsRoot, roomId, "editor", "projects", projectId)),
-    removeIfExists(path.join(recordingsRoot, roomId, "editor-assets")),
-    deleteS3Prefix(`weave-recordings/${roomId}/editor-assets/`),
+    removeIfExists(path.join(recordingsRoot, roomId, "editor")),
+    removeIfExists(path.join(recordingsRoot, roomId, "raw")),
+    removeIfExists(path.join(recordingsRoot, roomId, "tmp")),
+    ...prefixesToCleanup.map((prefix) => deleteS3Prefix(prefix)),
   ]);
 }

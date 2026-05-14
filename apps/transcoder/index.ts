@@ -21,12 +21,12 @@ import {
   normalizeS3Key,
   putObjectToS3,
   resolveStorageContext,
-  tryExtractS3Key,
 } from "@repo/amazons3";
 
 type TranscodePayload = {
   meetingId: string;
   finalPath?: string;
+  version?: string | number;
 };
 
 const QUEUE_NAME = "TranscodeVideo";
@@ -39,10 +39,6 @@ const redisClient = new Redis({
   host: process.env.REDIS_HOST,
   port: Number(process.env.REDIS_PORT || 6379),
 });
-
-function log(message: string) {
-  console.log(`[transcoder] ${new Date().toISOString()} ${message}`);
-}
 
 function runBinary(binary: string, args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -114,12 +110,8 @@ function readDurationSeconds(videoPath: string): Promise<number> {
 
 function toInputS3Key(payload: TranscodePayload) {
   if (payload.finalPath && payload.finalPath.trim()) {
-    const key = tryExtractS3Key(payload.finalPath);
-    if (key) {
-      return key;
-    }
+    return payload.finalPath;
   }
-
   return normalizeS3Key(`${payload.meetingId}/final/meeting_grid_recording.mp4`);
 }
 
@@ -134,6 +126,7 @@ async function downloadS3ObjectToFile(key: string, targetPath: string) {
   }
 
   await fs.writeFile(targetPath, bytes);
+  const sizeMB = (bytes.length / (1024 * 1024)).toFixed(2);
 }
 
 async function clearS3Prefix(prefix: string) {
@@ -174,15 +167,26 @@ async function uploadDirectoryToS3(localDir: string, prefix: string) {
 
 async function processMeeting(payload: TranscodePayload) {
   const inputKey = toInputS3Key(payload);
+
   const localWorkDir = path.join(recordingsRoot, "tmp", `transcode_${payload.meetingId}_${Date.now()}`);
   const inputPath = path.join(localWorkDir, "input.mp4");
   const outputDir = getTranscodeOutputDir(recordingsRoot, payload.meetingId);
 
   await fs.mkdir(localWorkDir, { recursive: true });
+
+  const bytesBefore = await getObjectBytesFromS3({
+    s3Client: storage.s3Client,
+    bucketName: storage.bucketName,
+    key: inputKey,
+  });
+
   await downloadS3ObjectToFile(inputKey, inputPath);
+
+  const inputStats = await fs.stat(inputPath);
+
   await fs.mkdir(outputDir, { recursive: true });
 
-  log(`Transcoding started for ${payload.meetingId}`);
+
   const duration = await readDurationSeconds(inputPath);
 
   for (const profile of HLS_PROFILES) {
@@ -197,7 +201,7 @@ async function processMeeting(payload: TranscodePayload) {
   const vtt = buildThumbnailVtt(duration);
   await fs.writeFile(path.join(outputDir, "thumbnails.vtt"), vtt, "utf8");
 
-  const hlsPrefix = `weave-recordings/${payload.meetingId}/hls/`;
+  const hlsPrefix = `weave-recordings/${payload.meetingId}/hls_v${payload.version ?? "stable"}/`;
   await clearS3Prefix(hlsPrefix);
   await uploadDirectoryToS3(outputDir, hlsPrefix);
 
@@ -206,7 +210,7 @@ async function processMeeting(payload: TranscodePayload) {
     fs.rm(localWorkDir, { recursive: true, force: true }),
   ]);
 
-  log(`Transcoding completed for ${payload.meetingId}`);
+
 }
 
 function parsePayload(raw: string): TranscodePayload | null {
@@ -223,6 +227,7 @@ function parsePayload(raw: string): TranscodePayload | null {
     return {
       meetingId: identifier.trim(),
       finalPath: typeof parsed.finalPath === "string" ? parsed.finalPath : undefined,
+      version: typeof parsed.version === "string" || typeof parsed.version === "number" ? parsed.version : undefined,
     };
   } catch {
     return null;
@@ -255,7 +260,8 @@ function getBackendServiceToken(): string {
 async function reportWorkerStatus(
   meetingId: string,
   status: "PROCESSING" | "READY" | "FAILED",
-  finalPath?: string
+  finalPath?: string,
+  version?: string | number
 ) {
   const backendUrl = process.env.BACKEND_URL || "http://localhost:3000/api/v1";
 
@@ -269,6 +275,7 @@ async function reportWorkerStatus(
         data: {
             status,
             finalPath,
+            version,
         },
   });
 
@@ -278,7 +285,7 @@ async function reportWorkerStatus(
 }
 
 async function workQueue() {
-  log(`Worker listening on queue ${QUEUE_NAME}`);
+
 
   while (true) {
     try {
@@ -289,7 +296,7 @@ async function workQueue() {
 
       const payload = parsePayload(result[1]);
       if (!payload || !payload.meetingId) {
-        log("Skipped invalid transcode payload");
+
         continue;
       }
 
@@ -297,17 +304,14 @@ async function workQueue() {
         await reportWorkerStatus(payload.meetingId, "PROCESSING");
         await processMeeting(payload);
         const callbackFinalPath = payload.finalPath || toInputS3Key(payload);
-        await reportWorkerStatus(payload.meetingId, "READY", callbackFinalPath);
+        await reportWorkerStatus(payload.meetingId, "READY", callbackFinalPath, payload.version);
       } catch (error) {
-        console.error(`[transcoder] Failed for ${payload.meetingId}:`, error);
         try {
           await reportWorkerStatus(payload.meetingId, "FAILED");
         } catch (statusError) {
-          console.error(`[transcoder] Failed to report FAILED for ${payload.meetingId}:`, statusError);
         }
       }
     } catch (error) {
-      console.error("[transcoder] Queue loop error:", error);
     }
   }
 }

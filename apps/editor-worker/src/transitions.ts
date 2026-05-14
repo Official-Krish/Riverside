@@ -101,7 +101,7 @@ export function getTransitionPlan(clip: RenderClip, position: "start" | "end") {
 export function buildClipRenderArgs(clip: RenderClip, outputPath: string, width: number, height: number, fps: number): string[] {
   const startTransition = getTransitionPlan(clip, "start");
   const endTransition = getTransitionPlan(clip, "end");
-  const presetFilter = buildPresetFilter(clip.preset, clip.presetConfig);
+  const presetFilter = buildPresetFilter(clip.preset, clip.presetConfig, width, height, fps);
 
   const args = [
     "-y",
@@ -117,7 +117,7 @@ export function buildClipRenderArgs(clip: RenderClip, outputPath: string, width:
       filterChain += `,${presetFilter}`;
     }
 
-    args.push(
+    const finalArgs = [
       "-t", (clip.durationMs / 1000).toFixed(3),
       "-vf", filterChain,
       "-r", String(fps),
@@ -128,13 +128,13 @@ export function buildClipRenderArgs(clip: RenderClip, outputPath: string, width:
       "-b:a", "320k",
       "-ar", "48000",
       outputPath,
-    );
-    return args;
+    ];
+    
+    return [...args, ...finalArgs];
   }
 
+  
   const filterParts: string[] = [];
-  // Ensure the clip's video stream is resampled to the target fps so that
-  // synthetic color inputs (used for transitions) have a matching timebase.
   filterParts.push(`[0:v]trim=duration=${(clip.durationMs / 1000).toFixed(3)},setpts=PTS-STARTPTS,scale=${width}:${height},fps=${fps}[clipv]`);
 
   let inputIndex = 1;
@@ -175,7 +175,7 @@ export function buildClipRenderArgs(clip: RenderClip, outputPath: string, width:
     outputLabel = "finalv";
   }
 
-  args.push(
+  const finalArgs = [
     "-filter_complex", filterParts.join(";"),
     "-map", `[${outputLabel}]`,
     "-map", "0:a?",
@@ -187,7 +187,70 @@ export function buildClipRenderArgs(clip: RenderClip, outputPath: string, width:
     "-b:a", "320k",
     "-ar", "48000",
     outputPath,
+  ];
+  
+  return [...args, ...finalArgs];
+}
+
+export function buildCrossfadeConcatArgs(parts: Array<{ path: string; transition?: { type: string; durationMs: number } | null }>, outputPath: string, fps: number): { args: string[]; listPath: string } | null {
+  if (parts.length < 2) return null;
+
+  const args = ["-y"];
+  const filterParts: string[] = [];
+  const inputLabels: string[] = [];
+  let inputIndex = 0;
+
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i]!;
+    args.push("-i", part.path);
+    filterParts.push(`[${inputIndex}:v]setpts=PTS-STARTPTS[v${inputIndex}]`);
+    inputLabels.push(`[v${inputIndex}]`);
+    inputIndex += 1;
+  }
+
+  if (parts.length === 2) {
+    const transition = parts[0]!.transition;
+    if (transition) {
+      const fadeType = getXFadeTransition(transition.type);
+      const durationSec = (transition.durationMs / 1000).toFixed(3);
+      const offset = Math.max(0, (0 - transition.durationMs) / 1000).toFixed(3);
+      args.push(
+        "-filter_complex",
+        `${inputLabels.join("")}xfade=transition=${fadeType}:duration=${durationSec}:offset=${offset}[vout]`,
+        "-map", "[vout]",
+      );
+    } else {
+      args.push(
+        "-filter_complex", `${inputLabels.join("")}concat=n=2:v=1:a=0[vout]`,
+        "-map", "[vout]",
+      );
+    }
+  } else {
+    for (let i = 0; i < parts.length - 1; i++) {
+      const currentTransition = parts[i]!.transition;
+      if (currentTransition) {
+        const fadeType = getXFadeTransition(currentTransition.type);
+        const durationSec = (currentTransition.durationMs / 1000).toFixed(3);
+        filterParts.push(`[v${i}][v${i + 1}]xfade=transition=${fadeType}:duration=${durationSec}:offset=0[v${i}_faded]`);
+      } else {
+        filterParts.push(`[v${i}][v${i + 1}]concat=v=1:a=0[n${i}]`);
+      }
+    }
+
+    const lastLabel = parts.length === 2 ? "[vout]" : `[v${parts.length - 2}_faded]`;
+    args.push(
+      "-filter_complex", filterParts.join(";"),
+      "-map", lastLabel,
+    );
+  }
+
+  args.push(
+    "-r", String(fps),
+    "-c:v", "libx264",
+    "-preset", "fast",
+    "-crf", "22",
+    outputPath,
   );
 
-  return args;
+  return { args, listPath: "" };
 }

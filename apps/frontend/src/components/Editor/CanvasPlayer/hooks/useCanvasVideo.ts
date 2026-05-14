@@ -31,6 +31,8 @@ export interface UseCanvasVideoOptions {
   }>;
   /** Active transition state computed by useActiveTransition hook */
   activeTransition?: ActiveTransitionInfo | null;
+  stageWidth?: number;
+  stageHeight?: number;
 }
 
 export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {}) {
@@ -44,6 +46,8 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
     videoAlpha = 1,
     audioClips = [],
     activeTransition = null,
+    stageWidth = 1920,
+    stageHeight = 1080,
   } = options;
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -148,11 +152,13 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
       (videoTimeMs) => {
         setVideoCurrentTime(videoTimeMs / 1000);
         onTimeUpdateRef.current?.(videoTimeMs);
-      }
+      },
+      stageWidth,
+      stageHeight
     );
 
     stopLoopRef.current = stop;
-  }, [getVisibleOverlays]);
+  }, [getVisibleOverlays, stageHeight, stageWidth]);
 
   const drawCurrentFrame = useCallback(() => {
     const video = videoRef.current;
@@ -161,8 +167,8 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     const activeOverlays = getVisibleOverlays();
-    drawSingleFrame(ctx, video, canvas, transformRef.current, activeOverlays);
-  }, [getVisibleOverlays]);
+    drawSingleFrame(ctx, video, canvas, transformRef.current, activeOverlays, stageWidth, stageHeight);
+  }, [getVisibleOverlays, stageHeight, stageWidth]);
 
   const syncExternalAudio = useCallback(async () => {
     const video = videoRef.current;
@@ -266,14 +272,14 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
         // Ensure canvas has dimensions
         if (canvas.width === 0 || canvas.height === 0) {
           const dpr = window.devicePixelRatio || 1;
-          canvas.width = 1280 * dpr;
-          canvas.height = 720 * dpr;
-          canvas.style.width = "1280px";
-          canvas.style.height = "720px";
+          canvas.width = stageWidth * dpr;
+          canvas.height = stageHeight * dpr;
+          canvas.style.width = `${stageWidth}px`;
+          canvas.style.height = `${stageHeight}px`;
         }
         const ctx = canvas.getContext("2d");
         if (ctx) {
-          drawSingleFrame(ctx, video, canvas, transformRef.current);
+          drawSingleFrame(ctx, video, canvas, transformRef.current, undefined, stageWidth, stageHeight);
         }
       }
     };
@@ -286,7 +292,7 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
       if (canvas) {
         const ctx = canvas.getContext("2d");
         if (ctx) {
-          drawSingleFrame(ctx, video, canvas, transformRef.current);
+          drawSingleFrame(ctx, video, canvas, transformRef.current, undefined, stageWidth, stageHeight);
         }
       }
     };
@@ -298,7 +304,7 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
         if (canvas) {
           const ctx = canvas.getContext("2d");
           if (ctx) {
-            drawSingleFrame(ctx, video, canvas, transformRef.current);
+            drawSingleFrame(ctx, video, canvas, transformRef.current, undefined, stageWidth, stageHeight);
           }
         }
       }
@@ -322,7 +328,7 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
         const ctx = canvas.getContext("2d");
         if (ctx) {
           const activeOverlays = getVisibleOverlays();
-          drawSingleFrame(ctx, video, canvas, transformRef.current, activeOverlays);
+          drawSingleFrame(ctx, video, canvas, transformRef.current, activeOverlays, stageWidth, stageHeight);
         }
       }
     };
@@ -335,7 +341,7 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
         const ctx = canvas.getContext("2d");
         if (ctx) {
           const activeOverlays = getVisibleOverlays();
-          drawSingleFrame(ctx, video, canvas, transformRef.current, activeOverlays);
+          drawSingleFrame(ctx, video, canvas, transformRef.current, activeOverlays, stageWidth, stageHeight);
         }
       }
     };
@@ -380,7 +386,7 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
         if (canvas) {
           const ctx = canvas.getContext("2d");
           if (ctx) {
-            drawSingleFrame(ctx, video, canvas, transformRef.current);
+            drawSingleFrame(ctx, video, canvas, transformRef.current, undefined, stageWidth, stageHeight);
           }
         }
       };

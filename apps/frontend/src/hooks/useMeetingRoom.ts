@@ -19,6 +19,27 @@ type ParticipantState = {
   tracks: JitsiTrack[];
 };
 
+function buildMeetingAudioConstraints(selectedMicId?: string): MediaTrackConstraints {
+  return {
+    deviceId: selectedMicId ? { exact: selectedMicId } : undefined,
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
+    channelCount: { ideal: 1 },
+    sampleRate: { ideal: 48000 },
+  };
+}
+
+function buildMeetingVideoConstraints(selectedCameraId?: string): MediaTrackConstraints {
+  return {
+    deviceId: selectedCameraId ? { exact: selectedCameraId } : undefined,
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+    frameRate: { ideal: 30, max: 60 },
+    aspectRatio: { ideal: 16 / 9 },
+  };
+}
+
 export function useMeetingRoom({
   meetingId,
   displayName,
@@ -467,8 +488,13 @@ export function useMeetingRoom({
 
             const localTracks = await JitsiMeetJS.createLocalTracks({
               devices: ["audio", "video"],
+              resolution: 1080,
               cameraDeviceId: selectedCameraId || undefined,
               micDeviceId: selectedMicId || undefined,
+              constraints: {
+                audio: buildMeetingAudioConstraints(selectedMicId),
+                video: buildMeetingVideoConstraints(selectedCameraId),
+              },
             });
 
             localTracks.forEach((track: JitsiTrack) => {

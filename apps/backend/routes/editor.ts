@@ -149,6 +149,11 @@ editorRouter.get("/projects/:id", authMiddleware, async (req, res) => {
                 meeting: {
                     select: {
                         roomId: true,
+                        finalRecording: {
+                            select: {
+                                version: true,
+                            },
+                        },
                     },
                 },
             },
@@ -173,6 +178,8 @@ editorRouter.get("/projects/:id", authMiddleware, async (req, res) => {
                             durationMs: clip.durationMs,
                             name: clip.name ?? undefined,
                             ...(meta.audioMode ? { audioMode: meta.audioMode } : {}),
+                            ...(meta.preset !== undefined ? { preset: meta.preset } : {}),
+                            ...(meta.presetConfig ? { presetConfig: meta.presetConfig } : {}),
                             ...(meta.transitionStart ? { transitionStart: meta.transitionStart } : {}),
                             ...(meta.transitionEnd ? { transitionEnd: meta.transitionEnd } : {}),
                             ...(meta.transitionIn ? { transitionIn: meta.transitionIn } : {}),
@@ -196,6 +203,7 @@ editorRouter.get("/projects/:id", authMiddleware, async (req, res) => {
                     ...job,
                     outputUrl: job.outputUrl ? toPublicRecordingLink(job.outputUrl) : null,
                 })),
+                finalRecordingVersion: project.meeting.finalRecording?.version ?? "0",
             },
         });
     } catch (error) {
@@ -224,6 +232,19 @@ editorRouter.put("/projects/:id", authMiddleware, async (req, res) => {
         }
 
         const { tracks, overlays, durationMs, fps, width, height } = parsedData.data;
+        console.log(`[editor.save] Received save request: projectId=${projectId}, tracks=${tracks.length}, overlays=${overlays?.length ?? 0}`);
+
+        // Log clips for debugging
+        tracks.forEach((track, ti) => {
+            console.log(`[editor.save] Track ${ti}: type=${track.type}, clips=${track.clips?.length ?? 0}`);
+            track.clips?.forEach((clip, ci) => {
+                console.log(`[editor.save]   Clip ${ci}: sourceAssetId=${clip.sourceAssetId}, durationMs=${clip.durationMs}`);
+                console.log(`[editor.save]   Clip ${ci} metadata: transitionStart=${JSON.stringify(clip.transitionStart)}, transitionEnd=${JSON.stringify(clip.transitionEnd)}`);
+            });
+        });
+        overlays?.forEach((o, oi) => {
+            console.log(`[editor.save] Overlay ${oi}: id=${o.id}, type=${o.type}, content=${JSON.stringify(o.content)}, timelineStartMs=${o.timelineStartMs}, durationMs=${o.durationMs}`);
+        });
 
         const project = await prisma.editorProject.findFirst({
             where: { id: projectId, ownerId: userId },
@@ -294,6 +315,8 @@ editorRouter.put("/projects/:id", authMiddleware, async (req, res) => {
                                 // Store transitions + deprecated fields as JSON metadata
                                 metadata: {
                                     ...(clipMeta.audioMode ? { audioMode: clipMeta.audioMode } : {}),
+                                    ...(clip.preset !== undefined ? { preset: clip.preset } : {}),
+                                    ...(clip.presetConfig ? { presetConfig: clip.presetConfig } : {}),
                                     ...(clip.transitionStart ? { transitionStart: clip.transitionStart } : {}),
                                     ...(clip.transitionEnd ? { transitionEnd: clip.transitionEnd } : {}),
                                     ...(clip.transitionIn ? { transitionIn: clip.transitionIn } : {}),

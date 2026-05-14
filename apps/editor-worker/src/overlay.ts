@@ -9,14 +9,49 @@ function applyTextTransform(text: string, transform: string): string {
   }
 }
 
+function estimateWrappedText(text: string, maxWidth: number | undefined, fontSize: number, letterSpacing: number): string {
+  if (!maxWidth || maxWidth <= 0) return text;
+
+  const approxCharWidth = Math.max(1, fontSize * 0.58 + letterSpacing);
+  const maxChars = Math.max(1, Math.floor(maxWidth / approxCharWidth));
+
+  return text
+    .split(/\r?\n/)
+    .flatMap((line) => {
+      const words = line.split(" ");
+      const lines: string[] = [];
+      let current = words.shift() ?? "";
+
+      for (const word of words) {
+        const next = current ? `${current} ${word}` : word;
+        if (next.length <= maxChars) {
+          current = next;
+        } else {
+          if (current) lines.push(current);
+          current = word;
+        }
+      }
+
+      if (current) lines.push(current);
+      return lines.length ? lines : [""];
+    })
+    .join("\n");
+}
+
 function buildSingleOverlayFilter(o: any, timelineOffsetMs = 0): string | null {
   let text = o.content?.text ?? "";
-  if (!text) return null;
+  if (!text) {
+    
+    return null;
+  }
+
+  
+  
+  
+  
 
   const textTransform = o.style?.textTransform || "none";
   text = applyTextTransform(text, textTransform);
-  text = sanitizeDrawtext(text).replace(/\r?\n/g, "\\n");
-  if (!text) return null;
 
   const style = o.style ?? {};
   const transform = o.transform ?? {};
@@ -24,14 +59,16 @@ function buildSingleOverlayFilter(o: any, timelineOffsetMs = 0): string | null {
   const positionX = Number.isFinite(transform.x) ? transform.x : 100;
   const positionY = Number.isFinite(transform.y) ? transform.y : 100;
   const fontSize = Number.isFinite(style.fontSize) ? style.fontSize : 24;
+  const letterSpacing = Number(style.letterSpacing) || 0;
+
+  text = estimateWrappedText(text, Number(style.maxWidth), fontSize, letterSpacing);
+  text = sanitizeDrawtext(text).replace(/\r?\n/g, "\\n");
+  if (!text) return null;
 
   // FIX 1: Take only the first font name from a CSS font-family stack
   const rawFont = style.fontFamily || "sans-serif";
   const fontFamily = rawFont.split(",")[0].trim().replace(/['"]/g, "");
 
-  const fontWeight = style.fontWeight === "bold" ? ":bold" : "";
-  const fontStyle = style.fontStyle === "italic" ? ":italic" : "";
-  const letterSpacing = Number(style.letterSpacing) || 0;
   const textAlign = style.textAlign || "left";
 
   const startSec = ((o.timelineStartMs - timelineOffsetMs) / 1000).toFixed(3);
@@ -39,22 +76,28 @@ function buildSingleOverlayFilter(o: any, timelineOffsetMs = 0): string | null {
 
   let xValue: string;
   if (textAlign === "center") {
-    xValue = `(w-text_w)/2`;
+    xValue = `${positionX}-text_w/2`;
   } else if (textAlign === "right") {
-    xValue = `w-text_w-${positionX}`;
+    xValue = `${positionX}-text_w`;
   } else {
     xValue = `${positionX}`;
   }
 
+  const textOpacity = Number.isFinite(style.opacity) ? Math.max(0, Math.min(1, Number(style.opacity))) : 1;
+  const textAlphaHex = Math.round(textOpacity * 255).toString(16).padStart(2, "0");
+
   const parts: string[] = [
     `fontsize=${fontSize}`,
-    `fontcolor=0x${normalizeHexColor(style.color, "ffffff")}`,
+    `fontcolor=0x${normalizeHexColor(style.color, "ffffff")}${textAlphaHex}`,
     `x=${xValue}`,
     `y=${positionY}`,
-    `font=${fontFamily}${fontWeight}${fontStyle}`,  // single clean font name
+    `font=${fontFamily}`,
   ];
 
   if (letterSpacing !== 0) parts.push(`text_spacing=${letterSpacing}`);
+  if (Number.isFinite(style.lineHeight) && style.lineHeight > 0) {
+    parts.push(`line_spacing=${Math.round(fontSize * (style.lineHeight - 1))}`);
+  }
 
   const bgStyle = style.background ?? {};
   const bgEnabled = bgStyle.opacity > 0 && bgStyle.color;
@@ -63,7 +106,9 @@ function buildSingleOverlayFilter(o: any, timelineOffsetMs = 0): string | null {
       .toString(16).padStart(2, "0");
     parts.push(`box=1`);
     parts.push(`boxcolor=0x${normalizeHexColor(bgStyle.color, "000000")}${alphaHex}`);
-    parts.push(`boxborderw=${Number(bgStyle.paddingX) || 8}`);
+    const paddingX = Number(bgStyle.paddingX) || 8;
+    const paddingY = Number(bgStyle.paddingY) || paddingX;
+    parts.push(`boxborderw=${Math.max(paddingX, paddingY)}`);
   }
 
   if (style.textShadow) {

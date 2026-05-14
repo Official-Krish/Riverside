@@ -331,7 +331,6 @@ export async function finalizeMeetingRoom(roomId: string, hostUserId?: string) {
           internalMeetingId: meeting.id,
         })
       );
-      console.log(`[${new Date().toISOString()}] Enqueued ProcessVideo for roomId=${meeting.roomId}`);
     }
 
     if (meeting.scheduleId && meeting.schedule) {

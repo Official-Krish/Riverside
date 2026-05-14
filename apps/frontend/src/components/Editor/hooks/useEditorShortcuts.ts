@@ -11,7 +11,6 @@ const PRESET_SHORTCUTS: Record<string, PresetType> = {
   "i": "intro-template",
   "m": "meme-format",
   "p": "podcast-layout",
-  "g": "gaming-edit",
 };
 
 export function useEditorShortcuts(

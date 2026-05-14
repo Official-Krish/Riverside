@@ -63,6 +63,7 @@ export const workerRecordingStatusSchema = z.object({
     meetingId: z.string(),
     status: z.enum(["PROCESSING", "READY", "FAILED"]),
     finalPath: z.string().optional(),
+    version: z.string().optional(),
 });
 
 export const removeRecordingVisibilitySchema = z.object({
@@ -156,6 +157,21 @@ export const SaveEditorProjectSchema = z.object({
                     durationMs: z.number(),
                     name: z.string().optional(),
                     audioMode: z.enum(["replace", "layer"]).optional(),
+                    preset: z.enum([
+                        "zoom-pop",
+                        "shake",
+                        "glitch",
+                        "cinematic-bars",
+                        "vhs",
+                        "chromakey",
+                        "intro-template",
+                        "meme-format",
+                        "podcast-layout",
+                        "lower-third",
+                        "cta-button",
+                        "chapter-title",
+                    ]).nullable().optional(),
+                    presetConfig: z.any().optional(),
                     // Transition metadata stored as JSON
                     transitionStart: z.any().optional(),
                     transitionEnd: z.any().optional(),

@@ -63,18 +63,18 @@ const TEXT_PRESETS = [
 ];
 
 const ENTRY_ANIMATIONS = [
-  { type: "slide-right", icon: "→", name: "Slide in" },
-  { type: "fade-in", icon: "◉", name: "Fade" },
-  { type: "typewriter", icon: "▮", name: "Typewriter" },
-  { type: "bounce", icon: "⦿", name: "Bounce" },
-  { type: "scale-in", icon: "⊕", name: "Scale" },
-  { type: "none", icon: "—", name: "None" },
+  { type: "slide-right", icon: "→", name: "Slide", disabled: true, tooltip: "Coming Soon" },
+  { type: "fade-in", icon: "◉", name: "Fade", disabled: false },
+  { type: "typewriter", icon: "▮", name: "Typewriter", disabled: true, tooltip: "Coming Soon" },
+  { type: "bounce", icon: "⦿", name: "Bounce", disabled: true, tooltip: "Coming Soon" },
+  { type: "scale-in", icon: "⊕", name: "Scale", disabled: true, tooltip: "Coming Soon" },
+  { type: "none", icon: "—", name: "None", disabled: false },
 ];
 
 const EXIT_ANIMATIONS = [
-  { type: "slide-left", icon: "←", name: "Slide out" },
-  { type: "fade-out", icon: "◎", name: "Fade" },
-  { type: "none", icon: "—", name: "None" },
+  { type: "slide-left", icon: "←", name: "Slide", disabled: true, tooltip: "Coming Soon" },
+  { type: "fade-out", icon: "◎", name: "Fade", disabled: false },
+  { type: "none", icon: "—", name: "None", disabled: false },
 ];
 
 const Divider = () => <div className="h-px bg-[#252525]" />;
@@ -174,19 +174,31 @@ const BgOption = ({ label, active, onClick }: { label: string; active: boolean; 
   </button>
 );
 
-const AnimButton = ({ icon, name, active, onClick }: { icon: string; name: string; active: boolean; onClick: () => void }) => (
-  <button
-    onClick={onClick}
-    className={`p-2 rounded-md text-[10px] cursor-pointer text-center font-medium transition-colors flex flex-col items-center gap-1 ${
-      active
-        ? "bg-[#f5a6231a] border border-[#f5a623] text-[#f5a623]"
-        : "bg-[#111] border border-[#2a2a2a] text-[#666] hover:border-[#f5a623] hover:text-[#f5a623]"
-    }`}
-  >
-    <span className="text-[15px]">{icon}</span>
-    {name}
-  </button>
+const AnimButton = ({ icon, name, active, onClick, disabled, tooltip }: { icon: string; name: string; active: boolean; onClick: () => void; disabled?: boolean; tooltip?: string }) => (
+  <div className="relative group">
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`p-2 rounded-md text-[10px] cursor-pointer text-center font-medium transition-colors flex flex-col items-center gap-1 ${
+        active
+          ? "bg-[#f5a6231a] border border-[#f5a623] text-[#f5a623]"
+          : disabled
+            ? "bg-[#0a0a0a] border border-[#222] text-[#333] cursor-not-allowed opacity-50"
+            : "bg-[#111] border border-[#2a2a2a] text-[#666] hover:border-[#f5a623] hover:text-[#f5a623]"
+      }`}
+    >
+      <span className="text-[15px]">{icon}</span>
+      {name}
+    </button>
+    {disabled && tooltip && (
+      <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-[#1a1a1a] text-[#f5a623] text-[9px] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+        {tooltip}
+      </div>
+    )}
+  </div>
 );
+
+
 
 export function TextStyleControls({
   style,
@@ -360,26 +372,28 @@ export function TextStyleControls({
                 >
                   I
                 </button>
-                <button
-                  onClick={() => applyStyleUpdate({ underline: !style.underline })}
-                  className={`w-[28px] h-[28px] rounded-md border text-[12px] cursor-pointer flex items-center justify-center transition-colors ${
-                    style.underline
-                      ? "bg-[#f5a623] border-[#f5a623] text-[#1a1a1a]"
-                      : "bg-[#111] border-[#333] text-[#888] hover:border-[#555]"
-                  }`}
-                >
-                  <span className="underline">U</span>
-                </button>
-                <button
-                  onClick={() => applyStyleUpdate({ strikeThrough: !style.strikeThrough })}
-                  className={`w-[28px] h-[28px] rounded-md border text-[12px] cursor-pointer flex items-center justify-center transition-colors ${
-                    style.strikeThrough
-                      ? "bg-[#f5a623] border-[#f5a623] text-[#1a1a1a]"
-                      : "bg-[#111] border-[#333] text-[#888] hover:border-[#555]"
-                  }`}
-                >
-                  <span className="line-through">S</span>
-                </button>
+                <div className="relative group">
+                  <button
+                    onClick={() => {}}
+                    className="w-[28px] h-[28px] rounded-md border text-[12px] cursor-not-allowed flex items-center justify-center transition-colors bg-[#0a0a0a] border-[#222] text-[#333] opacity-50"
+                  >
+                    <span className="underline">U</span>
+                  </button>
+                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-[#1a1a1a] text-[#f5a623] text-[9px] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                    Coming Soon
+                  </div>
+                </div>
+                <div className="relative group">
+                  <button
+                    onClick={() => {}}
+                    className="w-[28px] h-[28px] rounded-md border text-[12px] cursor-not-allowed flex items-center justify-center transition-colors bg-[#0a0a0a] border-[#222] text-[#333] opacity-50"
+                  >
+                    <span className="line-through">S</span>
+                  </button>
+                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-[#1a1a1a] text-[#f5a623] text-[9px] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                    Coming Soon
+                  </div>
+                </div>
               </div>
               <div className="flex gap-1">
                 <button
@@ -487,10 +501,29 @@ export function TextStyleControls({
 
             <Divider />
 
-            {/* Gradient */}
+            {/* Gradient - Coming Soon */}
             <div className="flex items-center justify-between">
-              <MiniLabel>Gradient</MiniLabel>
-              <Toggle active={!!style.gradient?.enabled} onClick={toggleGradient} />
+              <div className="flex items-center gap-2">
+                <MiniLabel>Gradient</MiniLabel>
+                <span className="text-[8px] text-[#f5a623] bg-[#f5a623]/10 px-1.5 py-0.5 rounded">Coming Soon</span>
+              </div>
+              <div className="relative group">
+                <button
+                  onClick={toggleGradient}
+                  className={`w-[30px] h-[17px] rounded-full cursor-pointer relative transition-colors ${
+                    style.gradient?.enabled ? "bg-[#f5a623]" : "bg-[#333]"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-[2px] w-[13px] h-[13px] bg-white rounded-full transition-left ${
+                      style.gradient?.enabled ? "left-[15px]" : "left-[2px]"
+                    }`}
+                  />
+                </button>
+                <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-[#1a1a1a] text-[#f5a623] text-[9px] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  Available in next update
+                </div>
+              </div>
             </div>
             {style.gradient?.enabled && (
               <div className="flex items-center gap-2">
@@ -673,6 +706,12 @@ export function TextStyleControls({
         {/* ANIMATE TAB */}
         {activeTab === "anim" && onAnimationChange && animation && (
           <div className="flex flex-col gap-3">
+            {/* Coming Soon Note */}
+            <div className="flex items-center gap-2 px-2 py-1.5 bg-[#f5a623]/10 border border-[#f5a623]/20 rounded">
+              <span className="text-[10px] text-[#f5a623]">⚠️</span>
+              <span className="text-[10px] text-[#bfa873]">Most animations export in next update. Fade only for now.</span>
+            </div>
+
             {/* Entry */}
             <div className="flex flex-col gap-2">
               <MiniLabel>Entry</MiniLabel>
@@ -683,7 +722,9 @@ export function TextStyleControls({
                     icon={anim.icon}
                     name={anim.name}
                     active={animation.type === anim.type}
-                    onClick={() => handleAnimationTypeChange(anim.type as AnimationType)}
+                    disabled={anim.disabled}
+                    tooltip={anim.tooltip}
+                    onClick={() => !anim.disabled && handleAnimationTypeChange(anim.type as AnimationType)}
                   />
                 ))}
               </div>
@@ -714,7 +755,9 @@ export function TextStyleControls({
                     icon={anim.icon}
                     name={anim.name}
                     active={animation.exitType === anim.type}
-                    onClick={() => handleExitAnimationTypeChange(anim.type as AnimationType)}
+                    disabled={anim.disabled}
+                    tooltip={anim.tooltip}
+                    onClick={() => !anim.disabled && handleExitAnimationTypeChange(anim.type as AnimationType)}
                   />
                 ))}
               </div>

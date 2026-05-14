@@ -14,7 +14,6 @@ export function getRedisClient(): Redis {
         });
 
         redisClient.on("ready", () => {
-            console.log(`[${new Date().toISOString()}] Connected to Redis at ${process.env.REDIS_HOST || "localhost"}:${process.env.REDIS_PORT || 6379}`);
         });
     }
     return redisClient;

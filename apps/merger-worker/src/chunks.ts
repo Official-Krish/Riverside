@@ -102,11 +102,14 @@ export async function collectUserChunks(
         await fs.writeFile(localPath, bytes);
 
         const metadata = metadataByPath.get(key);
+        const parsedTimestamp = parseChunkTimestamp(fileName) ?? 0;
 
         const item: UserChunk = {
             userId,
             localPath,
-            timestamp: parseChunkTimestamp(fileName) ?? Date.now(),
+            timestamp: parsedTimestamp,
+            durationSeconds: 10,
+            hasValidTimestamp: parsedTimestamp !== null,
             metadata: metadata
                 ? {
                     isEncrypted: metadata.isEncrypted,
@@ -128,6 +131,20 @@ export async function collectUserChunks(
     }
 
     for (const [userId, chunks] of userChunks.entries()) {
+        const validChunks = chunks.filter(c => c.hasValidTimestamp);
+        const baseTimestamp = validChunks.length > 0
+            ? Math.min(...validChunks.map(c => c.timestamp))
+            : Date.now();
+
+        let fallbackIndex = 0;
+        for (const chunk of chunks) {
+            if (!chunk.hasValidTimestamp) {
+                chunk.timestamp = baseTimestamp + (fallbackIndex * 5000);
+                chunk.hasValidTimestamp = true;
+                fallbackIndex++;
+            }
+        }
+
         chunks.sort((a, b) => a.timestamp - b.timestamp);
         
         const decryptedChunks = await decryptUserChunks(chunks, meetingId, tempDir);

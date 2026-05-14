@@ -14,15 +14,7 @@ export function calculateGridDimensions(count: number): GridDimensions {
     return { rows, cols };
 }
 
-export function normalizeVideoDurations(processedUsers: ProcessedUser[], log: (message: string) => void): ProcessedUser[] {
-    const maxDuration = Math.max(...processedUsers.map(u => u.duration));
 
-    for (const user of processedUsers) {
-        const trailingPaddingSeconds = Math.max(0, maxDuration - user.duration);
-        log(`[normalizeVideoDurations] User ${user.userId}: leading=${user.leadingPaddingSeconds.toFixed(2)}s trailing=${trailingPaddingSeconds.toFixed(2)}s deferred to final grid encode`);
-    }
-    return processedUsers;
-}
 
 async function createSingleUserVideo(user: ProcessedUser, outputPath: string, config: MergerConfig, log: (message: string) => void): Promise<void> {
     const label = `createGridVideo[single-user]`;

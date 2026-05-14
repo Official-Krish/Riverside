@@ -37,20 +37,21 @@ export async function handleFailedStatus(meetingIdentifier: string) {
   ]);
 }
 
-export async function handleReadyStatus(meetingIdentifier: string, finalPath: string) {
+export async function handleReadyStatus(meetingIdentifier: string, finalPath: string, version?: string) {
   const meeting = await getMeetingByIdentifier(meetingIdentifier);
-  const publicFinalPath = toPublicRecordingLink(finalPath);
 
   await prisma.$transaction(async (tx) => {
     await tx.finalRecording.upsert({
       where: { meetingId: meeting.id },
       create: {
         meetingId: meeting.id,
-        videoLink: publicFinalPath,
+        videoLink: finalPath,
+        version: version ?? "stable",
         visibleToEmails: [],
       },
       update: {
-        videoLink: publicFinalPath,
+        videoLink: finalPath,
+        version: version ?? "stable",
       },
     });
 

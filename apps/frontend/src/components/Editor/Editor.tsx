@@ -65,7 +65,7 @@ export function Editor() {
   const [editingOverlayId, setEditingOverlayId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
 
-  const [containerSize, setContainerSize] = useState({ width: 1280, height: 720 });
+  const [containerSize, setContainerSize] = useState({ width: 1920, height: 1080 });
 
   // Panel state
   const [activePanelTab, setActivePanelTab] = useState<PanelTab>("controls");
@@ -277,11 +277,23 @@ export function Editor() {
     handleApplyPreset
   );
 
-  const stageWidth = project?.width || 1280;
-  const stageHeight = project?.height || 720;
+  const stageWidth = project?.width || 1920;
+  const stageHeight = project?.height || 1080;
 
   // Compute active transition based on current timeline position
   const activeTransitionState = useActiveTransition(tracks, timelineTime);
+  const previewPreset = useMemo(() => {
+    for (const track of tracks) {
+      if (track.type !== "VIDEO" || !track.visible) continue;
+      const clip = track.clips.find(
+        (item) =>
+          timelineTime >= item.timelineStartMs &&
+          timelineTime < item.timelineStartMs + item.durationMs
+      );
+      if (clip?.preset) return clip.preset;
+    }
+    return activePreset;
+  }, [activePreset, timelineTime, tracks]);
 
   // Convert to the format expected by useCanvasVideo
   const activeTransitionInfo: ActiveTransitionInfo | null = activeTransitionState
@@ -308,6 +320,8 @@ export function Editor() {
     videoAlpha: 1, // Always use full opacity - transitions handled by TransitionRenderer
     audioClips,
     activeTransition: activeTransitionInfo,
+    stageWidth,
+    stageHeight,
   });
 
   useEffect(() => {
@@ -444,7 +458,7 @@ export function Editor() {
                     isLoaded={canvasState.isLoaded}
                     onClickToggle={() => setSelectedOverlayId(null)}
                     onDoubleClickFullscreen={() => canvasRef.current?.requestFullscreen?.()}
-                    preset={activePreset}
+                    preset={previewPreset}
                   />
 
                   <OverlayLayer
