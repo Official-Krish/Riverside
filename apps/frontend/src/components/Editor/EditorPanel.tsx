@@ -20,11 +20,17 @@ import { TransitionPanel } from "./transitions";
 import { TransitionControls } from "./transitions/TransitionControls";
 import type { TransitionType } from "./transitions/types";
 import { PRESET_DEFINITIONS, type PresetType } from "./types";
+import { EffectControls } from "./effects";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 
-type PanelTab = "controls" | "transition" | "presets" | "transform";
+export type PanelTab =
+  | "controls"
+  | "transition"
+  | "presets"
+  | "effects"
+  | "transform";
 
 interface CanvasTransform {
   stretchX: number;
@@ -43,6 +49,10 @@ interface EditorPanelProps {
   onTabChange: (tab: PanelTab) => void;
   activePreset?: PresetType | null;
   onApplyPreset?: (presetType: PresetType) => void;
+  clipEffects?: any;
+  onClipEffectsChange?: (effects: any) => void;
+  activeClipName?: string | null;
+  activeClipDurationMs?: number;
   canvasTransform?: CanvasTransform;
   textOverlayStyle?: any;
   onTextStyleChange?: (updates: any) => void;
@@ -53,7 +63,11 @@ interface EditorPanelProps {
     selectedTransition: string | null;
     onClose: () => void;
     selectedTransitionId?: string | null;
-    selectedTransitionLocation?: { trackIndex: number; clipId: string; position: "start" | "end" } | null;
+    selectedTransitionLocation?: {
+      trackIndex: number;
+      clipId: string;
+      position: "start" | "end";
+    } | null;
     tracks?: any[];
     onUpdateTransition?: (updates: any) => void;
     onDeleteTransition?: () => void;
@@ -81,6 +95,7 @@ const TABS = [
   { id: "controls" as PanelTab, label: "Controls", icon: Type },
   { id: "transition" as PanelTab, label: "Transition", icon: ArrowLeftRight },
   { id: "presets" as PanelTab, label: "Presets", icon: Sparkles },
+  { id: "effects" as PanelTab, label: "Effects", icon: Sparkles },
   { id: "transform" as PanelTab, label: "Transform", icon: Maximize },
 ];
 
@@ -96,6 +111,10 @@ export function EditorPanel({
   onTabChange,
   activePreset,
   onApplyPreset,
+  clipEffects,
+  onClipEffectsChange,
+  activeClipName,
+  activeClipDurationMs = 0,
   canvasTransform,
   textOverlayStyle,
   onTextStyleChange,
@@ -184,11 +203,15 @@ export function EditorPanel({
           </span>
           <span className="w-px h-4 bg-[#f5a623]/20" />
           <span className="flex flex-col items-center">
-            <strong className="text-[#bfa873]">{tracks.reduce((acc, t) => acc + t.clips.length, 0)}</strong> clips
+            <strong className="text-[#bfa873]">
+              {tracks.reduce((acc, t) => acc + t.clips.length, 0)}
+            </strong>{" "}
+            clips
           </span>
           <span className="w-px h-4 bg-[#f5a623]/20" />
           <span className="flex flex-col items-center font-mono">
-            <strong className="text-[#bfa873]">{formatTime(durationMs)}</strong> duration
+            <strong className="text-[#bfa873]">{formatTime(durationMs)}</strong>{" "}
+            duration
           </span>
         </div>
 
@@ -302,13 +325,21 @@ export function EditorPanel({
 
         {activeTab === "transition" && transitionProps && (
           <>
-            {transitionProps.selectedTransitionId && transitionProps.selectedTransitionLocation && transitionProps.tracks ? (
+            {transitionProps.selectedTransitionId &&
+            transitionProps.selectedTransitionLocation &&
+            transitionProps.tracks ? (
               (() => {
                 const loc = transitionProps.selectedTransitionLocation;
                 if (!loc) return null;
                 const track = transitionProps.tracks[loc.trackIndex];
-                const clip = track?.clips.find((c: any) => (c.id ?? c.sourceAssetId) === loc.clipId);
-                const trans = clip ? (loc.position === "start" ? clip.transitionStart : clip.transitionEnd) : null;
+                const clip = track?.clips.find(
+                  (c: any) => (c.id ?? c.sourceAssetId) === loc.clipId,
+                );
+                const trans = clip
+                  ? loc.position === "start"
+                    ? clip.transitionStart
+                    : clip.transitionEnd
+                  : null;
                 if (!trans) return null;
                 return (
                   <TransitionControls
@@ -331,7 +362,9 @@ export function EditorPanel({
             ) : (
               <TransitionPanel
                 onSelectTransition={transitionProps.onSelectTransition}
-                selectedTransition={transitionProps.selectedTransition as TransitionType | null}
+                selectedTransition={
+                  transitionProps.selectedTransition as TransitionType | null
+                }
                 onClose={transitionProps.onClose}
               />
             )}
@@ -357,7 +390,9 @@ export function EditorPanel({
                       toast.success(`${preset.name} applied`);
                     }}
                     className={`flex flex-col h-auto py-2 text-[10px] border-[#f5a623]/20 bg-[#f5a623]/5 hover:bg-[#f5a623]/10 hover:border-[#f5a623]/30 ${
-                      activePreset === preset.type ? "ring-1 ring-[#f5a623]" : ""
+                      activePreset === preset.type
+                        ? "ring-1 ring-[#f5a623]"
+                        : ""
                     }`}
                     title={`${preset.name} (${preset.shortcut})`}
                   >
@@ -396,7 +431,10 @@ export function EditorPanel({
             {activePreset && (
               <div className="flex items-center justify-between px-3 py-2 bg-[#f5a623]/10 rounded-lg border border-[#f5a623]/20">
                 <span className="text-[11px] text-[#bfa873]">
-                  Active: <span className="text-[#f5a623] font-medium">{activePreset}</span>
+                  Active:{" "}
+                  <span className="text-[#f5a623] font-medium">
+                    {activePreset}
+                  </span>
                 </span>
                 <button
                   onClick={() => onApplyPreset?.(null as any)}
@@ -404,6 +442,36 @@ export function EditorPanel({
                 >
                   Clear
                 </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "effects" && (
+          <div className="space-y-4">
+            {clipEffects && onClipEffectsChange ? (
+              <>
+                <div className="rounded-xl border border-[#f5a623]/10 bg-[#060605]/60 px-4 py-3">
+                  <div className="text-[11px] uppercase tracking-wider text-[#8d7850]">
+                    Active clip
+                  </div>
+                  <div className="mt-1 text-sm font-medium text-[#fff5de]">
+                    {activeClipName || "Clip at playhead"}
+                  </div>
+                  <div className="mt-1 text-[11px] text-[#8d7850]">
+                    Move the playhead onto a video clip to edit blur, color,
+                    LUT, chroma key, and speed ramp settings.
+                  </div>
+                </div>
+                <EffectControls
+                  value={clipEffects}
+                  onChange={onClipEffectsChange}
+                  clipDurationMs={activeClipDurationMs}
+                />
+              </>
+            ) : (
+              <div className="text-center text-[#8d7850] text-sm py-8">
+                Move the playhead onto a video clip to edit effects
               </div>
             )}
           </div>
@@ -445,7 +513,9 @@ export function EditorPanel({
                   max="3"
                   step="0.05"
                   value={canvasTransform.stretchX}
-                  onChange={(e) => canvasTransform.setStretchX(Number(e.target.value))}
+                  onChange={(e) =>
+                    canvasTransform.setStretchX(Number(e.target.value))
+                  }
                   className="w-full h-1.5 accent-[#f5a623] cursor-pointer"
                 />
               </div>
@@ -467,7 +537,9 @@ export function EditorPanel({
                   max="3"
                   step="0.05"
                   value={canvasTransform.stretchY}
-                  onChange={(e) => canvasTransform.setStretchY(Number(e.target.value))}
+                  onChange={(e) =>
+                    canvasTransform.setStretchY(Number(e.target.value))
+                  }
                   className="w-full h-1.5 accent-[#f5a623] cursor-pointer"
                 />
               </div>
@@ -488,7 +560,9 @@ export function EditorPanel({
                   max="500"
                   step="10"
                   value={canvasTransform.offsetX}
-                  onChange={(e) => canvasTransform.setOffsetX(Number(e.target.value))}
+                  onChange={(e) =>
+                    canvasTransform.setOffsetX(Number(e.target.value))
+                  }
                   className="w-full h-1.5 accent-[#f5a623] cursor-pointer"
                 />
               </div>
@@ -509,7 +583,9 @@ export function EditorPanel({
                   max="500"
                   step="10"
                   value={canvasTransform.offsetY}
-                  onChange={(e) => canvasTransform.setOffsetY(Number(e.target.value))}
+                  onChange={(e) =>
+                    canvasTransform.setOffsetY(Number(e.target.value))
+                  }
                   className="w-full h-1.5 accent-[#f5a623] cursor-pointer"
                 />
               </div>
@@ -526,5 +602,3 @@ export function EditorPanel({
     </div>
   );
 }
-
-export type { PanelTab };

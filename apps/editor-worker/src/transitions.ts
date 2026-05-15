@@ -1,5 +1,12 @@
 import type { RenderClip } from "./types";
 import { buildPresetFilter } from "./presets";
+import {
+  buildSimpleVisualFilterChain,
+  buildSpeedGraph,
+  buildVisualEffectsGraph,
+  needsComplexVisualGraph,
+  needsSpeedGraph,
+} from "./effects/ffmpeg";
 
 export function getXFadeTransition(type: string | null | undefined): string {
   switch (type) {
@@ -68,99 +75,200 @@ export function getXFadeTransition(type: string | null | undefined): string {
   }
 }
 
-function buildXFadeArgs(transition: { type: string; durationMs: number; borderWidth?: number; borderColor?: string; reverse?: boolean }, offsetSec: string): string {
+function buildXFadeArgs(
+  transition: {
+    type: string;
+    durationMs: number;
+    borderWidth?: number;
+    borderColor?: string;
+    reverse?: boolean;
+  },
+  offsetSec: string,
+): string {
   let args = `transition=${transition.type}:duration=${(transition.durationMs / 1000).toFixed(3)}:offset=${offsetSec}`;
   if (transition.borderWidth) args += `:borderw=${transition.borderWidth}`;
-  if (transition.borderColor) args += `:bordercolor=0x${transition.borderColor.replace("#", "")}`;
+  if (transition.borderColor)
+    args += `:bordercolor=0x${transition.borderColor.replace("#", "")}`;
   if (transition.reverse) args += ":reverse=1";
   return args;
 }
 
 export function getTransitionPlan(clip: RenderClip, position: "start" | "end") {
-  const transition = position === "start"
-    ? (clip.transitionStart ?? (clip.transitionIn ? { type: clip.transitionIn, durationMs: 500 } : null))
-    : (clip.transitionEnd ?? (clip.transitionOut ? { type: clip.transitionOut, durationMs: 500 } : null));
+  const transition =
+    position === "start"
+      ? (clip.transitionStart ??
+        (clip.transitionIn
+          ? { type: clip.transitionIn, durationMs: 500 }
+          : null))
+      : (clip.transitionEnd ??
+        (clip.transitionOut
+          ? { type: clip.transitionOut, durationMs: 500 }
+          : null));
 
   if (!transition || typeof transition !== "object") return null;
 
   const transitionRecord = transition as Record<string, unknown>;
-  const transitionType = typeof transitionRecord.type === "string" ? transitionRecord.type : null;
-  const transitionDuration = Number.isFinite(transitionRecord.durationMs) ? Number(transitionRecord.durationMs) : 500;
+  const transitionType =
+    typeof transitionRecord.type === "string" ? transitionRecord.type : null;
+  const transitionDuration = Number.isFinite(transitionRecord.durationMs)
+    ? Number(transitionRecord.durationMs)
+    : 500;
 
   if (!transitionType || transitionType === "cut") return null;
 
   return {
     type: getXFadeTransition(transitionType),
     durationMs: Math.max(100, transitionDuration),
-    borderWidth: Number.isFinite(transitionRecord.borderWidth) ? Number(transitionRecord.borderWidth) : undefined,
-    borderColor: typeof transitionRecord.borderColor === "string" ? transitionRecord.borderColor : undefined,
-    reverse: typeof transitionRecord.reverse === "boolean" ? transitionRecord.reverse : undefined,
+    borderWidth: Number.isFinite(transitionRecord.borderWidth)
+      ? Number(transitionRecord.borderWidth)
+      : undefined,
+    borderColor:
+      typeof transitionRecord.borderColor === "string"
+        ? transitionRecord.borderColor
+        : undefined,
+    reverse:
+      typeof transitionRecord.reverse === "boolean"
+        ? transitionRecord.reverse
+        : undefined,
   };
 }
 
-export function buildClipRenderArgs(clip: RenderClip, outputPath: string, width: number, height: number, fps: number): string[] {
+export function buildClipRenderArgs(
+  clip: RenderClip,
+  outputPath: string,
+  width: number,
+  height: number,
+  fps: number,
+): string[] {
   const startTransition = getTransitionPlan(clip, "start");
   const endTransition = getTransitionPlan(clip, "end");
-  const presetFilter = buildPresetFilter(clip.preset, clip.presetConfig, width, height, fps);
+  const presetFilter = buildPresetFilter(
+    clip.preset,
+    clip.presetConfig,
+    width,
+    height,
+    fps,
+  );
+  const visualFilters = buildSimpleVisualFilterChain(clip.effects);
+  const useSpeedGraph = needsSpeedGraph(clip);
+  const useComplexVisuals = needsComplexVisualGraph(clip.effects);
+  const needsFilterComplex = Boolean(
+    startTransition || endTransition || useSpeedGraph || useComplexVisuals,
+  );
 
   const args = [
     "-y",
-    "-ss", (clip.sourceStartMs / 1000).toFixed(3),
-    "-i", clip.sourcePath,
+    "-ss",
+    (clip.sourceStartMs / 1000).toFixed(3),
+    "-i",
+    clip.sourcePath,
   ];
 
-  const hasTransition = Boolean(startTransition || endTransition);
-
-  if (!hasTransition) {
+  if (!needsFilterComplex) {
     let filterChain = `scale=${width}:${height}`;
+    if (visualFilters.length > 0) {
+      filterChain += `,${visualFilters.join(",")}`;
+    }
     if (presetFilter) {
       filterChain += `,${presetFilter}`;
     }
 
     const finalArgs = [
-      "-t", (clip.durationMs / 1000).toFixed(3),
-      "-vf", filterChain,
-      "-r", String(fps),
-      "-c:v", "libx264",
-      "-preset", "fast",
-      "-crf", "22",
-      "-c:a", "aac",
-      "-b:a", "320k",
-      "-ar", "48000",
+      "-t",
+      (clip.durationMs / 1000).toFixed(3),
+      "-vf",
+      filterChain,
+      "-r",
+      String(fps),
+      "-c:v",
+      "libx264",
+      "-preset",
+      "fast",
+      "-crf",
+      "22",
+      "-c:a",
+      "aac",
+      "-b:a",
+      "320k",
+      "-ar",
+      "48000",
       outputPath,
     ];
-    
+
     return [...args, ...finalArgs];
   }
 
-  
   const filterParts: string[] = [];
-  filterParts.push(`[0:v]trim=duration=${(clip.durationMs / 1000).toFixed(3)},setpts=PTS-STARTPTS,scale=${width}:${height},fps=${fps}[clipv]`);
+  let videoLabel = "clipv";
+  let audioLabel: string | null = null;
+
+  if (useSpeedGraph) {
+    const speedGraph = buildSpeedGraph(clip, "spd");
+    filterParts.push(...speedGraph.filterParts);
+    filterParts.push(
+      `[${speedGraph.videoLabel}]scale=${width}:${height},fps=${fps}[clipscaled]`,
+    );
+    videoLabel = "clipscaled";
+    audioLabel = speedGraph.audioLabel ?? null;
+  } else {
+    let filterChain = `trim=duration=${(clip.durationMs / 1000).toFixed(3)},setpts=PTS-STARTPTS,scale=${width}:${height},fps=${fps}`;
+    if (visualFilters.length > 0) {
+      filterChain += `,${visualFilters.join(",")}`;
+    }
+    filterParts.push(`[0:v]${filterChain}[clipbase]`);
+    videoLabel = "clipbase";
+  }
+
+  if (useComplexVisuals) {
+    const visualGraph = buildVisualEffectsGraph(
+      videoLabel,
+      clip.effects,
+      width,
+      height,
+      fps,
+      "fx",
+    );
+    filterParts.push(...visualGraph.filterParts);
+    videoLabel = visualGraph.outputLabel;
+  }
 
   let inputIndex = 1;
-  let outputLabel = "clipv";
+  let outputLabel = videoLabel;
 
   if (startTransition) {
     args.push(
-      "-f", "lavfi",
-      "-t", (startTransition.durationMs / 1000).toFixed(3),
-      "-i", `color=c=black:s=${width}x${height}:r=${fps}`,
+      "-f",
+      "lavfi",
+      "-t",
+      (startTransition.durationMs / 1000).toFixed(3),
+      "-i",
+      `color=c=black:s=${width}x${height}:r=${fps}`,
     );
     filterParts.push(`[${inputIndex}:v]format=rgba[blackstart]`);
-    filterParts.push(`[blackstart][clipv]xfade=${buildXFadeArgs(startTransition, "0")}[afterstart]`);
+    filterParts.push(
+      `[blackstart][${videoLabel}]xfade=${buildXFadeArgs(startTransition, "0")}[afterstart]`,
+    );
     outputLabel = "afterstart";
     inputIndex += 1;
   }
 
   if (endTransition) {
     args.push(
-      "-f", "lavfi",
-      "-t", (endTransition.durationMs / 1000).toFixed(3),
-      "-i", `color=c=black:s=${width}x${height}:r=${fps}`,
+      "-f",
+      "lavfi",
+      "-t",
+      (endTransition.durationMs / 1000).toFixed(3),
+      "-i",
+      `color=c=black:s=${width}x${height}:r=${fps}`,
     );
     filterParts.push(`[${inputIndex}:v]format=rgba[blackend]`);
-    const endOffset = Math.max(0, (clip.durationMs - endTransition.durationMs) / 1000).toFixed(3);
-    filterParts.push(`[${outputLabel}][blackend]xfade=${buildXFadeArgs(endTransition, endOffset)}[outv]`);
+    const endOffset = Math.max(
+      0,
+      (clip.durationMs - endTransition.durationMs) / 1000,
+    ).toFixed(3);
+    filterParts.push(
+      `[${outputLabel}][blackend]xfade=${buildXFadeArgs(endTransition, endOffset)}[outv]`,
+    );
     outputLabel = "outv";
   }
 
@@ -170,29 +278,64 @@ export function buildClipRenderArgs(clip: RenderClip, outputPath: string, width:
     } else if (outputLabel === "afterstart") {
       filterParts.push(`[afterstart]${presetFilter}[finalv]`);
     } else {
-      filterParts.push(`[clipv]${presetFilter}[finalv]`);
+      filterParts.push(`[${videoLabel}]${presetFilter}[finalv]`);
     }
     outputLabel = "finalv";
   }
 
   const finalArgs = [
-    "-filter_complex", filterParts.join(";"),
-    "-map", `[${outputLabel}]`,
-    "-map", "0:a?",
-    "-r", String(fps),
-    "-c:v", "libx264",
-    "-preset", "fast",
-    "-crf", "22",
-    "-c:a", "aac",
-    "-b:a", "320k",
-    "-ar", "48000",
+    "-filter_complex",
+    filterParts.join(";"),
+    "-map",
+    `[${outputLabel}]`,
+    "-r",
+    String(fps),
+    "-c:v",
+    "libx264",
+    "-preset",
+    "fast",
+    "-crf",
+    "22",
     outputPath,
   ];
-  
+
+  if (audioLabel) {
+    finalArgs.splice(2, 0, "-map", `[${audioLabel}]`);
+    finalArgs.splice(
+      finalArgs.length - 1,
+      0,
+      "-c:a",
+      "aac",
+      "-b:a",
+      "320k",
+      "-ar",
+      "48000",
+    );
+  } else {
+    finalArgs.splice(2, 0, "-map", "0:a?");
+    finalArgs.splice(
+      finalArgs.length - 1,
+      0,
+      "-c:a",
+      "aac",
+      "-b:a",
+      "320k",
+      "-ar",
+      "48000",
+    );
+  }
+
   return [...args, ...finalArgs];
 }
 
-export function buildCrossfadeConcatArgs(parts: Array<{ path: string; transition?: { type: string; durationMs: number } | null }>, outputPath: string, fps: number): { args: string[]; listPath: string } | null {
+export function buildCrossfadeConcatArgs(
+  parts: Array<{
+    path: string;
+    transition?: { type: string; durationMs: number } | null;
+  }>,
+  outputPath: string,
+  fps: number,
+): { args: string[]; listPath: string } | null {
   if (parts.length < 2) return null;
 
   const args = ["-y"];
@@ -217,12 +360,15 @@ export function buildCrossfadeConcatArgs(parts: Array<{ path: string; transition
       args.push(
         "-filter_complex",
         `${inputLabels.join("")}xfade=transition=${fadeType}:duration=${durationSec}:offset=${offset}[vout]`,
-        "-map", "[vout]",
+        "-map",
+        "[vout]",
       );
     } else {
       args.push(
-        "-filter_complex", `${inputLabels.join("")}concat=n=2:v=1:a=0[vout]`,
-        "-map", "[vout]",
+        "-filter_complex",
+        `${inputLabels.join("")}concat=n=2:v=1:a=0[vout]`,
+        "-map",
+        "[vout]",
       );
     }
   } else {
@@ -231,24 +377,28 @@ export function buildCrossfadeConcatArgs(parts: Array<{ path: string; transition
       if (currentTransition) {
         const fadeType = getXFadeTransition(currentTransition.type);
         const durationSec = (currentTransition.durationMs / 1000).toFixed(3);
-        filterParts.push(`[v${i}][v${i + 1}]xfade=transition=${fadeType}:duration=${durationSec}:offset=0[v${i}_faded]`);
+        filterParts.push(
+          `[v${i}][v${i + 1}]xfade=transition=${fadeType}:duration=${durationSec}:offset=0[v${i}_faded]`,
+        );
       } else {
         filterParts.push(`[v${i}][v${i + 1}]concat=v=1:a=0[n${i}]`);
       }
     }
 
-    const lastLabel = parts.length === 2 ? "[vout]" : `[v${parts.length - 2}_faded]`;
-    args.push(
-      "-filter_complex", filterParts.join(";"),
-      "-map", lastLabel,
-    );
+    const lastLabel =
+      parts.length === 2 ? "[vout]" : `[v${parts.length - 2}_faded]`;
+    args.push("-filter_complex", filterParts.join(";"), "-map", lastLabel);
   }
 
   args.push(
-    "-r", String(fps),
-    "-c:v", "libx264",
-    "-preset", "fast",
-    "-crf", "22",
+    "-r",
+    String(fps),
+    "-c:v",
+    "libx264",
+    "-preset",
+    "fast",
+    "-crf",
+    "22",
     outputPath,
   );
 

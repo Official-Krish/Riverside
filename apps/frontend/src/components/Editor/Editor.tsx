@@ -21,6 +21,7 @@ import { useTrackOperations } from "./hooks/useTrackOperations";
 import { usePlaybackState } from "./hooks/usePlaybackState";
 import { useMediaUpload } from "./hooks/useMediaUpload";
 import { useExport } from "./hooks/useExport";
+import { buildPreviewFilter, normalizeClipEffects } from "./effects";
 
 const EDITOR_CSS = `
   @keyframes editor-fade-in {
@@ -61,11 +62,16 @@ export function Editor() {
   const [timelineZoom, setTimelineZoom] = useState(1);
   const [videoTime, setVideoTime] = useState<number>(0);
 
-  const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null);
+  const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(
+    null,
+  );
   const [editingOverlayId, setEditingOverlayId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
 
-  const [containerSize, setContainerSize] = useState({ width: 1920, height: 1080 });
+  const [containerSize, setContainerSize] = useState({
+    width: 1920,
+    height: 1080,
+  });
 
   // Panel state
   const [activePanelTab, setActivePanelTab] = useState<PanelTab>("controls");
@@ -147,9 +153,8 @@ export function Editor() {
   const timeUpdateRef = useRef<((t: number) => void) | null>(null);
   const playStateChangeRef = useRef<((p: boolean) => void) | null>(null);
 
-  const { canUndo, canRedo, handleUndo, handleRedo, resetHistory } = useEditorHistory(
-    tracks, overlays, setTracks, setOverlays
-  );
+  const { canUndo, canRedo, handleUndo, handleRedo, resetHistory } =
+    useEditorHistory(tracks, overlays, setTracks, setOverlays);
 
   const handleUndoWithToast = useCallback(() => {
     handleUndo();
@@ -161,25 +166,46 @@ export function Editor() {
     toast.info("Redid action");
   }, [handleRedo]);
 
-  const { thumbnailsByAsset, waveformData, extractThumbnailsForAsset, extractingAssets } = useMediaExtraction(
-    assetsById, sourceUrl, durationMs
-  );
+  const {
+    thumbnailsByAsset,
+    waveformData,
+    extractThumbnailsForAsset,
+    extractingAssets,
+  } = useMediaExtraction(assetsById, sourceUrl, durationMs);
 
   // Global editor busy flag: true while thumbnails are being extracted
   // Waveform extraction happens in the background and doesn't block the editor
-  const isEditorBusy = Boolean(
-    Object.values(extractingAssets).some((v) => v)
-  );
+  const isEditorBusy = Boolean(Object.values(extractingAssets).some((v) => v));
 
   const { project, loading, saving, accessDenied } = useEditorProject(
-    meetingId, tracks, overlays, durationMs, setTracks, setOverlays, setDurationMs, setAssetsById, setSourceUrl, setActiveAssetId, resetHistory, extractThumbnailsForAsset
+    meetingId,
+    tracks,
+    overlays,
+    durationMs,
+    setTracks,
+    setOverlays,
+    setDurationMs,
+    setAssetsById,
+    setSourceUrl,
+    setActiveAssetId,
+    resetHistory,
+    extractThumbnailsForAsset,
   );
 
-  const { exportJob, showExportDialog, setShowExportDialog, handleExport } = useExport(project);
+  const { exportJob, showExportDialog, setShowExportDialog, handleExport } =
+    useExport(project);
 
-  const { handleDeleteOverlay, handleUpdateOverlay, handleAddOverlay } = useOverlayOperations(setOverlays);
+  const { handleDeleteOverlay, handleUpdateOverlay, handleAddOverlay } =
+    useOverlayOperations(setOverlays);
 
-  const { handleUpdateClip, handleDeleteClip, handleUpdateTrack, handleSplitClip, handleAddTransitionAtPosition, handlePlaceTransitionAtTime } = useTrackOperations(setTracks, setSplitMode);
+  const {
+    handleUpdateClip,
+    handleDeleteClip,
+    handleUpdateTrack,
+    handleSplitClip,
+    handleAddTransitionAtPosition,
+    handlePlaceTransitionAtTime,
+  } = useTrackOperations(setTracks, setSplitMode);
 
   const {
     selectedTransitionId,
@@ -191,30 +217,45 @@ export function Editor() {
     clearSelectedTransition,
   } = useTransitions(tracks, setTracks);
 
-  const handleUpdateSelectedTransition = useCallback((updates: any) => {
-    if (selectedTransitionLocation) {
-      updateTransition(
-        selectedTransitionLocation.trackIndex,
-        selectedTransitionLocation.clipId,
-        selectedTransitionLocation.position,
-        updates
-      );
-    }
-  }, [selectedTransitionLocation, updateTransition]);
+  const handleUpdateSelectedTransition = useCallback(
+    (updates: any) => {
+      if (selectedTransitionLocation) {
+        updateTransition(
+          selectedTransitionLocation.trackIndex,
+          selectedTransitionLocation.clipId,
+          selectedTransitionLocation.position,
+          updates,
+        );
+      }
+    },
+    [selectedTransitionLocation, updateTransition],
+  );
 
   const handleDeleteSelectedTransition = useCallback(() => {
     if (selectedTransitionLocation) {
       removeTransition(
         selectedTransitionLocation.trackIndex,
         selectedTransitionLocation.clipId,
-        selectedTransitionLocation.position
+        selectedTransitionLocation.position,
       );
       clearSelectedTransition();
     }
   }, [selectedTransitionLocation, removeTransition, clearSelectedTransition]);
 
-  const { handleSeek, handleTimeUpdate, handlePlayPause, handlePlayStateChange } = usePlaybackState(
-    tracks, assetsById, activeAssetId, setActiveAssetId, setSourceUrl, setTimelineTime, setVideoTime, setIsPlaying
+  const {
+    handleSeek,
+    handleTimeUpdate,
+    handlePlayPause,
+    handlePlayStateChange,
+  } = usePlaybackState(
+    tracks,
+    assetsById,
+    activeAssetId,
+    setActiveAssetId,
+    setSourceUrl,
+    setTimelineTime,
+    setVideoTime,
+    setIsPlaying,
   );
 
   const audioClips = useMemo(() => {
@@ -225,42 +266,56 @@ export function Editor() {
         const asset = assetsById[clip.sourceAssetId];
         if (!asset?.url) return [];
 
-        return [{
-          assetId: clip.sourceAssetId,
-          url: asset.url,
-          timelineStartMs: clip.timelineStartMs,
-          durationMs: clip.durationMs,
-          sourceStartMs: clip.sourceStartMs,
-          muted: track.muted,
-          volume: track.volume / 100,
-          audioMode: clip.audioMode,
-        }];
+        return [
+          {
+            assetId: clip.sourceAssetId,
+            url: asset.url,
+            timelineStartMs: clip.timelineStartMs,
+            durationMs: clip.durationMs,
+            sourceStartMs: clip.sourceStartMs,
+            muted: track.muted,
+            volume: track.volume / 100,
+            audioMode: clip.audioMode,
+          },
+        ];
       });
     });
   }, [tracks, assetsById]);
 
   const { handleClipFilePicked, handleAudioFilePicked } = useMediaUpload(
-    project, tracks, setTracks, setAssetsById, setDurationMs, sourceUrl, setSourceUrl, setActiveAssetId, extractThumbnailsForAsset
+    project,
+    tracks,
+    setTracks,
+    setAssetsById,
+    setDurationMs,
+    sourceUrl,
+    setSourceUrl,
+    setActiveAssetId,
+    extractThumbnailsForAsset,
   );
 
   const handleApplyPreset = useCallback((preset: PresetType | null) => {
     if (preset === null) {
       setActivePreset(null);
-      setTracks((prev) => prev.map((track) => ({
-        ...track,
-        clips: track.clips.map((clip) => ({ ...clip, preset: null })),
-      })));
+      setTracks((prev) =>
+        prev.map((track) => ({
+          ...track,
+          clips: track.clips.map((clip) => ({ ...clip, preset: null })),
+        })),
+      );
     } else {
       setActivePreset(preset);
-      setTracks((prev) => prev.map((track, trackIndex) => ({
-        ...track,
-        clips: track.clips.map((clip, clipIndex) => {
-          if (trackIndex === 0 && clipIndex === 0) {
-            return { ...clip, preset };
-          }
-          return clip;
-        }),
-      })));
+      setTracks((prev) =>
+        prev.map((track, trackIndex) => ({
+          ...track,
+          clips: track.clips.map((clip, clipIndex) => {
+            if (trackIndex === 0 && clipIndex === 0) {
+              return { ...clip, preset };
+            }
+            return clip;
+          }),
+        })),
+      );
     }
   }, []);
 
@@ -274,7 +329,7 @@ export function Editor() {
     handleUndo,
     handleRedo,
     setTimelineZoom,
-    handleApplyPreset
+    handleApplyPreset,
   );
 
   const stageWidth = project?.width || 1920;
@@ -289,21 +344,51 @@ export function Editor() {
       const clip = track.clips.find(
         (item) =>
           timelineTime >= item.timelineStartMs &&
-          timelineTime < item.timelineStartMs + item.durationMs
+          timelineTime < item.timelineStartMs + item.durationMs,
       );
       if (clip?.preset) return clip.preset;
     }
     return activePreset;
   }, [activePreset, timelineTime, tracks]);
 
-  // Convert to the format expected by useCanvasVideo
-  const activeTransitionInfo: ActiveTransitionInfo | null = activeTransitionState
-    ? {
-        type: activeTransitionState.type,
-        progress: activeTransitionState.progress,
-        position: activeTransitionState.position,
+  const activeVideoClipInfo = useMemo(() => {
+    for (let trackIndex = 0; trackIndex < tracks.length; trackIndex += 1) {
+      const track = tracks[trackIndex];
+      if (track.type !== "VIDEO" || !track.visible) continue;
+
+      const clipIndex = track.clips.findIndex(
+        (item) =>
+          timelineTime >= item.timelineStartMs &&
+          timelineTime < item.timelineStartMs + item.durationMs,
+      );
+
+      if (clipIndex >= 0) {
+        const clip = track.clips[clipIndex]!;
+        return { trackIndex, clipIndex, clip };
       }
-    : null;
+    }
+
+    return null;
+  }, [timelineTime, tracks]);
+
+  const activeClipEffects = useMemo(
+    () => normalizeClipEffects(activeVideoClipInfo?.clip.effects),
+    [activeVideoClipInfo],
+  );
+  const previewFilter = useMemo(
+    () => buildPreviewFilter(activeVideoClipInfo?.clip.effects),
+    [activeVideoClipInfo],
+  );
+
+  // Convert to the format expected by useCanvasVideo
+  const activeTransitionInfo: ActiveTransitionInfo | null =
+    activeTransitionState
+      ? {
+          type: activeTransitionState.type,
+          progress: activeTransitionState.progress,
+          position: activeTransitionState.position,
+        }
+      : null;
 
   const {
     videoRef,
@@ -368,16 +453,19 @@ export function Editor() {
     audioInputRef.current?.click();
   }, []);
 
-  const handleSelectTransition = useCallback((type: TransitionType) => {
-    if (selectedTransitionLocation) {
-      addTransition(
-        selectedTransitionLocation.trackIndex,
-        selectedTransitionLocation.clipId,
-        selectedTransitionLocation.position,
-        type
-      );
-    }
-  }, [selectedTransitionLocation, addTransition]);
+  const handleSelectTransition = useCallback(
+    (type: TransitionType) => {
+      if (selectedTransitionLocation) {
+        addTransition(
+          selectedTransitionLocation.trackIndex,
+          selectedTransitionLocation.clipId,
+          selectedTransitionLocation.position,
+          type,
+        );
+      }
+    },
+    [selectedTransitionLocation, addTransition],
+  );
 
   const handleSplitAtPlayhead = useCallback(() => {
     const currentMs = timelineTime;
@@ -418,8 +506,12 @@ export function Editor() {
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 rounded-2xl border border-[#f5a623]/10 bg-[#0a0a08]/40 p-8 text-center">
         <Film className="h-12 w-12 text-[#f5a623]/40" />
         <div className="space-y-2">
-          <h2 className="text-xl font-semibold text-[#fff5de]">You don't have access</h2>
-          <p className="text-[#bfa873]">Ask the host for access to edit this recording.</p>
+          <h2 className="text-xl font-semibold text-[#fff5de]">
+            You don't have access
+          </h2>
+          <p className="text-[#bfa873]">
+            Ask the host for access to edit this recording.
+          </p>
         </div>
       </div>
     );
@@ -443,7 +535,9 @@ export function Editor() {
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-[#f5a623]" />
-              <p className="text-sm text-[#f5a623]">Preparing editor assets...</p>
+              <p className="text-sm text-[#f5a623]">
+                Preparing editor assets...
+              </p>
             </div>
           </div>
         )}
@@ -461,8 +555,11 @@ export function Editor() {
                     audioRef={audioRef}
                     isLoaded={canvasState.isLoaded}
                     onClickToggle={() => setSelectedOverlayId(null)}
-                    onDoubleClickFullscreen={() => canvasRef.current?.requestFullscreen?.()}
+                    onDoubleClickFullscreen={() =>
+                      canvasRef.current?.requestFullscreen?.()
+                    }
                     preset={previewPreset}
+                    previewFilter={previewFilter}
                   />
 
                   <OverlayLayer
@@ -488,7 +585,9 @@ export function Editor() {
                 <div className="aspect-video flex items-center justify-center">
                   <div className="flex flex-col items-center gap-3 text-center">
                     <Film className="h-10 w-10 text-[#f5a623]/30" />
-                    <p className="text-sm text-[#bfa873]">No video source available</p>
+                    <p className="text-sm text-[#bfa873]">
+                      No video source available
+                    </p>
                   </div>
                 </div>
               )}
@@ -498,63 +597,116 @@ export function Editor() {
           <div className="flex flex-col gap-4 w-105 max-h-[calc(100vh-100px)]">
             <div className="flex-1 overflow-hidden rounded-2xl border border-[#f5a623]/20 bg-[#0a0a08] shadow-lg max-h-full">
               <EditorPanel
-                  activeTab={activePanelTab}
-                  onTabChange={setActivePanelTab}
-                  activePreset={activePreset}
-                  onApplyPreset={handleApplyPreset}
-                  canvasTransform={canvasTransform}
-                  textOverlayStyle={selectedOverlayId ? overlays.find(o => o.id === selectedOverlayId)?.style : undefined}
-                  onTextStyleChange={selectedOverlayId ? (updates) => {
-                    const overlay = overlays.find(o => o.id === selectedOverlayId);
-                    if (overlay) {
-                      handleUpdateOverlay(selectedOverlayId, { style: { ...overlay.style, ...updates } });
-                    }
-                  } : undefined}
-                  textAnimation={selectedOverlayId ? overlays.find(o => o.id === selectedOverlayId)?.animation : undefined}
-                  onTextAnimationChange={selectedOverlayId ? (anim) => {
-                    if (anim.type === "none") {
-                      handleUpdateOverlay(selectedOverlayId, { animation: undefined });
-                    } else {
-                      handleUpdateOverlay(selectedOverlayId, { animation: anim });
-                    }
-                  } : undefined}
-                  transitionProps={{
-                    onSelectTransition: handleSelectTransition,
-                    selectedTransition: selectedTransitionId ? (() => {
-                      if (!selectedTransitionLocation) return null;
-                      const track = tracks[selectedTransitionLocation.trackIndex];
-                      if (!track) return null;
-                      const clip = track.clips.find(c => (c.id ?? c.sourceAssetId) === selectedTransitionLocation.clipId);
-                      if (!clip) return null;
-                      const trans = selectedTransitionLocation.position === "start" ? clip.transitionStart : clip.transitionEnd;
-                      return trans?.type || null;
-                    })() : null,
-                    onClose: () => setActivePanelTab("controls"),
-                    selectedTransitionId,
-                    selectedTransitionLocation,
-                    tracks,
-                    onUpdateTransition: handleUpdateSelectedTransition,
-                    onDeleteTransition: handleDeleteSelectedTransition,
-                    onClearSelection: clearSelectedTransition,
-                  }}
-                  // Toolbar props
-                  isPlaying={isPlaying}
-                  onPlayPause={handlePlayPause}
-                  currentTime={timelineTime}
-                  durationMs={durationMs}
-                  onSeek={handleSeek}
-                  onAddClip={handleAddClip}
-                  onAddAudio={handleAddAudio}
-                  onSplitAtPlayhead={handleSplitAtPlayhead}
-                  onUndo={handleUndoWithToast}
-                  onRedo={handleRedoWithToast}
-                  canUndo={canUndo}
-                  canRedo={canRedo}
-                  onExport={handleExport}
-                  saving={saving}
-                  tracks={tracks}
-                />
-              </div>
+                activeTab={activePanelTab}
+                onTabChange={setActivePanelTab}
+                activePreset={activePreset}
+                onApplyPreset={handleApplyPreset}
+                clipEffects={
+                  activeVideoClipInfo ? activeClipEffects : undefined
+                }
+                activeClipName={activeVideoClipInfo?.clip.name || null}
+                activeClipDurationMs={activeVideoClipInfo?.clip.durationMs || 0}
+                onClipEffectsChange={
+                  activeVideoClipInfo
+                    ? (effects) => {
+                        const clip = activeVideoClipInfo.clip;
+                        const clipId = clip.id ?? clip.sourceAssetId;
+                        handleUpdateClip(
+                          activeVideoClipInfo.trackIndex,
+                          clipId,
+                          { effects },
+                        );
+                      }
+                    : undefined
+                }
+                canvasTransform={canvasTransform}
+                textOverlayStyle={
+                  selectedOverlayId
+                    ? overlays.find((o) => o.id === selectedOverlayId)?.style
+                    : undefined
+                }
+                onTextStyleChange={
+                  selectedOverlayId
+                    ? (updates) => {
+                        const overlay = overlays.find(
+                          (o) => o.id === selectedOverlayId,
+                        );
+                        if (overlay) {
+                          handleUpdateOverlay(selectedOverlayId, {
+                            style: { ...overlay.style, ...updates },
+                          });
+                        }
+                      }
+                    : undefined
+                }
+                textAnimation={
+                  selectedOverlayId
+                    ? overlays.find((o) => o.id === selectedOverlayId)
+                        ?.animation
+                    : undefined
+                }
+                onTextAnimationChange={
+                  selectedOverlayId
+                    ? (anim) => {
+                        if (anim.type === "none") {
+                          handleUpdateOverlay(selectedOverlayId, {
+                            animation: undefined,
+                          });
+                        } else {
+                          handleUpdateOverlay(selectedOverlayId, {
+                            animation: anim,
+                          });
+                        }
+                      }
+                    : undefined
+                }
+                transitionProps={{
+                  onSelectTransition: handleSelectTransition,
+                  selectedTransition: selectedTransitionId
+                    ? (() => {
+                        if (!selectedTransitionLocation) return null;
+                        const track =
+                          tracks[selectedTransitionLocation.trackIndex];
+                        if (!track) return null;
+                        const clip = track.clips.find(
+                          (c) =>
+                            (c.id ?? c.sourceAssetId) ===
+                            selectedTransitionLocation.clipId,
+                        );
+                        if (!clip) return null;
+                        const trans =
+                          selectedTransitionLocation.position === "start"
+                            ? clip.transitionStart
+                            : clip.transitionEnd;
+                        return trans?.type || null;
+                      })()
+                    : null,
+                  onClose: () => setActivePanelTab("controls"),
+                  selectedTransitionId,
+                  selectedTransitionLocation,
+                  tracks,
+                  onUpdateTransition: handleUpdateSelectedTransition,
+                  onDeleteTransition: handleDeleteSelectedTransition,
+                  onClearSelection: clearSelectedTransition,
+                }}
+                // Toolbar props
+                isPlaying={isPlaying}
+                onPlayPause={handlePlayPause}
+                currentTime={timelineTime}
+                durationMs={durationMs}
+                onSeek={handleSeek}
+                onAddClip={handleAddClip}
+                onAddAudio={handleAddAudio}
+                onSplitAtPlayhead={handleSplitAtPlayhead}
+                onUndo={handleUndoWithToast}
+                onRedo={handleRedoWithToast}
+                canUndo={canUndo}
+                canRedo={canRedo}
+                onExport={handleExport}
+                saving={saving}
+                tracks={tracks}
+              />
+            </div>
           </div>
         </div>
 
@@ -578,22 +730,30 @@ export function Editor() {
           onAddTransitionAtPosition={handleAddTransitionAtPosition}
           onPlaceTransitionAtTime={handlePlaceTransitionAtTime}
           transitionMode={transitionMode}
-          onToggleTransitionMode={() => setTransitionMode(prev => !prev)}
+          onToggleTransitionMode={() => setTransitionMode((prev) => !prev)}
           splitMode={splitMode}
           thumbnailsByAsset={thumbnailsByAsset}
           extractingAssets={extractingAssets}
           waveformData={waveformData}
           assetsById={assetsById}
           timelineZoom={timelineZoom}
-          onZoomIn={() => setTimelineZoom((prev) => Math.min(8, +(prev + 0.25).toFixed(2)))}
-          onZoomOut={() => setTimelineZoom((prev) => Math.max(0.5, +(prev - 0.25).toFixed(2)))}
+          onZoomIn={() =>
+            setTimelineZoom((prev) => Math.min(8, +(prev + 0.25).toFixed(2)))
+          }
+          onZoomOut={() =>
+            setTimelineZoom((prev) => Math.max(0.5, +(prev - 0.25).toFixed(2)))
+          }
           onZoomReset={() => setTimelineZoom(1)}
           selectedTransitionId={selectedTransitionId}
           onSelectTransition={(trackIndex, clipId, position) => {
             setSelectedTransition(trackIndex, clipId, position);
             setActivePanelTab("transition");
           }}
-          onToggleTransitionPanel={() => setActivePanelTab((prev) => prev === "transition" ? "controls" : "transition")}
+          onToggleTransitionPanel={() =>
+            setActivePanelTab((prev) =>
+              prev === "transition" ? "controls" : "transition",
+            )
+          }
           showTransitionPanel={activePanelTab === "transition"}
         />
 
@@ -619,7 +779,7 @@ export function Editor() {
             onClose={() => {
               setShowExportDialog(false);
               if (shouldResetAfterExport) {
-                window.location.reload();
+                window.location.href = "/dashboard";
               }
             }}
             onCompleted={() => setShouldResetAfterExport(true)}

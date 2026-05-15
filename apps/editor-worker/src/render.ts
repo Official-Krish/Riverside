@@ -7,14 +7,28 @@ import { CONFIG } from "./config";
 import { recordingsRoot, ensureDir, runBinary } from "./helpers";
 import { verifySourceExists, updateProgress } from "./utils";
 import { collectRenderClips } from "./clips";
-import { buildClipRenderArgs, getTransitionPlan, buildCrossfadeConcatArgs } from "./transitions";
+import {
+  buildClipRenderArgs,
+  getTransitionPlan,
+  buildCrossfadeConcatArgs,
+} from "./transitions";
 import { buildOverlayFilter } from "./overlay";
 import { buildAudioMixArgs, buildConcatArgs } from "./audio";
-import { promoteRenderedVideo, refreshMeetingRecordingArtifacts } from "./artifacts";
+import {
+  promoteRenderedVideo,
+  refreshMeetingRecordingArtifacts,
+} from "./artifacts";
 import { downloadSourceToLocal } from "./storage";
 import { generateTemplateOverlays, type GeneratedOverlay } from "./presets";
+import { materializeClipEffectsAssets } from "./effects/materialize";
 
-function buildOverlayBurnInArgs(inputPath: string, overlays: any[], outputPath: string, width: number, height: number): string[] {
+function buildOverlayBurnInArgs(
+  inputPath: string,
+  overlays: any[],
+  outputPath: string,
+  width: number,
+  height: number,
+): string[] {
   const overlay = buildOverlayFilter(overlays, 0);
   if (!overlay) {
     return ["-y", "-i", inputPath, "-c", "copy", outputPath];
@@ -22,12 +36,18 @@ function buildOverlayBurnInArgs(inputPath: string, overlays: any[], outputPath: 
 
   return [
     "-y",
-    "-i", inputPath,
-    "-vf", overlay,
-    "-c:v", "libx264",
-    "-preset", "fast",
-    "-crf", "22",
-    "-c:a", "copy",
+    "-i",
+    inputPath,
+    "-vf",
+    overlay,
+    "-c:v",
+    "libx264",
+    "-preset",
+    "fast",
+    "-crf",
+    "22",
+    "-c:a",
+    "copy",
     outputPath,
   ];
 }
@@ -57,9 +77,23 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
 
   if (!videoClips.length) throw new Error("No video clips found in project");
 
-  const exportDir = path.join(recordingsRoot, roomId, "editor", "projects", projectId, "exports");
+  const exportDir = path.join(
+    recordingsRoot,
+    roomId,
+    "editor",
+    "projects",
+    projectId,
+    "exports",
+  );
   await ensureDir(exportDir);
-  const sourceCacheDir = path.join(recordingsRoot, roomId, "editor", "projects", projectId, "sources");
+  const sourceCacheDir = path.join(
+    recordingsRoot,
+    roomId,
+    "editor",
+    "projects",
+    projectId,
+    "sources",
+  );
 
   const sourcePaths = new Set([
     ...videoClips.map((clip) => clip.sourcePath),
@@ -71,17 +105,24 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
   await Promise.all(
     [...sourcePaths].map(async (sourcePath) => {
       try {
-        const resolved = await downloadSourceToLocal(sourcePath, sourceCacheDir);
+        const resolved = await downloadSourceToLocal(
+          sourcePath,
+          sourceCacheDir,
+        );
         sourceMap.set(sourcePath, resolved);
         await verifySourceExists(resolved);
       } catch (err: any) {
-        log("error", "Failed to resolve source", { jobId, sourcePath, err: err.message });
+        log("error", "Failed to resolve source", {
+          jobId,
+          sourcePath,
+          err: err.message,
+        });
         throw err;
       }
-    })
+    }),
   );
 
-  const resolvedVideoClips = videoClips.map((clip) => ({
+  const resolvedVideoClipsBase = videoClips.map((clip) => ({
     ...clip,
     sourcePath: sourceMap.get(clip.sourcePath) || clip.sourcePath,
   }));
@@ -96,19 +137,28 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
   const overlayedPath = outputPath.replace(/\.mp4$/, "_overlay.mp4");
   const previewPath = outputPath.replace(/\.mp4$/, "_preview.mp4");
 
-  const firstClip = resolvedVideoClips[0]!;
+  const firstClip = resolvedVideoClipsBase[0]!;
 
   await runBinary(CONFIG.FFMPEG_BIN, [
     "-y",
-    "-ss", (firstClip.sourceStartMs / 1000).toFixed(3),
-    "-i", firstClip.sourcePath,
-    "-t", (firstClip.durationMs / 1000).toFixed(3),
-    "-vf", "scale=640:-2",
-    "-preset", "ultrafast",
-    "-crf", "32",
-    "-c:a", "aac",
-    "-b:a", "128k",
-    "-ar", "48000",
+    "-ss",
+    (firstClip.sourceStartMs / 1000).toFixed(3),
+    "-i",
+    firstClip.sourcePath,
+    "-t",
+    (firstClip.durationMs / 1000).toFixed(3),
+    "-vf",
+    "scale=640:-2",
+    "-preset",
+    "ultrafast",
+    "-crf",
+    "32",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "128k",
+    "-ar",
+    "48000",
     previewPath,
   ]);
 
@@ -118,6 +168,17 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
   let concatListPath: string | null = null;
 
   try {
+    const resolvedVideoClips = await Promise.all(
+      resolvedVideoClipsBase.map(async (clip) => {
+        const materialized = await materializeClipEffectsAssets(
+          clip,
+          exportDir,
+        );
+        tempFiles.push(...materialized.cleanupPaths);
+        return materialized.clip;
+      }),
+    );
+
     if (resolvedVideoClips.length === 1) {
       const c = resolvedVideoClips[0]!;
       const args = buildClipRenderArgs(c, videoOnlyPath, width, height, fps);
@@ -133,7 +194,10 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
 
       await updateProgress(jobId, 75);
     } else {
-      const clipParts: Array<{ path: string; transition?: { type: string; durationMs: number } | null }> = [];
+      const clipParts: Array<{
+        path: string;
+        transition?: { type: string; durationMs: number } | null;
+      }> = [];
       for (let i = 0; i < resolvedVideoClips.length; i++) {
         const c = resolvedVideoClips[i]!;
         const partPath = path.join(exportDir, `${jobId}_part${i}.mp4`);
@@ -143,21 +207,39 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
         try {
           await runBinary(CONFIG.FFMPEG_BIN, args);
         } catch (err: any) {
-          log("error", `Failed to encode part ${i + 1}`, { jobId, partPath, err: err.message });
+          log("error", `Failed to encode part ${i + 1}`, {
+            jobId,
+            partPath,
+            err: err.message,
+          });
           throw err;
         }
 
         const nextClip = resolvedVideoClips[i + 1];
         const transition = nextClip
-          ? getTransitionPlan(c, "end") ?? (getTransitionPlan(nextClip, "start") ? { type: nextClip.transitionIn as string ?? "fade", durationMs: (nextClip.transitionStart as any)?.durationMs ?? 500 } : null)
+          ? (getTransitionPlan(c, "end") ??
+            (getTransitionPlan(nextClip, "start")
+              ? {
+                  type: (nextClip.transitionIn as string) ?? "fade",
+                  durationMs:
+                    (nextClip.transitionStart as any)?.durationMs ?? 500,
+                }
+              : null))
           : null;
 
         clipParts.push({ path: partPath, transition });
         tempFiles.push(partPath);
-        await updateProgress(jobId, 10 + Math.round(((i + 1) / resolvedVideoClips.length) * 70));
+        await updateProgress(
+          jobId,
+          10 + Math.round(((i + 1) / resolvedVideoClips.length) * 70),
+        );
       }
 
-      const crossfadeResult = buildCrossfadeConcatArgs(clipParts, videoOnlyPath, fps);
+      const crossfadeResult = buildCrossfadeConcatArgs(
+        clipParts,
+        videoOnlyPath,
+        fps,
+      );
       if (crossfadeResult) {
         try {
           await runBinary(CONFIG.FFMPEG_BIN, crossfadeResult.args);
@@ -166,7 +248,10 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
           throw err;
         }
       } else {
-        const { args, listPath } = await buildConcatArgs(clipParts.map(p => p.path), videoOnlyPath);
+        const { args, listPath } = await buildConcatArgs(
+          clipParts.map((p) => p.path),
+          videoOnlyPath,
+        );
         concatListPath = listPath;
         try {
           await runBinary(CONFIG.FFMPEG_BIN, args);
@@ -181,19 +266,33 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
     const allOverlays = [...project.overlays];
 
     for (const clip of videoClips) {
-      if (clip.preset && ["intro-template", "meme-format", "podcast-layout"].includes(clip.preset)) {
-        const templateOverlays = generateTemplateOverlays(clip.preset, clip.durationMs, width, height)
-          .map((overlay) => ({
-            ...overlay,
-            timelineStartMs: overlay.timelineStartMs + clip.timelineStartMs,
-          }));
-        allOverlays.push(...templateOverlays as any);
+      if (
+        clip.preset &&
+        ["intro-template", "meme-format", "podcast-layout"].includes(
+          clip.preset,
+        )
+      ) {
+        const templateOverlays = generateTemplateOverlays(
+          clip.preset,
+          clip.durationMs,
+          width,
+          height,
+        ).map((overlay) => ({
+          ...overlay,
+          timelineStartMs: overlay.timelineStartMs + clip.timelineStartMs,
+        }));
+        allOverlays.push(...(templateOverlays as any));
       }
     }
 
-
     if (allOverlays.length > 0) {
-      const overlayArgs = buildOverlayBurnInArgs(videoOnlyPath, allOverlays, overlayedPath, width, height);
+      const overlayArgs = buildOverlayBurnInArgs(
+        videoOnlyPath,
+        allOverlays,
+        overlayedPath,
+        width,
+        height,
+      );
       try {
         await runBinary(CONFIG.FFMPEG_BIN, overlayArgs);
       } catch (err: any) {
@@ -207,7 +306,11 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
     }
 
     if (resolvedAudioClips.length > 0) {
-      const mixArgs = buildAudioMixArgs(overlayedPath, resolvedAudioClips, outputPath);
+      const mixArgs = buildAudioMixArgs(
+        overlayedPath,
+        resolvedAudioClips,
+        outputPath,
+      );
       await runBinary(CONFIG.FFMPEG_BIN, mixArgs);
       await updateProgress(jobId, 98);
       // Clean up intermediate files (will be skipped in finally block)
@@ -221,7 +324,13 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
     // ── Promote to canonical final recording and trigger retranscode ──────
     const version = String(Date.now());
     const finalPath = await promoteRenderedVideo(roomId, outputPath, version);
-    const publicFinalPath = await refreshMeetingRecordingArtifacts(roomId, finalPath, jobId, projectId, version);
+    const publicFinalPath = await refreshMeetingRecordingArtifacts(
+      roomId,
+      finalPath,
+      jobId,
+      projectId,
+      version,
+    );
 
     log("info", "Job completed and promoted to final recording", {
       jobId,

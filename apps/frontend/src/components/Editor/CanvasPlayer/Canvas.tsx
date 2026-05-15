@@ -10,6 +10,7 @@ type Props = {
   onClickToggle?: () => void;
   onDoubleClickFullscreen?: () => void;
   preset?: PresetType | null;
+  previewFilter?: string;
 };
 
 export default function CanvasPlayer({
@@ -20,6 +21,7 @@ export default function CanvasPlayer({
   onClickToggle,
   onDoubleClickFullscreen,
   preset,
+  previewFilter,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showControls, setShowControls] = useState(false);
@@ -83,7 +85,7 @@ export default function CanvasPlayer({
           className="block"
           onClick={onClickToggle}
           onDoubleClick={onDoubleClickFullscreen}
-          style={{ cursor: "pointer" }}
+          style={{ cursor: "pointer", filter: previewFilter || undefined }}
         />
       </div>
 
@@ -125,7 +127,9 @@ export default function CanvasPlayer({
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-10">
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="h-8 w-8 animate-spin text-[#f5a623]" />
-            <span className="text-xs text-[#bfa873] font-medium tracking-wide">Loading video...</span>
+            <span className="text-xs text-[#bfa873] font-medium tracking-wide">
+              Loading video...
+            </span>
           </div>
         </div>
       )}
@@ -156,9 +160,11 @@ export default function CanvasPlayer({
 
           {/* VHS Effect */}
           {preset === "vhs" && (
-            <div className="absolute inset-0 animate-pulse"
+            <div
+              className="absolute inset-0 animate-pulse"
               style={{
-                background: "repeating-linear-gradient(0deg, rgba(0,0,0,0.1) 0px, rgba(0,0,0,0.1) 1px, transparent 1px, transparent 2px)",
+                background:
+                  "repeating-linear-gradient(0deg, rgba(0,0,0,0.1) 0px, rgba(0,0,0,0.1) 1px, transparent 1px, transparent 2px)",
                 mixBlendMode: "overlay",
               }}
             />
@@ -167,9 +173,18 @@ export default function CanvasPlayer({
           {/* Glitch Effect - RGB Split */}
           {preset === "glitch" && (
             <>
-              <div className="absolute inset-0 bg-red-500/10 mix-blend-screen animate-pulse" style={{ animationDuration: "0.1s" }} />
-              <div className="absolute inset-0 bg-blue-500/10 mix-blend-screen animate-pulse" style={{ animationDuration: "0.15s", animationDelay: "0.05s" }} />
-              <div className="absolute inset-0 bg-green-500/5 mix-blend-screen animate-pulse" style={{ animationDuration: "0.12s", animationDelay: "0.02s" }} />
+              <div
+                className="absolute inset-0 bg-red-500/10 mix-blend-screen animate-pulse"
+                style={{ animationDuration: "0.1s" }}
+              />
+              <div
+                className="absolute inset-0 bg-blue-500/10 mix-blend-screen animate-pulse"
+                style={{ animationDuration: "0.15s", animationDelay: "0.05s" }}
+              />
+              <div
+                className="absolute inset-0 bg-green-500/5 mix-blend-screen animate-pulse"
+                style={{ animationDuration: "0.12s", animationDelay: "0.02s" }}
+              />
             </>
           )}
 
@@ -186,22 +201,30 @@ export default function CanvasPlayer({
           {/* Chromakey Indicator */}
           {preset === "chromakey" && (
             <div className="absolute inset-0 border-4 border-emerald-500/40">
-              <div className="absolute top-2 left-2 px-2 py-1 bg-emerald-500/80 text-white text-[10px] rounded">Green Screen</div>
+              <div className="absolute top-2 left-2 px-2 py-1 bg-emerald-500/80 text-white text-[10px] rounded">
+                Green Screen
+              </div>
             </div>
           )}
 
           {/* Intro Template */}
           {preset === "intro-template" && (
             <div className="absolute inset-0 border-4 border-green-500/30">
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 py-2 bg-green-500/20 text-green-400 text-xs rounded">INTRO</div>
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 py-2 bg-green-500/20 text-green-400 text-xs rounded">
+                INTRO
+              </div>
             </div>
           )}
 
           {/* Meme Format */}
           {preset === "meme-format" && (
             <div className="absolute inset-0 border-4 border-yellow-500/30">
-              <div className="absolute top-2 right-2 px-2 py-1 bg-yellow-500/80 text-black text-[10px] rounded font-bold">TOP TEXT</div>
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-yellow-500/80 text-black text-[10px] rounded font-bold">BOTTOM TEXT</div>
+              <div className="absolute top-2 right-2 px-2 py-1 bg-yellow-500/80 text-black text-[10px] rounded font-bold">
+                TOP TEXT
+              </div>
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-yellow-500/80 text-black text-[10px] rounded font-bold">
+                BOTTOM TEXT
+              </div>
             </div>
           )}
 
@@ -210,7 +233,9 @@ export default function CanvasPlayer({
             <div className="absolute inset-0 border-4 border-pink-500/30">
               <div className="absolute top-2 left-2 w-20 h-20 bg-pink-500/20 rounded-lg" />
               <div className="absolute bottom-2 right-2 w-16 h-16 bg-pink-500/20 rounded-lg" />
-              <div className="absolute top-2 right-2 px-2 py-1 bg-pink-500/80 text-white text-[10px] rounded">PODCAST</div>
+              <div className="absolute top-2 right-2 px-2 py-1 bg-pink-500/80 text-white text-[10px] rounded">
+                PODCAST
+              </div>
             </div>
           )}
         </div>

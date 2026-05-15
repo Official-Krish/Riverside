@@ -1,5 +1,14 @@
-import type { TransitionType, TransitionEasing, TransitionDirection } from "./transitions/types";
-import type { TextOverlayStyle, AnimationType, AnimationEasing } from "./overlays/types";
+import type {
+  TransitionType,
+  TransitionEasing,
+  TransitionDirection,
+} from "./transitions/types";
+import type {
+  TextOverlayStyle,
+  AnimationType,
+  AnimationEasing,
+} from "./overlays/types";
+import type { ClipEffects } from "./effects/types";
 
 export type TrackType = "VIDEO" | "AUDIO" | "TEXT";
 export type OverlayType = "TEXT";
@@ -41,6 +50,8 @@ export interface Clip {
   name?: string;
   /** Applied motion graphics preset */
   preset?: PresetType | null;
+  /** Additive clip effects rendered in export and previewed in the editor */
+  effects?: ClipEffects;
 }
 
 export interface Track {
@@ -183,7 +194,7 @@ export type PresetType =
   | "podcast-layout"
   | "lower-third"
   | "cta-button"
-  | "chapter-title"
+  | "chapter-title";
 
 export interface PresetConfig {
   durationMs?: number;
@@ -211,10 +222,25 @@ export const PRESET_DEFINITIONS: Omit<Preset, "id">[] = [
   { type: "zoom-pop", name: "Zoom Pop", shortcut: "Ctrl+1", icon: "ZoomIn" },
   { type: "shake", name: "Shake", shortcut: "Ctrl+2", icon: "Activity" },
   { type: "glitch", name: "Glitch", shortcut: "Ctrl+3", icon: "Zap" },
-  { type: "cinematic-bars", name: "Cinematic Bars", shortcut: "Ctrl+4", icon: "Maximize2" },
+  {
+    type: "cinematic-bars",
+    name: "Cinematic Bars",
+    shortcut: "Ctrl+4",
+    icon: "Maximize2",
+  },
   { type: "vhs", name: "VHS Effect", shortcut: "Ctrl+5", icon: "Film" },
-  { type: "chromakey", name: "Green Screen", shortcut: "Ctrl+6", icon: "Palette" },
-  { type: "intro-template", name: "Intro", shortcut: "Ctrl+I", icon: "PlayCircle" },
+  {
+    type: "chromakey",
+    name: "Green Screen",
+    shortcut: "Ctrl+6",
+    icon: "Palette",
+  },
+  {
+    type: "intro-template",
+    name: "Intro",
+    shortcut: "Ctrl+I",
+    icon: "PlayCircle",
+  },
   { type: "meme-format", name: "Meme", shortcut: "Ctrl+M", icon: "Sparkles" },
   { type: "podcast-layout", name: "Podcast", shortcut: "Ctrl+P", icon: "Mic" },
 ];

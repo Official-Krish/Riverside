@@ -1,3 +1,5 @@
+import type { ClipEffects } from "./effects/types";
+
 export type RenderPayload = {
   projectId: string;
   jobId: string;
@@ -14,6 +16,7 @@ export type RenderClip = {
   timelineStartMs: number;
   durationMs: number;
   name?: string | null;
+  sourceDurationMs?: number | null;
   audioMode?: "replace" | "layer";
   transitionStart?: Record<string, unknown> | null;
   transitionEnd?: Record<string, unknown> | null;
@@ -21,6 +24,7 @@ export type RenderClip = {
   transitionOut?: "fade" | "cut" | null;
   preset?: PresetType | null;
   presetConfig?: PresetConfig;
+  effects?: ClipEffects;
 };
 
 export type AudioClipPlan = {
