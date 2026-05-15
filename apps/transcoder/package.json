@@ -7,6 +7,7 @@
     "dev": "bun run index.ts"
   },
   "dependencies": {
+    "axios": "^1.16.1",
     "ffmpeg-static": "^5.2.0",
     "ffprobe-static": "^3.1.0",
     "ioredis": "^5.6.1",

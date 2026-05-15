@@ -19,7 +19,7 @@ spec:
         - name: weave-frontend
           image: krishanand01/weave-frontend:v1
           ports:
-            - containerPort: 5173
+            - containerPort: 80
           volumeMounts:
             - name: env-file
               mountPath: /app/.env
@@ -81,8 +81,6 @@ spec:
       containers:
         - name: weave-merger-worker
           image: krishanand01/weave-merger-worker:v1
-          ports:
-            - containerPort: 8080
           volumeMounts:
             - name: env-file
               mountPath: /app/apps/merger-worker/.env
@@ -117,8 +115,6 @@ spec:
       containers:
         - name: weave-editor-worker
           image: krishanand01/weave-editor-worker:v1.1
-          ports:
-            - containerPort: 9000
           volumeMounts:
             - name: env-file
               mountPath: /app/apps/editor-worker/.env
@@ -187,6 +183,8 @@ spec:
       containers:
         - name: weave-ws-relayer
           image: krishanand01/weave-ws-relayer:v1
+          ports:
+            - containerPort: 9093
           volumeMounts:
             - name: env-file
               mountPath: /app/apps/ws-relayer/.env

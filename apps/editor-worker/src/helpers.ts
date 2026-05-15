@@ -3,9 +3,8 @@ import * as path from "node:path";
 import { spawn } from "node:child_process";
 import { toPublicRecordingLink as toPublicS3Url, extractS3Key } from "./storage";
 
-export const recordingsRoot = path.resolve(process.cwd(), "../../recordings");
-// const recordingsRoot =
-//   process.env.RECORDINGS_ROOT || "/app/recordings";
+// export const recordingsRoot = path.resolve(process.cwd(), "../../recordings");
+export const recordingsRoot = process.env.RECORDINGS_ROOT || "/app/recordings";
 
 export function toLocalRecordingPath(value: string) {
   if (!value) {

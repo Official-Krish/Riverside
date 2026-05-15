@@ -4,7 +4,6 @@ WORKDIR /app
 
 COPY package.json bun.lock turbo.json ./
 COPY apps/frontend/package.json apps/frontend/package.json
-COPY packages/node-registry/package.json packages/node-registry/package.json
 COPY packages/types/package.json packages/types/package.json
 
 RUN bun install

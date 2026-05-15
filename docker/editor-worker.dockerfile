@@ -9,9 +9,9 @@ COPY packages/amazonS3/package.json packages/amazonS3/package.json
 
 RUN bun install
 
-RUN cd packages/db && bunx prisma generate
-
 COPY . .
+
+RUN cd packages/db && bunx prisma generate
 
 FROM oven/bun:1 AS runtime
 

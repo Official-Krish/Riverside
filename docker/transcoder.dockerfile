@@ -2,6 +2,7 @@ FROM oven/bun:1 AS builder
 
 WORKDIR /app
 
+COPY package.json bun.lock turbo.json ./
 COPY apps/transcoder/package.json apps/transcoder/package.json
 COPY packages/amazonS3/package.json packages/amazonS3/package.json
 

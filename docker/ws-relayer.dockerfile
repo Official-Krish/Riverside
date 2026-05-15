@@ -2,6 +2,7 @@ FROM oven/bun:1 AS builder
 
 WORKDIR /app
 
+COPY package.json bun.lock turbo.json ./
 COPY apps/ws-relayer/package.json apps/ws-relayer/package.json
 
 RUN bun install
