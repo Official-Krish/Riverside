@@ -9,6 +9,9 @@
     "@repo/types": "workspace:*",
     "@repo/amazons3": "workspace:*"
   },
+  "scripts": {
+    "build": "tsc"
+  },
   "peerDependencies": {
     "typescript": "^5"
   },

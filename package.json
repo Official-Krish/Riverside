@@ -3,13 +3,15 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
+    "build:frontend": "turbo run build --filter=frontend",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
+    "typecheck": "turbo run check-types",
     "prisma:generate": "cd ./packages/db && bunx prisma generate && cd ../..",
     "backend": "cd ./apps/backend && bun run index.ts",
-    "worker": "cd ./apps/worker && bun run index.ts",
+    "ws-relayer": "cd ./apps/ws-relayer && bun run index.ts",
     "merger-worker": "cd ./apps/merger-worker && bun run index.ts",
     "transcoder": "cd ./apps/transcoder && bun run index.ts",
     "editor-worker": "cd ./apps/editor-worker && bun run index.ts"

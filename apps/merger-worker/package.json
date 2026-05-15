@@ -7,6 +7,9 @@
     "@types/bun": "latest",
     "@repo/amazons3": "workspace:*"
   },
+  "scripts": {
+    "build": "tsc"
+  },
   "peerDependencies": {
     "typescript": "^5"
   },
