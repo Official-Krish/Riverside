@@ -1,6 +1,5 @@
 import type { RenderClip, AudioClipPlan } from "./types";
 import { toLocalRecordingPath } from "./helpers";
-import { prisma } from "@repo/db/client";
 import { normalizeClipEffects } from "./effects/normalize";
 
 function normalizeTransitionMetadata(raw: unknown) {

@@ -19,15 +19,15 @@ import {
   refreshMeetingRecordingArtifacts,
 } from "./artifacts";
 import { downloadSourceToLocal } from "./storage";
-import { generateTemplateOverlays, type GeneratedOverlay } from "./presets";
+import { generateTemplateOverlays } from "./presets";
 import { materializeClipEffectsAssets } from "./effects/materialize";
 
 function buildOverlayBurnInArgs(
   inputPath: string,
   overlays: any[],
   outputPath: string,
-  width: number,
-  height: number,
+  _width: number,
+  _height: number,
 ): string[] {
   const overlay = buildOverlayFilter(overlays, 0);
   if (!overlay) {

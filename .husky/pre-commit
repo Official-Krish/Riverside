@@ -1,14 +1,11 @@
 #!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
 
 # Disallow other package manager lockfiles
-unwanted_files=("package-lock.json" "pnpm-lock.yaml" "yarn.lock")
-
-for file in "${unwanted_files[@]}"; do
-    if git diff --cached --name-only | grep -qE "^$file$"; then
+for file in package-lock.json pnpm-lock.yaml yarn.lock
+do
+    if git diff --cached --name-only | grep -q "^${file}$"; then
         echo "❌ Only Bun is allowed in this repository."
-        echo "❌ Remove '$file' before committing."
-
+        echo "❌ Remove '${file}' before committing."
         exit 1
     fi
 done
