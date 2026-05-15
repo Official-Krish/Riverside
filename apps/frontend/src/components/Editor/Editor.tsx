@@ -143,7 +143,7 @@ export function Editor() {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const audioInputRef = useRef<HTMLInputElement | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const previewContainerRef = useRef<HTMLDivElement | null>(null);
   const timeUpdateRef = useRef<((t: number) => void) | null>(null);
   const playStateChangeRef = useRef<((p: boolean) => void) | null>(null);
 
@@ -279,6 +279,7 @@ export function Editor() {
 
   const stageWidth = project?.width || 1920;
   const stageHeight = project?.height || 1080;
+  const shouldRenderCanvasOverlays = isPlaying;
 
   // Compute active transition based on current timeline position
   const activeTransitionState = useActiveTransition(tracks, timelineTime);
@@ -315,7 +316,7 @@ export function Editor() {
     isPlaying,
     onTimeUpdate: (t) => timeUpdateRef.current?.(t),
     onPlayStateChange: (p) => playStateChangeRef.current?.(p),
-    overlays,
+    overlays: shouldRenderCanvasOverlays ? overlays : [],
     timelineTimeMs: timelineTime,
     videoAlpha: 1, // Always use full opacity - transitions handled by TransitionRenderer
     audioClips,
@@ -325,7 +326,7 @@ export function Editor() {
   });
 
   useEffect(() => {
-    const el = containerRef.current;
+    const el = previewContainerRef.current;
     if (!el) return;
 
     const observer = new ResizeObserver(() => {
@@ -447,10 +448,13 @@ export function Editor() {
           </div>
         )}
         <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2" ref={containerRef}>
+          <div className="lg:col-span-2">
             <div className="overflow-hidden rounded-2xl border border-[#f5a623]/15 bg-[#0a0a08] shadow-[0_0_0_1px_rgba(245,166,35,0.06),0_16px_48px_rgba(0,0,0,0.5)]">
               {sourceUrl ? (
-                <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
+                <div
+                  ref={previewContainerRef}
+                  className="relative w-full aspect-video bg-black rounded-lg overflow-hidden"
+                >
                   <CanvasPlayer
                     canvasRef={canvasRef}
                     videoRef={videoRef}

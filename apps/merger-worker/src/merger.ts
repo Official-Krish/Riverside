@@ -42,6 +42,7 @@ export class LocalVideoMerger {
     constructor(meetingId: string) {
         this.meetingId = meetingId;
         this.recordingsRoot = path.resolve(process.cwd(), "../../recordings");
+        // this.recordingsRoot = process.env.RECORDINGS_ROOT || "/app/recordings";
         this.tempDir = path.join(this.recordingsRoot, "tmp", `media_merge_${Date.now()}`);
         const storage = resolveStorageContext();
         this.bucketName = storage.bucketName;

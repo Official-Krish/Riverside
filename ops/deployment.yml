@@ -87,10 +87,15 @@ spec:
             - name: env-file
               mountPath: /app/apps/merger-worker/.env
               subPath: env
+            - name: merger-worker-storage
+              mountPath: /app/recordings
       volumes:
         - name: env-file
           secret:
             secretName: weave-merger-worker-env
+        - name: merger-worker-storage
+          emptyDir:
+            sizeLimit: 20Gi
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -118,10 +123,15 @@ spec:
             - name: env-file
               mountPath: /app/apps/editor-worker/.env
               subPath: env
+            - name: editor-worker-storage
+              mountPath: /app/recordings
       volumes:
         - name: env-file
           secret:
             secretName: weave-editor-worker-env
+        - name: editor-worker-storage
+          emptyDir:
+            sizeLimit: 20Gi
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -147,10 +157,15 @@ spec:
             - name: env-file
               mountPath: /app/apps/transcoder/.env
               subPath: env
+            - name: transcoder-storage
+              mountPath: /app/recordings
       volumes:
         - name: env-file
           secret:
             secretName: weave-transcoder-env
+        - name: transcoder-storage
+          emptyDir:
+            sizeLimit: 20Gi
 ---
 apiVersion: apps/v1
 kind: Deployment

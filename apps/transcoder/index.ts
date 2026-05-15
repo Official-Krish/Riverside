@@ -31,6 +31,8 @@ type TranscodePayload = {
 
 const QUEUE_NAME = "TranscodeVideo";
 const recordingsRoot = path.resolve(process.cwd(), "../../recordings");
+// const recordingsRoot =
+//   process.env.RECORDINGS_ROOT || "/app/recordings";
 const ffmpegBin = process.env.FFMPEG_PATH || ffmpegStatic || "ffmpeg";
 const ffprobeBin = process.env.FFPROBE_PATH || ffprobeStatic.path || "ffprobe";
 const storage = resolveStorageContext();

@@ -1,7 +1,6 @@
 import "dotenv/config";
 import express from 'express';
 import cors from 'cors';
-import path from "node:path";
 import userRouter from './routes/user';
 import meetingRouter from './routes/meeting';
 import workerRouter from './routes/worker';
@@ -17,11 +16,9 @@ import keysRouter from "./routes/keys";
 import { ensureServerKeyPair } from "./utils/keys";
 
 const app = express();
-const recordingsRoot = path.resolve(process.cwd(), "../../recordings");
 
 app.use(express.json());
 app.use(cors());
-app.use("/api/v1/recordings", express.static(recordingsRoot));
 
 // Trust proxy if behind a load balancer / nginx so req.ip is correct
 app.set("trust proxy", true);
