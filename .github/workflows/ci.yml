@@ -3,27 +3,27 @@ name: CI
 on:
   pull_request:
     paths:
-      - 'apps/**'
-      - 'packages/**'
-      - 'docker/**'
-      - 'ops/**'
-      - '.github/workflows/**'
-      - 'turbo.json'
-      - 'package.json'
-      - 'bun.lock'
+      - "apps/**"
+      - "packages/**"
+      - "docker/**"
+      - "ops/**"
+      - ".github/workflows/**"
+      - "turbo.json"
+      - "package.json"
+      - "bun.lock"
 
   push:
     branches:
       - main
     paths:
-      - 'apps/**'
-      - 'packages/**'
-      - 'docker/**'
-      - 'ops/**'
-      - '.github/workflows/**'
-      - 'turbo.json'
-      - 'package.json'
-      - 'bun.lock'
+      - "apps/**"
+      - "packages/**"
+      - "docker/**"
+      - "ops/**"
+      - ".github/workflows/**"
+      - "turbo.json"
+      - "package.json"
+      - "bun.lock"
 
 permissions:
   contents: read
@@ -37,6 +37,10 @@ jobs:
     name: Lint / Build
     runs-on: ubuntu-latest
     timeout-minutes: 20
+
+    env:
+      NODE_ENV: production
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
     steps:
       - name: Checkout

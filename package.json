@@ -14,9 +14,12 @@
     "ws-relayer": "cd ./apps/ws-relayer && bun run index.ts",
     "merger-worker": "cd ./apps/merger-worker && bun run index.ts",
     "transcoder": "cd ./apps/transcoder && bun run index.ts",
-    "editor-worker": "cd ./apps/editor-worker && bun run index.ts"
+    "editor-worker": "cd ./apps/editor-worker && bun run index.ts",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.4",
     "prettier": "^3.5.3",
     "turbo": "^2.5.3",
     "typescript": "5.8.2"
@@ -31,5 +34,14 @@
   ],
   "dependencies": {
     "prisma": "^7.0.0"
+  },
+  "lint-staged": {
+    "*.{js,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,yml,yaml,md}": [
+      "prettier --write"
+    ]
   }
 }
