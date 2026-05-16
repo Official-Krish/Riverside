@@ -35,7 +35,10 @@ export interface UseCanvasVideoOptions {
   stageHeight?: number;
 }
 
-export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {}) {
+export function useCanvasVideo(
+  src: string,
+  options: UseCanvasVideoOptions = {},
+) {
   const {
     currentTime,
     isPlaying,
@@ -93,18 +96,29 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
   const onTimeUpdateRef = useRef(onTimeUpdate);
   const onPlayStateChangeRef = useRef(onPlayStateChange);
 
-  const getActiveAudioClip = useCallback((timeMs: number) => {
-    return audioClips.find(
-      (clip) =>
-        timeMs >= clip.timelineStartMs &&
-        timeMs < clip.timelineStartMs + clip.durationMs
-    ) ?? null;
-  }, [audioClips]);
+  const getActiveAudioClip = useCallback(
+    (timeMs: number) => {
+      return (
+        audioClips.find(
+          (clip) =>
+            timeMs >= clip.timelineStartMs &&
+            timeMs < clip.timelineStartMs + clip.durationMs,
+        ) ?? null
+      );
+    },
+    [audioClips],
+  );
 
   // Update refs synchronously during render (no effects needed for refs)
   activeTransitionRef.current = activeTransition ?? null;
   transformRef.current = {
-    stretchX, stretchY, offsetX, offsetY, trimStart, trimEnd, videoAlpha,
+    stretchX,
+    stretchY,
+    offsetX,
+    offsetY,
+    trimStart,
+    trimEnd,
+    videoAlpha,
     activeTransition: activeTransitionRef.current
       ? {
           type: activeTransitionRef.current.type,
@@ -126,8 +140,7 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
     return overlaysRef.current
       .filter(
         (o) =>
-          tMs >= o.timelineStartMs &&
-          tMs <= o.timelineStartMs + o.durationMs
+          tMs >= o.timelineStartMs && tMs <= o.timelineStartMs + o.durationMs,
       )
       .map((overlay) => ({ overlay, timelineTimeMs: tMs }));
   }, []);
@@ -154,7 +167,7 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
         onTimeUpdateRef.current?.(videoTimeMs);
       },
       stageWidth,
-      stageHeight
+      stageHeight,
     );
 
     stopLoopRef.current = stop;
@@ -167,7 +180,15 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     const activeOverlays = getVisibleOverlays();
-    drawSingleFrame(ctx, video, canvas, transformRef.current, activeOverlays, stageWidth, stageHeight);
+    drawSingleFrame(
+      ctx,
+      video,
+      canvas,
+      transformRef.current,
+      activeOverlays,
+      stageWidth,
+      stageHeight,
+    );
   }, [getVisibleOverlays, stageHeight, stageWidth]);
 
   const syncExternalAudio = useCallback(async () => {
@@ -177,7 +198,9 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
 
     const isActuallyPlaying = !video.paused; // Source of truth from DOM
     const activeAudioClip = getActiveAudioClip(timelineTimeMsRef.current);
-    const shouldReplaceSourceAudio = Boolean(activeAudioClip && (activeAudioClip.audioMode ?? "replace") === "replace");
+    const shouldReplaceSourceAudio = Boolean(
+      activeAudioClip && (activeAudioClip.audioMode ?? "replace") === "replace",
+    );
 
     if (!activeAudioClip || !isActuallyPlaying) {
       audio.pause();
@@ -186,20 +209,35 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
     }
 
     // Only change audio src if it's different (avoid redundant load() calls)
-    const timelineOffsetMs = timelineTimeMsRef.current - activeAudioClip.timelineStartMs;
-    const nextAudioTime = Math.max(0, (activeAudioClip.sourceStartMs + timelineOffsetMs) / 1000);
+    const timelineOffsetMs =
+      timelineTimeMsRef.current - activeAudioClip.timelineStartMs;
+    const nextAudioTime = Math.max(
+      0,
+      (activeAudioClip.sourceStartMs + timelineOffsetMs) / 1000,
+    );
 
     // If URL changed, set up a one-time loadeddata handler before attempting to seek/play.
     if (audio.src !== activeAudioClip.url) {
       // Pause and reset to avoid artifacts while loading new source
-      try { audio.pause(); } catch {}
+      try {
+        audio.pause();
+      } catch (_error) {
+        /* ignore pause race */
+      }
       audio.src = activeAudioClip.url;
 
       const handleLoaded = () => {
         audio.removeEventListener("loadeddata", handleLoaded);
         // Only seek if the target time differs meaningfully
-        if (Number.isFinite(nextAudioTime) && Math.abs((audio.currentTime || 0) - nextAudioTime) > 0.5) {
-          try { audio.currentTime = nextAudioTime; } catch {}
+        if (
+          Number.isFinite(nextAudioTime) &&
+          Math.abs((audio.currentTime || 0) - nextAudioTime) > 0.5
+        ) {
+          try {
+            audio.currentTime = nextAudioTime;
+          } catch (_error) {
+            /* ignore invalid seek while loading */
+          }
         }
         audio.volume = Math.max(0, Math.min(1, activeAudioClip.volume ?? 1));
         audio.muted = Boolean(activeAudioClip.muted);
@@ -209,28 +247,51 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
 
       audio.addEventListener("loadeddata", handleLoaded, { once: true });
       // Trigger load by setting src; some browsers auto-load with src assignment
-      try { audio.load(); } catch {}
+      try {
+        audio.load();
+      } catch (_error) {
+        /* ignore load errors for external audio */
+      }
     } else {
       // Same URL: only adjust playback time if audio is ready
       if (audio.readyState >= 2) {
-        if (Number.isFinite(nextAudioTime) && Math.abs((audio.currentTime || 0) - nextAudioTime) > 0.5) {
-          try { audio.currentTime = nextAudioTime; } catch {}
+        if (
+          Number.isFinite(nextAudioTime) &&
+          Math.abs((audio.currentTime || 0) - nextAudioTime) > 0.5
+        ) {
+          try {
+            audio.currentTime = nextAudioTime;
+          } catch (_error) {
+            /* ignore minor seek failures */
+          }
         }
         audio.volume = Math.max(0, Math.min(1, activeAudioClip.volume ?? 1));
         audio.muted = Boolean(activeAudioClip.muted);
-        try { await audio.play(); } catch {}
+        try {
+          await audio.play();
+        } catch (_error) {
+          /* autoplay restrictions are expected */
+        }
       } else {
         // Not ready yet: wait for loadeddata then continue in handler to avoid seeks that cause crackle
         const onReady = () => {
           audio.removeEventListener("loadeddata", onReady);
           try {
-            if (Number.isFinite(nextAudioTime) && Math.abs((audio.currentTime || 0) - nextAudioTime) > 0.5) {
+            if (
+              Number.isFinite(nextAudioTime) &&
+              Math.abs((audio.currentTime || 0) - nextAudioTime) > 0.5
+            ) {
               audio.currentTime = nextAudioTime;
             }
-            audio.volume = Math.max(0, Math.min(1, activeAudioClip.volume ?? 1));
+            audio.volume = Math.max(
+              0,
+              Math.min(1, activeAudioClip.volume ?? 1),
+            );
             audio.muted = Boolean(activeAudioClip.muted);
             void audio.play();
-          } catch {}
+          } catch (_error) {
+            /* ignore stale loadeddata handler races */
+          }
         };
         audio.addEventListener("loadeddata", onReady, { once: true });
       }
@@ -243,9 +304,18 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
     }
   }, [getActiveAudioClip, muted]);
 
+  // Stable refs for startLoop / getVisibleOverlays so the heavy source-switching
+  // effect only re-runs when `src` actually changes (not on every re-render).
+  const startLoopRef = useRef(startLoop);
+  startLoopRef.current = startLoop;
+  const getVisibleOverlaysRef = useRef(getVisibleOverlays);
+  getVisibleOverlaysRef.current = getVisibleOverlays;
+  const syncExternalAudioRef = useRef(syncExternalAudio);
+  syncExternalAudioRef.current = syncExternalAudio;
+
   // ─── Source switching + Event listeners (merged to avoid mount-order issues) ───
-  // This effect re-runs whenever `src` changes. It sets the video source,
-  // attaches all event listeners, and cleans up on unmount or src change.
+  // This effect re-runs ONLY when `src` changes. All other callback dependencies
+  // are accessed through refs to avoid re-running the effect and losing listeners.
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -257,10 +327,12 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
     // If src is empty, just reset state
     if (!src) {
       setIsLoaded(false);
+      prevSrcRef.current = "";
       return;
     }
 
     setIsLoaded(false);
+    prevSrcRef.current = src;
 
     // ─── Event handlers ─────────────────────────────────────────
     const handleLoadedMetadata = () => {
@@ -279,7 +351,15 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
         }
         const ctx = canvas.getContext("2d");
         if (ctx) {
-          drawSingleFrame(ctx, video, canvas, transformRef.current, undefined, stageWidth, stageHeight);
+          drawSingleFrame(
+            ctx,
+            video,
+            canvas,
+            transformRef.current,
+            undefined,
+            stageWidth,
+            stageHeight,
+          );
         }
       }
     };
@@ -292,19 +372,37 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
       if (canvas) {
         const ctx = canvas.getContext("2d");
         if (ctx) {
-          drawSingleFrame(ctx, video, canvas, transformRef.current, undefined, stageWidth, stageHeight);
+          drawSingleFrame(
+            ctx,
+            video,
+            canvas,
+            transformRef.current,
+            undefined,
+            stageWidth,
+            stageHeight,
+          );
         }
       }
     };
 
     const handleCanPlay = () => {
-      // Additional draw attempt once video has enough data
+      // Also mark as loaded on canplay — covers edge cases where
+      // loadeddata fires before the effect attaches listeners.
+      setIsLoaded(true);
       if (video.paused) {
         const canvas = canvasRef.current;
         if (canvas) {
           const ctx = canvas.getContext("2d");
           if (ctx) {
-            drawSingleFrame(ctx, video, canvas, transformRef.current, undefined, stageWidth, stageHeight);
+            drawSingleFrame(
+              ctx,
+              video,
+              canvas,
+              transformRef.current,
+              undefined,
+              stageWidth,
+              stageHeight,
+            );
           }
         }
       }
@@ -312,9 +410,9 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
 
     const handlePlay = () => {
       onPlayStateChangeRef.current?.(true);
-      startLoop();
+      startLoopRef.current();
       // Let DOM settle to ensure video.paused has flipped to false before syncExternalAudio reads it
-      setTimeout(() => void syncExternalAudio(), 0);
+      setTimeout(() => void syncExternalAudioRef.current(), 0);
     };
 
     const handlePause = () => {
@@ -327,8 +425,16 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
       if (canvas) {
         const ctx = canvas.getContext("2d");
         if (ctx) {
-          const activeOverlays = getVisibleOverlays();
-          drawSingleFrame(ctx, video, canvas, transformRef.current, activeOverlays, stageWidth, stageHeight);
+          const activeOverlays = getVisibleOverlaysRef.current();
+          drawSingleFrame(
+            ctx,
+            video,
+            canvas,
+            transformRef.current,
+            activeOverlays,
+            stageWidth,
+            stageHeight,
+          );
         }
       }
     };
@@ -340,8 +446,16 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
       if (canvas && video.paused) {
         const ctx = canvas.getContext("2d");
         if (ctx) {
-          const activeOverlays = getVisibleOverlays();
-          drawSingleFrame(ctx, video, canvas, transformRef.current, activeOverlays, stageWidth, stageHeight);
+          const activeOverlays = getVisibleOverlaysRef.current();
+          drawSingleFrame(
+            ctx,
+            video,
+            canvas,
+            transformRef.current,
+            activeOverlays,
+            stageWidth,
+            stageHeight,
+          );
         }
       }
     };
@@ -369,40 +483,49 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
     video.addEventListener("timeupdate", handleTimeUpdate);
 
     // ─── Set source ─────────────────────────────────────────────
-    // This effect only runs when `src` changes, so always set it.
-    // (Cannot compare video.src === src because browsers normalize to absolute URLs)
-    if (prevSrcRef.current !== src) {
-      prevSrcRef.current = src;
-      video.src = src;
-      video.load();
+    video.src = src;
+    video.load();
 
-      const handleFirstLoaded = () => {
-        video.removeEventListener("loadeddata", handleFirstLoaded);
-        video.removeEventListener("canplay", handleFirstLoaded);
-        clearTimeout(fallbackTimeout);
+    // ─── Handle already-loaded video (race condition safety) ────
+    // If the video has already loaded (readyState >= 2) by the time
+    // this effect runs, the loadeddata/canplay events won't fire again.
+    // Detect this and set isLoaded immediately.
+    const checkAlreadyLoaded = () => {
+      if (video.readyState >= 2) {
         setDuration(video.duration);
         setIsLoaded(true);
         const canvas = canvasRef.current;
         if (canvas) {
           const ctx = canvas.getContext("2d");
           if (ctx) {
-            drawSingleFrame(ctx, video, canvas, transformRef.current, undefined, stageWidth, stageHeight);
+            drawSingleFrame(
+              ctx,
+              video,
+              canvas,
+              transformRef.current,
+              undefined,
+              stageWidth,
+              stageHeight,
+            );
           }
         }
-      };
+      }
+    };
 
-      video.addEventListener("loadeddata", handleFirstLoaded);
-      video.addEventListener("canplay", handleFirstLoaded);
+    // Check synchronously (video may be cached)
+    checkAlreadyLoaded();
 
-      const fallbackTimeout = setTimeout(() => {
-        video.removeEventListener("loadeddata", handleFirstLoaded);
-        video.removeEventListener("canplay", handleFirstLoaded);
-        if (video.readyState >= 1) {
-          setDuration(video.duration);
-          setIsLoaded(true);
-        }
-      }, 3000);
-    }
+    // Also check after a microtask — handles the case where load() triggers
+    // synchronous readyState update in some browsers
+    const raf = requestAnimationFrame(checkAlreadyLoaded);
+
+    // Fallback timeout in case all events are missed
+    const fallbackTimeout = setTimeout(() => {
+      if (video.readyState >= 1) {
+        setDuration(video.duration);
+        setIsLoaded(true);
+      }
+    }, 5000);
 
     return () => {
       video.removeEventListener("loadedmetadata", handleLoadedMetadata);
@@ -413,9 +536,11 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
       video.removeEventListener("seeked", handleSeeked);
       video.removeEventListener("ended", handleEnded);
       video.removeEventListener("timeupdate", handleTimeUpdate);
+      cancelAnimationFrame(raf);
+      clearTimeout(fallbackTimeout);
       stopLoopRef.current?.();
     };
-  }, [src, startLoop, getVisibleOverlays]);
+  }, [src]);
 
   useEffect(() => {
     void syncExternalAudio();
@@ -453,7 +578,15 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
     const video = videoRef.current;
     if (!video || !video.paused || !isLoaded) return;
     drawCurrentFrame();
-  }, [stretchX, stretchY, offsetX, offsetY, videoAlpha, drawCurrentFrame, isLoaded]);
+  }, [
+    stretchX,
+    stretchY,
+    offsetX,
+    offsetY,
+    videoAlpha,
+    drawCurrentFrame,
+    isLoaded,
+  ]);
 
   // ─── Redraw on overlay change (when paused) ───────────────────────
   useEffect(() => {
@@ -464,12 +597,20 @@ export function useCanvasVideo(src: string, options: UseCanvasVideoOptions = {})
 
   // ─── Actions ──────────────────────────────────────────────────────
   const actions = {
-    play: useCallback(() => { videoRef.current?.play().catch(() => {}); }, []),
-    pause: useCallback(() => { videoRef.current?.pause(); }, []),
+    play: useCallback(() => {
+      videoRef.current?.play().catch(() => {});
+    }, []),
+    pause: useCallback(() => {
+      videoRef.current?.pause();
+    }, []),
     toggle: useCallback(() => {
       const v = videoRef.current;
       if (!v) return;
-      v.paused ? v.play().catch(() => {}) : v.pause();
+      if (v.paused) {
+        v.play().catch(() => {});
+      } else {
+        v.pause();
+      }
     }, []),
     seek: useCallback((sec: number) => {
       const v = videoRef.current;

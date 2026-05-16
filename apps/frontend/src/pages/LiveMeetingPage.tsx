@@ -22,7 +22,11 @@ import { useMeetingRecording } from "../hooks/useMeetingRecording";
 import { useMeetingRoom } from "../hooks/useMeetingRoom";
 import { useRecordingLimit } from "../hooks/useRecordingLimit";
 import { http } from "../https";
-import { generateMeetingCek, persistMeetingCek, wrapMeetingCek } from "../lib/meetingCrypto";
+import {
+  generateMeetingCek,
+  persistMeetingCek,
+  wrapMeetingCek,
+} from "../lib/meetingCrypto";
 import { getParticipantMediaState } from "../lib/participantMediaState";
 import { getHttpErrorMessage } from "../lib/httpError";
 import type {
@@ -55,29 +59,44 @@ export function LiveMeetingPage() {
   const selectedMicId = searchParams.get("micId") || "";
   const selectedCameraId = searchParams.get("cameraId") || "";
 
-  const wrappedCekMutation = useMutation<RegisterWrappedCekResponse, unknown, void>({
+  const wrappedCekMutation = useMutation<
+    RegisterWrappedCekResponse,
+    unknown,
+    void
+  >({
     mutationFn: async () => {
-      const publicKeyResponse = await http.get<ServerPublicKeyResponse>("/keys/public");
+      const publicKeyResponse =
+        await http.get<ServerPublicKeyResponse>("/keys/public");
       const cek = generateMeetingCek();
       persistMeetingCek(roomName, cek);
 
-      const wrappedCek = await wrapMeetingCek(publicKeyResponse.data.publicKey, cek);
+      const wrappedCek = await wrapMeetingCek(
+        publicKeyResponse.data.publicKey,
+        cek,
+      );
       const response = await http.post<RegisterWrappedCekResponse>(
         `/keys/meeting/${meetingId}/wrapped-cek`,
         {
           wrappedCek,
-        }
+        },
       );
 
       return response.data;
     },
   });
 
-  const joinMutation = useMutation<JoinMeetingResponse, unknown, { passcode?: string } | undefined>({
+  const joinMutation = useMutation<
+    JoinMeetingResponse,
+    unknown,
+    { passcode?: string } | undefined
+  >({
     mutationFn: async (vars) => {
-      const res = await http.post<JoinMeetingResponse>(`/meeting/join/${meetingId}`, {
-        passcode: vars?.passcode || undefined,
-      });
+      const res = await http.post<JoinMeetingResponse>(
+        `/meeting/join/${meetingId}`,
+        {
+          passcode: vars?.passcode || undefined,
+        },
+      );
       return res.data;
     },
     onSuccess: () => {
@@ -117,7 +136,9 @@ export function LiveMeetingPage() {
     displayName,
     selectedCameraId,
     selectedMicId,
-    enabled: joinMutation.status === "success" && wrappedCekMutation.status === "success",
+    enabled:
+      joinMutation.status === "success" &&
+      wrappedCekMutation.status === "success",
   });
 
   const {
@@ -180,7 +201,7 @@ export function LiveMeetingPage() {
         if (remoteIsRecording) {
           void startLocalRecording?.().catch(() => {
             // best-effort: notify user
-            // eslint-disable-next-line no-console
+
             console.warn("Failed to start local recording on signal");
           });
         } else {
@@ -243,7 +264,13 @@ export function LiveMeetingPage() {
         sendRecordingState(true);
       });
     }
-  }, [initialRecordingState, sendRecordingState, startRecordingMutation, startLocalRecording, isHost]);
+  }, [
+    initialRecordingState,
+    sendRecordingState,
+    startRecordingMutation,
+    startLocalRecording,
+    isHost,
+  ]);
 
   const allTiles = useMemo<MeetingTile[]>(() => {
     const remoteTiles = participants.flatMap((participant) => {
@@ -449,6 +476,7 @@ export function LiveMeetingPage() {
     if (isRecording && isHost) {
       try {
         await stopRecordingMutation.mutateAsync();
+        sendRecordingState(false);
       } catch {
         // best effort
       }
@@ -511,6 +539,7 @@ export function LiveMeetingPage() {
     if (isRecording) {
       try {
         await stopRecordingMutation.mutateAsync();
+        sendRecordingState(false);
       } catch {
         // best effort
       }
@@ -593,7 +622,16 @@ export function LiveMeetingPage() {
     window.addEventListener("keydown", handleShortcutKeyDown);
 
     return () => window.removeEventListener("keydown", handleShortcutKeyDown);
-  }, [allTiles, setActiveLayout, setIsChatOpen, setIsSidebarOpen, setSelectedParticipantId, toggleAudio, toggleScreenShare, toggleVideo]);
+  }, [
+    allTiles,
+    setActiveLayout,
+    setIsChatOpen,
+    setIsSidebarOpen,
+    setSelectedParticipantId,
+    toggleAudio,
+    toggleScreenShare,
+    toggleVideo,
+  ]);
 
   if (!roomName) {
     return (
@@ -615,7 +653,10 @@ export function LiveMeetingPage() {
   }
 
   // Show loading state while joining meeting
-  if (joinMutation.status === "pending" || wrappedCekMutation.status === "pending") {
+  if (
+    joinMutation.status === "pending" ||
+    wrappedCekMutation.status === "pending"
+  ) {
     return (
       <motion.section
         initial={{ opacity: 0, y: 8 }}
@@ -625,23 +666,44 @@ export function LiveMeetingPage() {
       >
         <div className="text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#f5a623]/16 bg-[#130f0a]/92 px-4 py-2 text-sm mb-4">
-            <svg className="h-4 w-4 animate-spin text-[#f5a623]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            <svg
+              className="h-4 w-4 animate-spin text-[#f5a623]"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
             </svg>
             Joining meeting...
           </div>
-          <p className="text-[#c9af79] text-sm mt-2">Please wait while we verify access</p>
+          <p className="text-[#c9af79] text-sm mt-2">
+            Please wait while we verify access
+          </p>
         </div>
       </motion.section>
     );
   }
 
   // Show error state if join failed
-  if (joinMutation.status === "error" || wrappedCekMutation.status === "error") {
+  if (
+    joinMutation.status === "error" ||
+    wrappedCekMutation.status === "error"
+  ) {
     const errorMsg = getHttpErrorMessage(
       joinMutation.error || wrappedCekMutation.error,
-      "You don't have permission to join this meeting."
+      "You don't have permission to join this meeting.",
     );
     return (
       <motion.section
@@ -651,9 +713,7 @@ export function LiveMeetingPage() {
         className="relative h-[calc(100vh-3rem)] overflow-hidden rounded-2xl border border-[#f5a623]/16 bg-[#060504] flex items-center justify-center"
       >
         <div className="rounded-[2rem] border border-border/80 bg-card/82 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.12)] backdrop-blur-xl max-w-md">
-          <h1 className="text-2xl font-semibold text-red-300">
-            Access Denied
-          </h1>
+          <h1 className="text-2xl font-semibold text-red-300">Access Denied</h1>
           <p className="mt-3 text-muted-foreground text-sm">
             {errorMsg || "You don't have permission to join this meeting."}
           </p>
@@ -680,7 +740,9 @@ export function LiveMeetingPage() {
 
       <RecordingIndicator isRecording={isRecording} />
 
-      <div className="absolute top-4 right-4 z-30 pointer-events-auto">
+      <div
+        className={`absolute top-4 right-4 z-30 pointer-events-auto ${isRecording ? "top-16" : "top-4"}`}
+      >
         {isHost && (
           <RecordingLimitIndicator
             limit={recordingLimitData}
@@ -725,8 +787,13 @@ export function LiveMeetingPage() {
         isHost={isHost}
         isUploadingChunks={isUploadingChunks}
         isRecordingBusy={isRecordingBusy}
-        canToggleRecording={connectionState === "connected" && (recordingLimitData?.allowed ?? true)}
-        recordingLimitExceeded={recordingLimitData && !recordingLimitData.allowed}
+        canToggleRecording={
+          connectionState === "connected" &&
+          (recordingLimitData?.allowed ?? true)
+        }
+        recordingLimitExceeded={
+          recordingLimitData && !recordingLimitData.allowed
+        }
         unreadMessages={unreadCount}
         recordingButtonLabel={recordingButtonLabel}
         onToggleAudio={async () => {
@@ -776,12 +843,16 @@ export function LiveMeetingPage() {
           }
 
           // Check recording limit before allowing to start
-          if (!isRecording && recordingLimitData && !recordingLimitData.allowed) {
+          if (
+            !isRecording &&
+            recordingLimitData &&
+            !recordingLimitData.allowed
+          ) {
             toast.error(
               `Recording limit exceeded. You have ${recordingLimitData.recordingsUsed} of ${recordingLimitData.recordingsLimit} recordings.`,
               {
                 duration: 5000,
-              }
+              },
             );
             return;
           }
