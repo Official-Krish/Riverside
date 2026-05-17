@@ -206,7 +206,7 @@ jobs:
 
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}:v1.${{ github.run_number }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}:v1.2.${{ github.run_number }}
 
           cache-from: type=gha
           cache-to: type=gha,mode=max

@@ -32,7 +32,7 @@ jobs:
 
       - name: Update Image Tags
         run: |
-          VERSION=v1.${{ github.event.workflow_run.run_number }}
+          VERSION=v1.2.${{ github.event.workflow_run.run_number }}
 
           sed -i "s|image: krishanand01/weave-frontend:.*|image: krishanand01/weave-frontend:$VERSION|g" ops/deployment.yml
 
