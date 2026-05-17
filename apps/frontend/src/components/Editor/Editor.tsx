@@ -414,17 +414,27 @@ export function Editor() {
     const el = previewContainerRef.current;
     if (!el) return;
 
-    const observer = new ResizeObserver(() => {
-      const rect = el.getBoundingClientRect();
+    const updateContainerSize = () => {
+      const canvasRect = canvasRef.current?.getBoundingClientRect();
+      const rect =
+        canvasRect && canvasRect.width > 0 && canvasRect.height > 0
+          ? canvasRect
+          : el.getBoundingClientRect();
+
       setContainerSize({
         width: rect.width,
         height: rect.height,
       });
+    };
+
+    const observer = new ResizeObserver(() => {
+      updateContainerSize();
     });
 
     observer.observe(el);
+    updateContainerSize();
     return () => observer.disconnect();
-  }, []);
+  }, [canvasRef]);
 
   timeUpdateRef.current = handleTimeUpdate;
   playStateChangeRef.current = handlePlayStateChange;

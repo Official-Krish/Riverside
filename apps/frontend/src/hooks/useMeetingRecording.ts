@@ -270,7 +270,6 @@ export function useMeetingRecording({
 
       recorderStartingRef.current = true;
 
-      const initialIsMuted = options?.isMuted ?? isMutedRef.current;
       const initialIsVideoOff = options?.isVideoOff ?? isVideoOffRef.current;
 
       try {
