@@ -12,6 +12,8 @@ RUN bun install
 COPY apps/merger-worker /app/apps/merger-worker
 COPY packages/amazonS3 /app/packages/amazonS3
 COPY packages/db /app/packages/db
+COPY packages/typescript-config ./packages/typescript-config
+COPY packages/eslint-config ./packages/eslint-config
 
 RUN cd packages/db && bunx prisma generate
 

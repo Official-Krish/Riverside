@@ -10,7 +10,12 @@ COPY packages/amazonS3/package.json packages/amazonS3/package.json
 
 RUN bun install
 
-COPY . .
+COPY apps/backend ./apps/backend
+COPY packages/db ./packages/db
+COPY packages/types ./packages/types
+COPY packages/amazonS3 ./packages/amazonS3
+COPY packages/typescript-config ./packages/typescript-config
+COPY packages/eslint-config ./packages/eslint-config
 
 RUN cd packages/db && bunx prisma generate
 

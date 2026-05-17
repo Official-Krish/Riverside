@@ -10,6 +10,8 @@ RUN bun install
 
 COPY apps/transcoder /app/apps/transcoder
 COPY packages/amazonS3 /app/packages/amazonS3
+COPY packages/typescript-config ./packages/typescript-config
+COPY packages/eslint-config ./packages/eslint-config
 
 
 FROM oven/bun:1 AS runtime
