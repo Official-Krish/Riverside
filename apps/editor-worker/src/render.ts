@@ -339,12 +339,17 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
       transcodeQueue: CONFIG.TRANSCODE_QUEUE_NAME,
     });
   } finally {
-    // Clean up temp files and intermediates (videoOnlyPath/overlayedPath already deleted on success path)
+    // Clean up temp files and intermediates.
+    // Use force: true so already-deleted files (e.g. outputPath after promotion) don't throw.
     await Promise.allSettled([
-      fs.unlink(previewPath),
-      fs.unlink(outputPath), // only needed if job failed before promotion
-      ...tempFiles.map((f) => fs.unlink(f)),
-      concatListPath ? fs.unlink(concatListPath) : Promise.resolve(),
+      fs.rm(previewPath, { force: true }),
+      fs.rm(videoOnlyPath, { force: true }),
+      fs.rm(overlayedPath, { force: true }),
+      fs.rm(outputPath, { force: true }),
+      ...tempFiles.map((f) => fs.rm(f, { force: true })),
+      concatListPath
+        ? fs.rm(concatListPath, { force: true })
+        : Promise.resolve(),
     ]);
   }
 }

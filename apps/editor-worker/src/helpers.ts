@@ -47,12 +47,18 @@ export async function ensureDir(dirPath: string) {
 }
 
 export function runBinary(binary: string, args: string[]) {
+  const MAX_STDERR_BYTES = 32 * 1024; // Keep last 32 KB of stderr (most useful for debugging)
+
   return new Promise<void>((resolve, reject) => {
     const processRef = spawn(binary, args);
     let stderr = "";
 
     processRef.stderr.on("data", (chunk) => {
       stderr += chunk.toString();
+      // Trim to tail when stderr exceeds the cap
+      if (stderr.length > MAX_STDERR_BYTES * 1.5) {
+        stderr = stderr.slice(-MAX_STDERR_BYTES);
+      }
     });
 
     processRef.on("close", (code) => {
@@ -61,7 +67,11 @@ export function runBinary(binary: string, args: string[]) {
         return;
       }
 
-      reject(new Error(`${binary} exited with code ${code}: ${stderr}`));
+      reject(
+        new Error(
+          `${binary} exited with code ${code}: ${stderr.slice(-MAX_STDERR_BYTES)}`,
+        ),
+      );
     });
 
     processRef.on("error", (error) => {
