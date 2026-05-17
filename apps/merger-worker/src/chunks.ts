@@ -1,10 +1,50 @@
 import * as fs from "node:fs/promises";
+import { createWriteStream } from "node:fs";
 import * as path from "node:path";
-import { getObjectBytesFromS3, listObjectKeysByPrefix } from "@repo/amazons3";
+import { pipeline } from "node:stream/promises";
+import { Readable } from "node:stream";
+import {
+  getObjectBytesFromS3,
+  listObjectKeysByPrefix,
+  resolveStorageContext,
+} from "@repo/amazons3";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { type UserChunk } from "./types";
-import { resolveStorageContext } from "@repo/amazons3";
 import { decryptUserChunks } from "./decryption";
 import { prisma } from "@repo/db/client";
+
+const DOWNLOAD_CONCURRENCY = 4;
+
+/**
+ * Stream an S3 object directly to a local file (constant memory).
+ * Falls back to getObjectBytesFromS3 if the body is not a stream.
+ */
+async function streamS3ToLocal(
+  s3Client: ReturnType<typeof resolveStorageContext>["s3Client"],
+  bucketName: string,
+  key: string,
+  localPath: string,
+): Promise<boolean> {
+  const response = await s3Client.send(
+    new GetObjectCommand({ Bucket: bucketName, Key: key }),
+  );
+
+  const body = response.Body;
+  if (!body) {
+    return false;
+  }
+
+  if (typeof (body as any).pipe === "function") {
+    await pipeline(body as Readable, createWriteStream(localPath));
+  } else if (typeof (body as any).transformToByteArray === "function") {
+    const bytes = await (body as any).transformToByteArray();
+    if (!bytes || bytes.length === 0) return false;
+    await fs.writeFile(localPath, Buffer.from(bytes));
+  } else {
+    return false;
+  }
+  return true;
+}
 
 export function parseChunkTimestamp(filename: string): number | null {
   const match = filename.match(
@@ -57,6 +97,7 @@ export async function collectUserChunks(
       encryptionAlgorithm: string | null;
       encryptionIv: string | null;
       encryptionTagBits: number | null;
+      durationMs: number | null;
     }
   > = new Map();
 
@@ -70,6 +111,7 @@ export async function collectUserChunks(
         encryptionAlgorithm: true,
         encryptionIv: true,
         encryptionTagBits: true,
+        durationMs: true,
       },
     });
 
@@ -82,10 +124,19 @@ export async function collectUserChunks(
           encryptionAlgorithm: record.encryptionAlgorithm,
           encryptionIv: record.encryptionIv,
           encryptionTagBits: record.encryptionTagBits,
+          durationMs: record.durationMs,
         },
       ]),
     );
   }
+
+  // Prepare download tasks
+  const downloadTasks: Array<{
+    key: string;
+    userId: string;
+    localPath: string;
+    metadata: typeof metadataByPath extends Map<string, infer V> ? V : never;
+  } | null> = [];
 
   for (const key of keys) {
     const relativeKey = key.startsWith(prefix) ? key.slice(prefix.length) : key;
@@ -100,41 +151,63 @@ export async function collectUserChunks(
     await fs.mkdir(userLocalDir, { recursive: true });
 
     const localPath = path.join(userLocalDir, fileName);
-    const bytes = await getObjectBytesFromS3({
-      s3Client,
-      bucketName,
-      key,
-    });
-    if (!bytes) {
-      continue;
-    }
-
-    await fs.writeFile(localPath, bytes);
-
     const metadata = metadataByPath.get(key);
-    const parsedTimestamp = parseChunkTimestamp(fileName) ?? 0;
-
-    const item: UserChunk = {
+    downloadTasks.push({
+      key,
       userId,
       localPath,
-      timestamp: parsedTimestamp,
-      durationSeconds: 5,
-      hasValidTimestamp: parsedTimestamp !== null,
-      metadata: metadata
-        ? {
-            isEncrypted: metadata.isEncrypted,
-            sourceMimeType: metadata.sourceMimeType,
-            encryptionAlgorithm: metadata.encryptionAlgorithm,
-            encryptionIv: metadata.encryptionIv,
-            encryptionTagBits: metadata.encryptionTagBits,
-          }
-        : null,
-    };
-
-    const existing = userChunks.get(userId) || [];
-    existing.push(item);
-    userChunks.set(userId, existing);
+      metadata: metadata ?? (null as any),
+    });
   }
+
+  // Download chunks with controlled concurrency — stream to disk, not RAM
+  let taskIndex = 0;
+  const concurrency = Math.min(DOWNLOAD_CONCURRENCY, downloadTasks.length);
+
+  await Promise.all(
+    Array.from({ length: concurrency }, async () => {
+      while (taskIndex < downloadTasks.length) {
+        const idx = taskIndex++;
+        const task = downloadTasks[idx];
+        if (!task) continue;
+
+        const ok = await streamS3ToLocal(
+          s3Client,
+          bucketName,
+          task.key,
+          task.localPath,
+        );
+        if (!ok) continue;
+
+        const parsedTimestamp =
+          parseChunkTimestamp(path.basename(task.localPath)) ?? 0;
+
+        const item: UserChunk = {
+          userId: task.userId,
+          localPath: task.localPath,
+          timestamp: parsedTimestamp,
+          durationSeconds: Math.max(
+            0.1,
+            (task.metadata?.durationMs ?? 10000) / 1000,
+          ),
+          hasValidTimestamp: parsedTimestamp !== null,
+          metadata: task.metadata
+            ? {
+                isEncrypted: task.metadata.isEncrypted,
+                sourceMimeType: task.metadata.sourceMimeType,
+                encryptionAlgorithm: task.metadata.encryptionAlgorithm,
+                encryptionIv: task.metadata.encryptionIv,
+                encryptionTagBits: task.metadata.encryptionTagBits,
+              }
+            : null,
+        };
+
+        const existing = userChunks.get(task.userId) || [];
+        existing.push(item);
+        userChunks.set(task.userId, existing);
+      }
+    }),
+  );
 
   if (userChunks.size === 0) {
     throw new Error(`No chunk objects found in s3://${bucketName}/${prefix}`);
@@ -150,7 +223,9 @@ export async function collectUserChunks(
     let fallbackIndex = 0;
     for (const chunk of chunks) {
       if (!chunk.hasValidTimestamp) {
-        chunk.timestamp = baseTimestamp + fallbackIndex * 5000;
+        chunk.timestamp =
+          baseTimestamp +
+          fallbackIndex * Math.round(chunk.durationSeconds * 1000);
         chunk.hasValidTimestamp = true;
         fallbackIndex++;
       }

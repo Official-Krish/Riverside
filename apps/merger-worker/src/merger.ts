@@ -1,7 +1,8 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { putObjectToS3, deletePrefixFromS3 } from "@repo/amazons3";
+import { putObjectToS3 } from "@repo/amazons3";
 import { resolveStorageContext } from "@repo/amazons3";
+import { HeadObjectCommand } from "@aws-sdk/client-s3";
 import { collectUserChunks } from "./chunks";
 import { createUserVideo, createBlackPlaceholderVideo } from "./video-creator";
 import { createGridVideo } from "./grid-builder";
@@ -100,22 +101,46 @@ export class LocalVideoMerger {
 
   private async persistFinal(gridVideoPath: string): Promise<string> {
     const finalKey = `weave-recordings/${this.meetingId}/final/meeting_grid_recording.mp4`;
+    const fileStats = await fs.stat(gridVideoPath);
+    const uploadStart = Date.now();
 
-    await deletePrefixFromS3({
-      s3Client: this.s3Client,
-      bucketName: this.bucketName,
-      prefix: `weave-recordings/${this.meetingId}/final/`,
-    });
+    this.log(
+      `[phase:persistFinal] Uploading final video (${fileStats.size} bytes) to s3://${this.bucketName}/${finalKey}`,
+    );
 
-    const body = await fs.readFile(gridVideoPath);
+    try {
+      const body = await fs.readFile(gridVideoPath);
+      await putObjectToS3({
+        s3Client: this.s3Client,
+        bucketName: this.bucketName,
+        key: finalKey,
+        body,
+        contentType: "video/mp4",
+      });
+    } catch (error) {
+      throw new Error(
+        `Final buffered upload failed for ${finalKey}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
 
-    await putObjectToS3({
-      s3Client: this.s3Client,
-      bucketName: this.bucketName,
-      key: finalKey,
-      body,
-      contentType: "video/mp4",
-    });
+    const head = await this.s3Client.send(
+      new HeadObjectCommand({
+        Bucket: this.bucketName,
+        Key: finalKey,
+      }),
+    );
+    const uploadedSize = head.ContentLength ?? 0;
+    const verified = uploadedSize > fileStats.size * 0.5;
+
+    if (!verified) {
+      throw new Error(
+        `Final upload verification failed for ${finalKey} (uploaded: ${uploadedSize}, expected: >${fileStats.size * 0.5})`,
+      );
+    }
+
+    this.log(
+      `[phase:persistFinal] Final upload complete in ${Date.now() - uploadStart}ms (verified ${uploadedSize} bytes)`,
+    );
 
     return finalKey;
   }
@@ -132,6 +157,13 @@ export class LocalVideoMerger {
         this.s3Client,
         this.bucketName,
       );
+      for (const [userId, chunks] of userChunks.entries()) {
+        const firstTimestamp = chunks[0]?.timestamp ?? null;
+        const lastTimestamp = chunks[chunks.length - 1]?.timestamp ?? null;
+        this.log(
+          `[phase:collectUserChunks] user=${userId} chunks=${chunks.length} first=${firstTimestamp ? new Date(firstTimestamp).toISOString() : "n/a"} last=${lastTimestamp ? new Date(lastTimestamp).toISOString() : "n/a"} durations=${chunks.map((chunk) => chunk.durationSeconds.toFixed(2)).join(",")}`,
+        );
+      }
 
       let recordingStartTime = Number.MAX_VALUE;
       const userJoinTimes = new Map<string, number>();
@@ -249,16 +281,18 @@ export class LocalVideoMerger {
 
       const finalPath = await this.persistFinal(gridVideo);
 
-      await cleanupSourceChunksFromS3(
-        this.meetingId,
-        this.s3Client,
-        this.bucketName,
-      );
-      await cleanupLegacyLocalChunks(this.recordingsRoot, this.meetingId);
-      await cleanupLegacyRecordingsTmp(
-        this.recordingsRoot,
-        this.log.bind(this),
-      );
+      // Cleanup is independent — run in parallel for speed
+      this.log("[phase:cleanup] Starting post-merge cleanup");
+      await Promise.allSettled([
+        cleanupSourceChunksFromS3(
+          this.meetingId,
+          this.s3Client,
+          this.bucketName,
+        ),
+        cleanupLegacyLocalChunks(this.recordingsRoot, this.meetingId),
+        cleanupLegacyRecordingsTmp(this.recordingsRoot, this.log.bind(this)),
+      ]);
+      this.log("[phase:cleanup] Post-merge cleanup finished");
 
       const totalDuration = Date.now() - totalStartTime;
       this.log(
