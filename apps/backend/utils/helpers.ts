@@ -1,36 +1,38 @@
 import { prisma } from "@repo/db/client";
 import { redisPublisher, clearChatHistory } from "./redis";
 import { Resend } from "resend";
-import {
-  toPublicRecordingLink,
-} from "./storage";
+import { toPublicRecordingLink } from "./storage";
 
 export { toPublicRecordingLink };
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
-export function toSingleString(value: string | string[] | undefined): string | null {
-    if (typeof value === "string") {
-        return value;
-    }
+export function toSingleString(
+  value: string | string[] | undefined,
+): string | null {
+  if (typeof value === "string") {
+    return value;
+  }
 
-    if (Array.isArray(value) && value.length > 0) {
-        return value[0] ?? null;
-    }
+  if (Array.isArray(value) && value.length > 0) {
+    return value[0] ?? null;
+  }
 
-    return null;
+  return null;
 }
 
-export const characters ='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+export const characters =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+export const MAX_MEETING_DURATION_MS = 60 * 60 * 1000;
 
 export function generateString() {
-    let result = '';
-    const charactersLength = characters.length;
-    for ( let i = 0; i < 20; i++ ) {
-        result += characters.charAt(Math.floor(Math.random() * charactersLength));
-    }
+  let result = "";
+  const charactersLength = characters.length;
+  for (let i = 0; i < 20; i++) {
+    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+  }
 
-    return result;
+  return result;
 }
 
 export function generateRandomToken() {
@@ -86,20 +88,20 @@ export async function SendVerificationEmail(email: string, token: string) {
       </table>
     </body>
     </html>
-     `
+     `,
   });
 }
 
 export async function getMeetingSessions(roomId: string) {
-    return prisma.meeting.findMany({
-        where: {
-            roomId: roomId,
-        },
-        include: {
-            finalRecording: true,
-            participants: true,
-        }
-    });
+  return prisma.meeting.findMany({
+    where: {
+      roomId: roomId,
+    },
+    include: {
+      finalRecording: true,
+      participants: true,
+    },
+  });
 }
 
 export async function getUserMeetingSession(roomId: string, userId: string) {
@@ -125,19 +127,19 @@ export async function getUserMeetingSession(roomId: string, userId: string) {
 }
 
 export function canViewFinalRecording(args: {
-    isHost: boolean;
-    userEmail: string | null;
-    visibleToEmails: string[];
+  isHost: boolean;
+  userEmail: string | null;
+  visibleToEmails: string[];
 }) {
-    if (args.isHost) {
-        return true;
-    }
+  if (args.isHost) {
+    return true;
+  }
 
-    if (!args.userEmail) {
-        return false;
-    }
+  if (!args.userEmail) {
+    return false;
+  }
 
-    return args.visibleToEmails.includes(args.userEmail);
+  return args.visibleToEmails.includes(args.userEmail);
 }
 
 export function canEditFinalRecording(args: {
@@ -149,48 +151,54 @@ export function canEditFinalRecording(args: {
 }
 
 export function normalizeEmails(values: unknown): string[] {
-    if (!Array.isArray(values)) {
-        return [];
-    }
+  if (!Array.isArray(values)) {
+    return [];
+  }
 
-    const normalized = values
-        .map((value) => (typeof value === "string" ? value.trim().toLowerCase() : ""))
-        .filter((email) => Boolean(email) && email.includes("@"));
+  const normalized = values
+    .map((value) =>
+      typeof value === "string" ? value.trim().toLowerCase() : "",
+    )
+    .filter((email) => Boolean(email) && email.includes("@"));
 
-    return [...new Set(normalized)];
+  return [...new Set(normalized)];
 }
 
-export function normalizeFinalRecordingLinks<T extends { videoLink: string }>(recordings: T[]): T[] {
-    return recordings.map((recording) => {
-        const videoLink = recording.videoLink || "";
-    const normalizedUrl = toPublicRecordingLink(videoLink);
-    if (!normalizedUrl || normalizedUrl === videoLink) {
-            return recording;
-        }
-
-        return {
-            ...recording,
-      videoLink: normalizedUrl,
-        };
-    });
-}
-
-export function normalizeFinalRecordingLink<T extends { videoLink: string }>(recording: T | null | undefined): T | null {
-    if (!recording) {
-        return null;
-    }
-
+export function normalizeFinalRecordingLinks<T extends { videoLink: string }>(
+  recordings: T[],
+): T[] {
+  return recordings.map((recording) => {
     const videoLink = recording.videoLink || "";
-
     const normalizedUrl = toPublicRecordingLink(videoLink);
     if (!normalizedUrl || normalizedUrl === videoLink) {
-        return recording;
+      return recording;
     }
 
     return {
-        ...recording,
+      ...recording,
       videoLink: normalizedUrl,
     };
+  });
+}
+
+export function normalizeFinalRecordingLink<T extends { videoLink: string }>(
+  recording: T | null | undefined,
+): T | null {
+  if (!recording) {
+    return null;
+  }
+
+  const videoLink = recording.videoLink || "";
+
+  const normalizedUrl = toPublicRecordingLink(videoLink);
+  if (!normalizedUrl || normalizedUrl === videoLink) {
+    return recording;
+  }
+
+  return {
+    ...recording,
+    videoLink: normalizedUrl,
+  };
 }
 
 // Rate limiting configuration
@@ -198,6 +206,7 @@ export const RECORDING_LIMITS = {
   FREE: 3,
   PRO: 50,
   ENTERPRISE: -1, // unlimited
+  ADMIN: -1, // unlimited
 } as const;
 
 export async function getRecordingCount(userId: string): Promise<number> {
@@ -220,7 +229,9 @@ export interface RecordingLimitCheckResult {
   remainingRecordings: number;
 }
 
-export async function checkRecordingLimit(userId: string): Promise<RecordingLimitCheckResult> {
+export async function checkRecordingLimit(
+  userId: string,
+): Promise<RecordingLimitCheckResult> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { tier: true },
@@ -235,7 +246,18 @@ export async function checkRecordingLimit(userId: string): Promise<RecordingLimi
     };
   }
 
-  const tier = user.tier || 'FREE';
+  // Admin users have unlimited recordings
+  if (user.tier === "ADMIN") {
+    const recordingsUsed = await getRecordingCount(userId);
+    return {
+      allowed: true,
+      recordingsUsed,
+      recordingsLimit: -1,
+      remainingRecordings: -1,
+    };
+  }
+
+  const tier = user.tier || "FREE";
   const limit = RECORDING_LIMITS[tier];
   const recordingsUsed = await getRecordingCount(userId);
 
@@ -329,7 +351,7 @@ export async function finalizeMeetingRoom(roomId: string, hostUserId?: string) {
           meetingId: meeting.roomId,
           roomId: meeting.roomId,
           internalMeetingId: meeting.id,
-        })
+        }),
       );
     }
 
@@ -347,7 +369,7 @@ export async function finalizeMeetingRoom(roomId: string, hostUserId?: string) {
     duration: meeting.createdAt
       ? Math.max(
           0,
-          Math.floor((endTime.getTime() - meeting.createdAt.getTime()) / 60000)
+          Math.floor((endTime.getTime() - meeting.createdAt.getTime()) / 60000),
         )
       : 0,
     alreadyEnded,

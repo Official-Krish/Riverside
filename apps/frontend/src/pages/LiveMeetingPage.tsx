@@ -15,6 +15,7 @@ import { MeetingControls } from "../components/LiveMeeting/MeetingControls";
 import { MeetingInfo } from "../components/LiveMeeting/MeetingInfo";
 import { RecordingIndicator } from "../components/LiveMeeting/RecordingIndicator";
 import { RecordingLimitIndicator } from "../components/LiveMeeting/RecordingLimitIndicator";
+import { MeetingTimer } from "../components/LiveMeeting/MeetingTimer";
 import { MeetingStage } from "../components/LiveMeeting/MeetingStage";
 import { ParticipantsSidebar } from "../components/LiveMeeting/ParticipantsSidebar";
 import { useMeetingRealtime } from "../hooks/useMeetingRealtime";
@@ -22,6 +23,7 @@ import { useMeetingRecording } from "../hooks/useMeetingRecording";
 import { useMeetingRoom } from "../hooks/useMeetingRoom";
 import { useRecordingLimit } from "../hooks/useRecordingLimit";
 import { http } from "../https";
+import { useAuth } from "../hooks/useAuth";
 import {
   generateMeetingCek,
   persistMeetingCek,
@@ -55,6 +57,7 @@ export function LiveMeetingPage() {
   const isHost = searchParams.get("role") === "host";
   const passcode = searchParams.get("passcode") || "";
   const roomName = useMemo(() => meetingId.trim(), [meetingId]);
+  const { isAuthenticated } = useAuth();
   const initialRecordingState = searchParams.get("recordingState") === "true";
   const selectedMicId = searchParams.get("micId") || "";
   const selectedCameraId = searchParams.get("cameraId") || "";
@@ -143,6 +146,7 @@ export function LiveMeetingPage() {
     enabled:
       joinMutation.status === "success" &&
       wrappedCekMutation.status === "success",
+    isAuthenticated,
   });
 
   const {
@@ -744,6 +748,12 @@ export function LiveMeetingPage() {
       <div className="pointer-events-none absolute inset-0 bg-size-[180px_180px] bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] opacity-60" />
 
       <RecordingIndicator isRecording={isRecording} />
+
+      <MeetingTimer
+        meetingId={meetingId}
+        isHost={isHost}
+        isRecording={isRecording}
+      />
 
       <div
         className={`absolute top-4 right-4 z-30 pointer-events-auto ${isRecording ? "top-16" : "top-4"}`}

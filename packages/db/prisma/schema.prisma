@@ -106,14 +106,15 @@ model ScheduleParticipant {
 
 model Meeting {
   id         String  @id @default(uuid())
-  roomId     String  @unique 
+  roomId     String  @unique
   scheduleId String?
-  passcode   String? 
+  passcode   String?
   userId     String
   isHost     Boolean @default(false)
   roomName   String?
   isEnded    Boolean @default(false)
   endedAt    DateTime?
+  startedAt  DateTime?
 
   recordingState      RecordingState @default(IDLE)
   recordingStartedAt  DateTime?
@@ -402,4 +403,5 @@ enum UserTier {
   FREE
   PRO
   ENTERPRISE
+  ADMIN
 }

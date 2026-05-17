@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { JITSI_BASE_URL } from "../lib/config";
+import { http } from "@/https";
 
 type ConnectionState =
   | "idle"
@@ -57,6 +59,7 @@ export function useMeetingRoom({
   initialMuted = false,
   initialVideoOff = false,
   enabled = true,
+  isAuthenticated = false,
 }: {
   meetingId: string;
   displayName: string;
@@ -65,6 +68,7 @@ export function useMeetingRoom({
   initialMuted?: boolean;
   initialVideoOff?: boolean;
   enabled?: boolean;
+  isAuthenticated?: boolean;
 }) {
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("idle");
@@ -112,7 +116,7 @@ export function useMeetingRoom({
     const fallbackDomain = parsedBase.hostname;
     const fallbackMuc = `conference.${fallbackDomain}`;
     // Use proxied BOSH endpoint with absolute URL (goes through local dev server, avoiding cert issues)
-    const fallbackBosh = `http://${window.location.host}/jitsi/http-bind`;
+    const fallbackBosh = `https://jitsi.krishlabs.tech/http-bind`;
     const fallbackWebsocket = `${parsedBase.protocol === "https:" ? "wss" : "ws"}://${parsedBase.host}/xmpp-websocket`;
 
     try {
@@ -140,7 +144,7 @@ export function useMeetingRoom({
         // Ensure it's not empty or just "/"
         const safeBoshPath =
           boshPath && boshPath !== "/" ? boshPath : "/http-bind";
-        bosh = `http://${window.location.host}/jitsi${safeBoshPath}`;
+        bosh = `https://jitsi.krishlabs.tech/${safeBoshPath}`;
       }
       const websocket =
         extract(/config\.websocket\s*=\s*'([^']+)'/) || fallbackWebsocket;
@@ -405,8 +409,23 @@ export function useMeetingRoom({
     }
   }, []);
 
+  const getJitsiTokenMutation = useMutation<
+    { token: string; domain: string },
+    Error,
+    { meetingId: string }
+  >({
+    mutationFn: async ({ meetingId }: { meetingId: string }) => {
+      const response = await http.post<{ token: string; domain: string }>(
+        "/jitsi/token",
+        { meetingId },
+      );
+
+      return response.data;
+    },
+  });
+
   useEffect(() => {
-    if (!meetingId || !enabled) {
+    if (!meetingId || !enabled || !isAuthenticated) {
       return;
     }
 
@@ -466,6 +485,16 @@ export function useMeetingRoom({
         const runtimeConfig = await fetchJitsiConnectionConfig();
         console.log("Jitsi config:", runtimeConfig);
 
+        let jwtToken: string | undefined = undefined;
+        try {
+          const tokenData = await getJitsiTokenMutation.mutateAsync({
+            meetingId,
+          });
+          jwtToken = tokenData.token;
+        } catch (err) {
+          console.error("Failed to get Jitsi token:", err);
+        }
+
         const connection = new JitsiMeetJS.JitsiConnection(null, null, {
           hosts: {
             domain: runtimeConfig.domain,
@@ -476,6 +505,7 @@ export function useMeetingRoom({
           clientNode: "http://jitsi.org/jitsimeet",
           enableLipSync: false,
           externalConnectUrl: null,
+          jwt: jwtToken ?? undefined,
         });
 
         console.log("JitsiConnection created:", connection);
@@ -649,12 +679,12 @@ export function useMeetingRoom({
     parsedBase.hostname,
     parsedBase.protocol,
     fetchJitsiConnectionConfig,
-    syncLocalTrackFlags,
     removeRemoteTrackById,
     selectedCameraId,
     initialMuted,
     initialVideoOff,
     selectedMicId,
+    isAuthenticated,
     updateParticipantName,
   ]);
 

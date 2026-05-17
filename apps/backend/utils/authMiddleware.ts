@@ -3,9 +3,11 @@ import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       userId?: string;
+      userTier?: string;
     }
   }
 }
@@ -13,13 +15,14 @@ declare global {
 export async function authMiddleware(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) {
   try {
     const authorization = req.headers["authorization"];
-    const token = typeof authorization === "string" && authorization.startsWith("Bearer ")
-      ? authorization.slice(7)
-      : null;
+    const token =
+      typeof authorization === "string" && authorization.startsWith("Bearer ")
+        ? authorization.slice(7)
+        : null;
 
     if (!token) {
       res.status(401).json({ message: "No token provided" });
@@ -44,14 +47,16 @@ export async function authMiddleware(
       return;
     }
 
-
     req.userId = userId;
-    const user = await prisma.user.findUnique({ where: { id: userId, isVerified: true } });
+    const user = await prisma.user.findUnique({
+      where: { id: userId, isVerified: true },
+    });
     if (!user) {
       res.status(403).json({ message: "User not found or email not verified" });
       return;
     }
 
+    req.userTier = user.tier;
     next();
   } catch (error) {
     console.error("Auth error:", error);
@@ -75,9 +80,16 @@ export async function authMiddleware(
 }
 
 function getWorkerServiceJwtSecret(): string {
-  const secret = process.env.WORKER_SERVICE_JWT_SECRET || process.env.WORKER_SERVICE_TOKEN;
-  if (!secret || secret === "WORKER_SERVICE_TOKEN" || secret === "WORKER_SERVICE_JWT_SECRET") {
-    throw new Error("Worker service JWT secret must be configured and must not use the default placeholder value.");
+  const secret =
+    process.env.WORKER_SERVICE_JWT_SECRET || process.env.WORKER_SERVICE_TOKEN;
+  if (
+    !secret ||
+    secret === "WORKER_SERVICE_TOKEN" ||
+    secret === "WORKER_SERVICE_JWT_SECRET"
+  ) {
+    throw new Error(
+      "Worker service JWT secret must be configured and must not use the default placeholder value.",
+    );
   }
   return secret;
 }
@@ -97,7 +109,9 @@ export async function serviceAuthMiddleware(
       req.headers["x-worker-token"] ||
       req.headers.authorization?.replace(/^Bearer\s+/i, "");
 
-    const providedToken = Array.isArray(headerToken) ? headerToken[0] : headerToken;
+    const providedToken = Array.isArray(headerToken)
+      ? headerToken[0]
+      : headerToken;
 
     if (!providedToken) {
       res.status(401).json({
@@ -130,13 +144,17 @@ export async function serviceAuthMiddleware(
 
     next();
   } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError || error instanceof jwt.TokenExpiredError) {
+    if (
+      error instanceof jwt.JsonWebTokenError ||
+      error instanceof jwt.TokenExpiredError
+    ) {
       res.status(403).json({
         success: false,
         code: "SERVICE_TOKEN_INVALID",
-        message: error instanceof jwt.TokenExpiredError
-          ? "Worker service token expired."
-          : "Invalid Worker service token.",
+        message:
+          error instanceof jwt.TokenExpiredError
+            ? "Worker service token expired."
+            : "Invalid Worker service token.",
       });
       return;
     }
@@ -144,7 +162,10 @@ export async function serviceAuthMiddleware(
     res.status(500).json({
       success: false,
       code: "SERVICE_AUTH_ERROR",
-      message: error instanceof Error ? error.message : "Worker service authentication failed.",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Worker service authentication failed.",
     });
   }
 }

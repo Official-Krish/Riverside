@@ -40,6 +40,7 @@ joinMeetingRouter.post("/join/:id", authMiddleware, async (req, res) => {
             isHost: true,
             isEnded: false,
             scheduleId: schedule.id,
+            startedAt: new Date(),
             participants: {
               create: [
                 {
@@ -57,15 +58,18 @@ joinMeetingRouter.post("/join/:id", authMiddleware, async (req, res) => {
           include: { participants: true },
         });
 
-        await redisPublisher.lpush("MeetingInvitations", JSON.stringify({
-          roomId: meeting.roomId,
-          message: `Your scheduled meeting "${schedule.title}" is starting now.`,
-          participants: schedule.participants
-            .filter((p) => p.userId !== schedule.hostId)
-            .map((p) => ({
-              userId: p.userId,
-            })),
-        }));
+        await redisPublisher.lpush(
+          "MeetingInvitations",
+          JSON.stringify({
+            roomId: meeting.roomId,
+            message: `Your scheduled meeting "${schedule.title}" is starting now.`,
+            participants: schedule.participants
+              .filter((p) => p.userId !== schedule.hostId)
+              .map((p) => ({
+                userId: p.userId,
+              })),
+          }),
+        );
         return res.status(200).json({
           roomId: meeting.roomId,
           meetingId: meeting.id,
@@ -73,7 +77,9 @@ joinMeetingRouter.post("/join/:id", authMiddleware, async (req, res) => {
           recordingState: meeting.recordingState,
         });
       } else if (schedule && schedule.hostId !== userId) {
-        return res.status(201).json({ message: "Waiting for host to start the meeting" });
+        return res
+          .status(201)
+          .json({ message: "Waiting for host to start the meeting" });
       }
     }
 
@@ -85,7 +91,7 @@ joinMeetingRouter.post("/join/:id", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "Meeting ended" });
     }
 
-    const existing = meeting.participants.find(p => p.userId === userId);
+    const existing = meeting.participants.find((p) => p.userId === userId);
     const isHost = meeting.userId === userId;
 
     let hasAccess = false;
@@ -106,10 +112,13 @@ joinMeetingRouter.post("/join/:id", authMiddleware, async (req, res) => {
 
       if (schedule) {
         const isScheduleHost = schedule.hostId === userId;
-        const isScheduleParticipant = schedule.participants.some(p => p.userId === userId);
+        const isScheduleParticipant = schedule.participants.some(
+          (p) => p.userId === userId,
+        );
 
         if (isScheduleHost || isScheduleParticipant) {
           hasAccess = true;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           accessReason = "scheduled_meeting_invited";
         }
       }
@@ -118,20 +127,19 @@ joinMeetingRouter.post("/join/:id", authMiddleware, async (req, res) => {
     // Check 3: For instant meetings, verify correct passcode if not already invited
     if (!hasAccess && meeting.passcode) {
       if (passcode !== meeting.passcode) {
-        return res.status(403).json({ 
+        return res.status(403).json({
           message: "Access denied. Invalid or missing passcode.",
-          code: "INVALID_PASSCODE" 
+          code: "INVALID_PASSCODE",
         });
       }
       hasAccess = true;
-      accessReason = "passcode_verified";
     }
 
     // Final access check: If user is not host, not participant, not scheduled, and no valid passcode
     if (!hasAccess && !isHost) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         message: "Access denied. You are not invited to this meeting.",
-        code: "NOT_INVITED" 
+        code: "NOT_INVITED",
       });
     }
 
@@ -151,13 +159,20 @@ joinMeetingRouter.post("/join/:id", authMiddleware, async (req, res) => {
       });
     }
 
+    // Set startedAt if not set (first participant joins)
+    if (!meeting.startedAt) {
+      await prisma.meeting.update({
+        where: { id: meeting.id },
+        data: { startedAt: new Date() },
+      });
+    }
+
     return res.status(200).json({
       roomId: meeting.roomId,
       meetingId: meeting.id,
       isHost,
       recordingState: meeting.recordingState,
     });
-
   } catch (error) {
     console.error("Join error:", error);
     return res.status(500).json({ message: "Internal server error" });
