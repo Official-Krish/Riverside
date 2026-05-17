@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { JITSI_BASE_URL } from "../lib/config";
 
-type ConnectionState = "idle" | "loading-lib" | "connecting" | "connected" | "failed";
+type ConnectionState =
+  | "idle"
+  | "loading-lib"
+  | "connecting"
+  | "connected"
+  | "failed";
 
 type JitsiTrack = any;
 type JitsiConference = any;
@@ -19,7 +24,9 @@ type ParticipantState = {
   tracks: JitsiTrack[];
 };
 
-function buildMeetingAudioConstraints(selectedMicId?: string): MediaTrackConstraints {
+function buildMeetingAudioConstraints(
+  selectedMicId?: string,
+): MediaTrackConstraints {
   return {
     deviceId: selectedMicId ? { exact: selectedMicId } : undefined,
     echoCancellation: true,
@@ -30,7 +37,9 @@ function buildMeetingAudioConstraints(selectedMicId?: string): MediaTrackConstra
   };
 }
 
-function buildMeetingVideoConstraints(selectedCameraId?: string): MediaTrackConstraints {
+function buildMeetingVideoConstraints(
+  selectedCameraId?: string,
+): MediaTrackConstraints {
   return {
     deviceId: selectedCameraId ? { exact: selectedCameraId } : undefined,
     width: { ideal: 1920 },
@@ -45,26 +54,35 @@ export function useMeetingRoom({
   displayName,
   selectedCameraId,
   selectedMicId,
+  initialMuted = false,
+  initialVideoOff = false,
   enabled = true,
 }: {
   meetingId: string;
   displayName: string;
   selectedCameraId?: string;
   selectedMicId?: string;
+  initialMuted?: boolean;
+  initialVideoOff?: boolean;
   enabled?: boolean;
 }) {
-  const [connectionState, setConnectionState] = useState<ConnectionState>("idle");
+  const [connectionState, setConnectionState] =
+    useState<ConnectionState>("idle");
   const [error, setError] = useState<string | null>(null);
 
-  const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOff, setIsVideoOff] = useState(false);
+  const [isMuted, setIsMuted] = useState(initialMuted);
+  const [isVideoOff, setIsVideoOff] = useState(initialVideoOff);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [localParticipantId, setLocalParticipantId] = useState<string | null>(null);
+  const [localParticipantId, setLocalParticipantId] = useState<string | null>(
+    null,
+  );
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeLayout, setActiveLayout] = useState<"grid" | "focus">("grid");
-  const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null);
+  const [selectedParticipantId, setSelectedParticipantId] = useState<
+    string | null
+  >(null);
 
   const connectionRef = useRef<JitsiConnection | null>(null);
   const conferenceRef = useRef<JitsiConference | null>(null);
@@ -72,9 +90,15 @@ export function useMeetingRoom({
   const localVideoTrackRef = useRef<JitsiTrack | null>(null);
   const localScreenTrackRef = useRef<JitsiTrack | null>(null);
 
-  const [localVideoTrack, setLocalVideoTrack] = useState<JitsiTrack | null>(null);
-  const [localScreenTrack, setLocalScreenTrack] = useState<JitsiTrack | null>(null);
-  const [participantsMap, setParticipantsMap] = useState<Record<string, ParticipantState>>({});
+  const [localVideoTrack, setLocalVideoTrack] = useState<JitsiTrack | null>(
+    null,
+  );
+  const [localScreenTrack, setLocalScreenTrack] = useState<JitsiTrack | null>(
+    null,
+  );
+  const [participantsMap, setParticipantsMap] = useState<
+    Record<string, ParticipantState>
+  >({});
 
   const parsedBase = useMemo(() => {
     try {
@@ -96,23 +120,30 @@ export function useMeetingRoom({
       const response = await fetch(proxyUrl, { cache: "no-store" });
       const configText = await response.text();
 
-      const extract = (pattern: RegExp) => configText.match(pattern)?.[1]?.trim();
+      const extract = (pattern: RegExp) =>
+        configText.match(pattern)?.[1]?.trim();
 
-      const domain = extract(/config\.hosts\.domain\s*=\s*'([^']+)'/) || fallbackDomain;
+      const domain =
+        extract(/config\.hosts\.domain\s*=\s*'([^']+)'/) || fallbackDomain;
       const rawMuc = extract(/config\.hosts\.muc\s*=\s*'([^']+)'/);
       // Some Jitsi config.js files build muc using string concatenation, which regex can partially read as "muc.".
-      const muc = rawMuc && rawMuc !== "muc." && !rawMuc.includes("+") ? rawMuc : `muc.${domain}`;
+      const muc =
+        rawMuc && rawMuc !== "muc." && !rawMuc.includes("+")
+          ? rawMuc
+          : `muc.${domain}`;
       // Extract path from BOSH URL and proxy through /jitsi/
       let bosh = fallbackBosh;
       const extractedBosh = extract(/config\.bosh\s*=\s*'([^']+)'/);
       if (extractedBosh) {
         // Convert 'https://localhost:8443/http-bind' to absolute proxied URL
-        const boshPath = extractedBosh.replace(/^[a-z]+:\/\/[^/]+/, '');
+        const boshPath = extractedBosh.replace(/^[a-z]+:\/\/[^/]+/, "");
         // Ensure it's not empty or just "/"
-        const safeBoshPath = boshPath && boshPath !== '/' ? boshPath : '/http-bind';
+        const safeBoshPath =
+          boshPath && boshPath !== "/" ? boshPath : "/http-bind";
         bosh = `http://${window.location.host}/jitsi${safeBoshPath}`;
       }
-      const websocket = extract(/config\.websocket\s*=\s*'([^']+)'/) || fallbackWebsocket;
+      const websocket =
+        extract(/config\.websocket\s*=\s*'([^']+)'/) || fallbackWebsocket;
 
       return {
         domain,
@@ -130,67 +161,80 @@ export function useMeetingRoom({
     }
   }, [parsedBase.host, parsedBase.hostname, parsedBase.protocol]);
 
-  const removeRemoteTrackById = useCallback((participantId: string, trackId: string) => {
-    setParticipantsMap((prev) => {
-      const participant = prev[participantId];
-      if (!participant) {
-        return prev;
-      }
-      const nextTracks = participant.tracks.filter((track) => track.getId?.() !== trackId);
-      return {
-        ...prev,
-        [participantId]: {
-          ...participant,
-          tracks: nextTracks,
-        },
-      };
-    });
-  }, []);
+  const removeRemoteTrackById = useCallback(
+    (participantId: string, trackId: string) => {
+      setParticipantsMap((prev) => {
+        const participant = prev[participantId];
+        if (!participant) {
+          return prev;
+        }
+        const nextTracks = participant.tracks.filter(
+          (track) => track.getId?.() !== trackId,
+        );
+        return {
+          ...prev,
+          [participantId]: {
+            ...participant,
+            tracks: nextTracks,
+          },
+        };
+      });
+    },
+    [],
+  );
 
-  const addRemoteTrack = useCallback((participantId: string, track: JitsiTrack) => {
-    setParticipantsMap((prev) => {
-      const current =
-        prev[participantId] ||
-        ({
-          id: participantId,
-          displayName: participantId,
-          tracks: [],
-        } as ParticipantState);
+  const addRemoteTrack = useCallback(
+    (participantId: string, track: JitsiTrack) => {
+      setParticipantsMap((prev) => {
+        const current =
+          prev[participantId] ||
+          ({
+            id: participantId,
+            displayName: participantId,
+            tracks: [],
+          } as ParticipantState);
 
-      const alreadyExists = current.tracks.some((item) => item.getId?.() === track.getId?.());
-      if (alreadyExists) {
-        return prev;
-      }
+        const alreadyExists = current.tracks.some(
+          (item) => item.getId?.() === track.getId?.(),
+        );
+        if (alreadyExists) {
+          return prev;
+        }
 
-      return {
-        ...prev,
-        [participantId]: {
-          ...current,
-          tracks: [...current.tracks, track],
-        },
-      };
-    });
-  }, []);
+        return {
+          ...prev,
+          [participantId]: {
+            ...current,
+            tracks: [...current.tracks, track],
+          },
+        };
+      });
+    },
+    [],
+  );
 
-  const updateParticipantName = useCallback((participantId: string, nextName: string) => {
-    setParticipantsMap((prev) => {
-      const current =
-        prev[participantId] ||
-        ({
-          id: participantId,
-          displayName: nextName || participantId,
-          tracks: [],
-        } as ParticipantState);
+  const updateParticipantName = useCallback(
+    (participantId: string, nextName: string) => {
+      setParticipantsMap((prev) => {
+        const current =
+          prev[participantId] ||
+          ({
+            id: participantId,
+            displayName: nextName || participantId,
+            tracks: [],
+          } as ParticipantState);
 
-      return {
-        ...prev,
-        [participantId]: {
-          ...current,
-          displayName: nextName || current.displayName || participantId,
-        },
-      };
-    });
-  }, []);
+        return {
+          ...prev,
+          [participantId]: {
+            ...current,
+            displayName: nextName || current.displayName || participantId,
+          },
+        };
+      });
+    },
+    [],
+  );
 
   const clearRoomState = useCallback(() => {
     setParticipantsMap({});
@@ -340,7 +384,9 @@ export function useMeetingRoom({
     }
 
     try {
-      const tracks = await JitsiMeetJS.createLocalTracks({ devices: ["desktop"] });
+      const tracks = await JitsiMeetJS.createLocalTracks({
+        devices: ["desktop"],
+      });
       const screenTrack = tracks?.[0];
       if (!screenTrack) {
         return;
@@ -374,10 +420,18 @@ export function useMeetingRoom({
       try {
         if (!window.JitsiMeetJS) {
           await new Promise<void>((resolve, reject) => {
-            const existing = document.getElementById(scriptId) as HTMLScriptElement | null;
+            const existing = document.getElementById(
+              scriptId,
+            ) as HTMLScriptElement | null;
             if (existing) {
-              existing.addEventListener("load", () => resolve(), { once: true });
-              existing.addEventListener("error", () => reject(new Error("lib-jitsi-meet load error")), { once: true });
+              existing.addEventListener("load", () => resolve(), {
+                once: true,
+              });
+              existing.addEventListener(
+                "error",
+                () => reject(new Error("lib-jitsi-meet load error")),
+                { once: true },
+              );
               return;
             }
 
@@ -386,7 +440,11 @@ export function useMeetingRoom({
             script.async = true;
             script.src = `${JITSI_BASE_URL}/libs/lib-jitsi-meet.min.js`;
             script.addEventListener("load", () => resolve(), { once: true });
-            script.addEventListener("error", () => reject(new Error("lib-jitsi-meet load error")), { once: true });
+            script.addEventListener(
+              "error",
+              () => reject(new Error("lib-jitsi-meet load error")),
+              { once: true },
+            );
             document.body.appendChild(script);
           });
         }
@@ -407,7 +465,7 @@ export function useMeetingRoom({
 
         const runtimeConfig = await fetchJitsiConnectionConfig();
         console.log("Jitsi config:", runtimeConfig);
-        
+
         const connection = new JitsiMeetJS.JitsiConnection(null, null, {
           hosts: {
             domain: runtimeConfig.domain,
@@ -430,57 +488,81 @@ export function useMeetingRoom({
               return;
             }
 
-            const conference = connectionRef.current.initJitsiConference(meetingId, {
-              openBridgeChannel: true,
-              p2p: {
-                enabled: true,
+            const conference = connectionRef.current.initJitsiConference(
+              meetingId,
+              {
+                openBridgeChannel: true,
+                p2p: {
+                  enabled: true,
+                },
+                useStunTurn: false,
+                disableSimulcast: true,
               },
-              useStunTurn: false,
-              disableSimulcast: true,
-            });
+            );
             conferenceRef.current = conference;
 
-            conference.on(JitsiMeetJS.events.conference.USER_JOINED, (participantId: string, user: any) => {
-              updateParticipantName(participantId, user?.getDisplayName?.() || participantId);
-            });
+            conference.on(
+              JitsiMeetJS.events.conference.USER_JOINED,
+              (participantId: string, user: any) => {
+                updateParticipantName(
+                  participantId,
+                  user?.getDisplayName?.() || participantId,
+                );
+              },
+            );
 
-            conference.on(JitsiMeetJS.events.conference.USER_LEFT, (participantId: string) => {
-              setParticipantsMap((prev) => {
-                const next = { ...prev };
-                delete next[participantId];
-                return next;
-              });
-            });
+            conference.on(
+              JitsiMeetJS.events.conference.USER_LEFT,
+              (participantId: string) => {
+                setParticipantsMap((prev) => {
+                  const next = { ...prev };
+                  delete next[participantId];
+                  return next;
+                });
+              },
+            );
 
-            conference.on(JitsiMeetJS.events.conference.DISPLAY_NAME_CHANGED, (participantId: string, name: string) => {
-              updateParticipantName(participantId, name);
-            });
+            conference.on(
+              JitsiMeetJS.events.conference.DISPLAY_NAME_CHANGED,
+              (participantId: string, name: string) => {
+                updateParticipantName(participantId, name);
+              },
+            );
 
-            conference.on(JitsiMeetJS.events.conference.TRACK_ADDED, (track: JitsiTrack) => {
-              if (!track || track.isLocal?.()) {
-                return;
-              }
-              const participantId = track.getParticipantId?.();
-              if (participantId) {
-                addRemoteTrack(participantId, track);
-              }
-            });
+            conference.on(
+              JitsiMeetJS.events.conference.TRACK_ADDED,
+              (track: JitsiTrack) => {
+                if (!track || track.isLocal?.()) {
+                  return;
+                }
+                const participantId = track.getParticipantId?.();
+                if (participantId) {
+                  addRemoteTrack(participantId, track);
+                }
+              },
+            );
 
-            conference.on(JitsiMeetJS.events.conference.TRACK_REMOVED, (track: JitsiTrack) => {
-              if (!track || track.isLocal?.()) {
-                return;
-              }
-              const participantId = track.getParticipantId?.();
-              const trackId = track.getId?.();
-              if (participantId && trackId) {
-                removeRemoteTrackById(participantId, trackId);
-              }
-            });
+            conference.on(
+              JitsiMeetJS.events.conference.TRACK_REMOVED,
+              (track: JitsiTrack) => {
+                if (!track || track.isLocal?.()) {
+                  return;
+                }
+                const participantId = track.getParticipantId?.();
+                const trackId = track.getId?.();
+                if (participantId && trackId) {
+                  removeRemoteTrackById(participantId, trackId);
+                }
+              },
+            );
 
-            conference.on(JitsiMeetJS.events.conference.CONFERENCE_JOINED, () => {
-              setLocalParticipantId(conference.myUserId?.() || null);
-              setConnectionState("connected");
-            });
+            conference.on(
+              JitsiMeetJS.events.conference.CONFERENCE_JOINED,
+              () => {
+                setLocalParticipantId(conference.myUserId?.() || null);
+                setConnectionState("connected");
+              },
+            );
 
             conference.on(JitsiMeetJS.events.conference.CONFERENCE_LEFT, () => {
               setConnectionState("idle");
@@ -497,7 +579,14 @@ export function useMeetingRoom({
               },
             });
 
-            localTracks.forEach((track: JitsiTrack) => {
+            for (const track of localTracks) {
+              if (track.getType?.() === "audio" && initialMuted) {
+                await track.mute?.();
+              }
+              if (track.getType?.() === "video" && initialVideoOff) {
+                await track.mute?.();
+              }
+
               conference.addTrack(track);
               if (track.getType?.() === "audio") {
                 localAudioTrackRef.current = track;
@@ -508,30 +597,38 @@ export function useMeetingRoom({
               }
 
               syncLocalTrackFlags(track);
-            });
+            }
 
             conference.setDisplayName?.(displayName || "Guest");
             conference.join();
-          }
+          },
         );
 
-        connection.addEventListener(JitsiMeetJS.events.connection.CONNECTION_FAILED, () => {
-          setConnectionState("failed");
-          setError(
-            `Could not connect to Jitsi XMPP at ${JITSI_BASE_URL}. Verify Jitsi is running and reachable.`
-          );
-        });
+        connection.addEventListener(
+          JitsiMeetJS.events.connection.CONNECTION_FAILED,
+          () => {
+            setConnectionState("failed");
+            setError(
+              `Could not connect to Jitsi XMPP at ${JITSI_BASE_URL}. Verify Jitsi is running and reachable.`,
+            );
+          },
+        );
 
-        connection.addEventListener(JitsiMeetJS.events.connection.CONNECTION_DISCONNECTED, () => {
-          setConnectionState("idle");
-        });
+        connection.addEventListener(
+          JitsiMeetJS.events.connection.CONNECTION_DISCONNECTED,
+          () => {
+            setConnectionState("idle");
+          },
+        );
 
         connection.connect();
       } catch (err) {
         console.error("Jitsi initialization error:", err);
         if (!cancelled) {
           setConnectionState("failed");
-          setError(`Jitsi error: ${err instanceof Error ? err.message : String(err)}`);
+          setError(
+            `Jitsi error: ${err instanceof Error ? err.message : String(err)}`,
+          );
         }
       }
     };
@@ -555,11 +652,16 @@ export function useMeetingRoom({
     syncLocalTrackFlags,
     removeRemoteTrackById,
     selectedCameraId,
+    initialMuted,
+    initialVideoOff,
     selectedMicId,
     updateParticipantName,
   ]);
 
-  const participants = useMemo(() => Object.values(participantsMap), [participantsMap]);
+  const participants = useMemo(
+    () => Object.values(participantsMap),
+    [participantsMap],
+  );
 
   return {
     connectionState,

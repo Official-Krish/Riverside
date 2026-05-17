@@ -595,7 +595,7 @@ export function Editor() {
           </div>
 
           <div className="flex flex-col gap-4 w-105 max-h-[calc(100vh-100px)]">
-            <div className="flex-1 overflow-hidden rounded-2xl border border-[#f5a623]/20 bg-[#0a0a08] shadow-lg max-h-full">
+            <div className="flex-1 overflow-hidden rounded-2xl border border-[#f5a623]/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)] max-h-full">
               <EditorPanel
                 activeTab={activePanelTab}
                 onTabChange={setActivePanelTab}

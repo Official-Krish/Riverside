@@ -27,6 +27,7 @@ type UseMeetingRecordingArgs = {
   isMuted: boolean;
   isVideoOff: boolean;
   selectedMicId?: string;
+  selectedCameraId?: string;
 };
 
 function buildRecordingAudioConstraints(
@@ -42,6 +43,17 @@ function buildRecordingAudioConstraints(
   };
 }
 
+function buildRecordingVideoConstraints(
+  selectedCameraId?: string,
+): MediaTrackConstraints {
+  return {
+    deviceId: selectedCameraId ? { exact: selectedCameraId } : undefined,
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+    frameRate: { ideal: 60 },
+  };
+}
+
 export function useMeetingRecording({
   meetingId,
   roomName,
@@ -52,8 +64,9 @@ export function useMeetingRecording({
   isMuted,
   isVideoOff,
   selectedMicId,
+  selectedCameraId,
 }: UseMeetingRecordingArgs) {
-  const CHUNK_DURATION_MS = 5000;
+  const CHUNK_DURATION_MS = 10000;
 
   const [isUploadingChunks, setIsUploadingChunks] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
@@ -65,7 +78,6 @@ export function useMeetingRecording({
   const canvasAnimationRef = useRef<number | null>(null);
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
   const lastVideoTrackIdRef = useRef<string | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
   const audioTrackRef = useRef<MediaStreamTrack | null>(null);
   const isMutedRef = useRef(isMuted);
   const isVideoOffRef = useRef(isVideoOff);
@@ -73,10 +85,12 @@ export function useMeetingRecording({
   const sequenceRef = useRef(0);
   const uploadChainRef = useRef<Promise<void>>(Promise.resolve());
   const stoppingRef = useRef(false);
+  const chunkStartedAtRef = useRef<number | null>(null);
 
   const resetRecorderSession = useCallback(() => {
     sequenceRef.current = 0;
     uploadChainRef.current = Promise.resolve();
+    chunkStartedAtRef.current = null;
     setRecordingError(null);
     setIsUploadingChunks(false);
   }, []);
@@ -126,7 +140,7 @@ export function useMeetingRecording({
   }, [isVideoOff, syncRecorderMediaState]);
 
   const enqueueChunkUpload = useCallback(
-    (chunk: Blob) => {
+    (chunk: Blob, startedAtIso: string, durationMs: number) => {
       const meetingKey = roomName;
 
       if (!meetingKey) {
@@ -134,7 +148,6 @@ export function useMeetingRecording({
       }
 
       const nextSequence = sequenceRef.current++;
-      const startedAt = new Date().toISOString();
 
       uploadChainRef.current = uploadChainRef.current
         .then(async () => {
@@ -158,8 +171,8 @@ export function useMeetingRecording({
             formData.append("participantId", localParticipantId);
           }
           formData.append("sequenceNumber", String(nextSequence));
-          formData.append("startedAt", startedAt);
-          formData.append("durationMs", String(CHUNK_DURATION_MS));
+          formData.append("startedAt", startedAtIso);
+          formData.append("durationMs", String(durationMs));
           formData.append("mimeType", "application/octet-stream");
           formData.append("isEncrypted", "true");
           formData.append("sourceMimeType", encryptedPayload.sourceMimeType);
@@ -219,6 +232,7 @@ export function useMeetingRecording({
       recordingStreamRef.current = null;
     }
     audioTrackRef.current = null;
+    chunkStartedAtRef.current = null;
 
     if (processedStreamRef.current) {
       processedStreamRef.current.getTracks().forEach((track) => {
@@ -246,9 +260,6 @@ export function useMeetingRecording({
       }
       videoElementRef.current = null;
     }
-
-    void audioContextRef.current?.close();
-    audioContextRef.current = null;
   }, []);
 
   const startLocalChunkRecorder = useCallback(
@@ -281,48 +292,13 @@ export function useMeetingRecording({
           return canvas.captureStream(60).getVideoTracks()[0] ?? null;
         };
 
-        const createSilentAudioTrack = async () => {
-          if (typeof AudioContext === "undefined") {
-            return null;
-          }
-
-          const audioContext = new AudioContext();
-          audioContextRef.current = audioContext;
-          if (audioContext.state === "suspended") {
-            try {
-              await audioContext.resume();
-            } catch {
-              // best effort
-            }
-          }
-
-          const destination = audioContext.createMediaStreamDestination();
-          const oscillator = audioContext.createOscillator();
-          const silence = audioContext.createGain();
-          silence.gain.value = 0;
-          oscillator.connect(silence);
-          silence.connect(destination);
-          oscillator.start();
-
-          const silentAudioTrack =
-            destination.stream.getAudioTracks()[0] ?? null;
-          if (silentAudioTrack) {
-            audioTrackRef.current = silentAudioTrack;
-          }
-          return silentAudioTrack;
-        };
-
         const mediaConstraints: MediaStreamConstraints = {
-          video: initialIsVideoOff
-            ? false
-            : {
-                width: { ideal: 1920 },
-                height: { ideal: 1080 },
-                frameRate: { ideal: 60 },
-              },
-          audio: initialIsMuted
-            ? false
-            : buildRecordingAudioConstraints(selectedMicId),
+          // Keep a real video source available even when the meeting camera is
+          // currently "off" so later camera-on toggles can produce frames.
+          video: buildRecordingVideoConstraints(selectedCameraId),
+          // Keep a real audio source available even when the participant joins
+          // muted so later unmute actions can be captured in the same session.
+          audio: buildRecordingAudioConstraints(selectedMicId),
         };
 
         const stream =
@@ -334,17 +310,10 @@ export function useMeetingRecording({
 
         const recorderStream = new MediaStream();
 
-        if (!initialIsMuted) {
-          const rawAudioTrack = stream.getAudioTracks()[0] ?? null;
-          if (rawAudioTrack) {
-            audioTrackRef.current = rawAudioTrack;
-            recorderStream.addTrack(rawAudioTrack);
-          }
-        } else {
-          const silentAudioTrack = await createSilentAudioTrack();
-          if (silentAudioTrack) {
-            recorderStream.addTrack(silentAudioTrack);
-          }
+        const rawAudioTrack = stream.getAudioTracks()[0] ?? null;
+        if (rawAudioTrack) {
+          audioTrackRef.current = rawAudioTrack;
+          recorderStream.addTrack(rawAudioTrack);
         }
 
         const videoTrack = initialIsVideoOff
@@ -394,7 +363,9 @@ export function useMeetingRecording({
 
             const shouldShowVideo = Boolean(
               !isVideoOffRef.current &&
-                (videoTrack || currentVideoTrack) &&
+                currentVideoTrack &&
+                currentVideoTrack.readyState === "live" &&
+                !currentVideoTrack.muted &&
                 videoEl.readyState >= 2,
             );
 
@@ -442,8 +413,17 @@ export function useMeetingRecording({
           if (!event.data || event.data.size === 0) {
             return;
           }
+          const chunkEndedAt = Date.now();
+          const chunkStartedAt =
+            chunkStartedAtRef.current ?? chunkEndedAt - CHUNK_DURATION_MS;
+          const actualDurationMs = Math.max(1, chunkEndedAt - chunkStartedAt);
+          chunkStartedAtRef.current = chunkEndedAt;
           setIsUploadingChunks(true);
-          enqueueChunkUpload(event.data);
+          enqueueChunkUpload(
+            event.data,
+            new Date(chunkStartedAt).toISOString(),
+            actualDurationMs,
+          );
         };
 
         recorder.onerror = () => {
@@ -457,6 +437,7 @@ export function useMeetingRecording({
 
         mediaRecorderRef.current = recorder;
         syncRecorderMediaState();
+        chunkStartedAtRef.current = Date.now();
         recorder.start(CHUNK_DURATION_MS);
       } catch (err) {
         // Ensure the transient starting flag is cleared on error so callers
@@ -472,6 +453,7 @@ export function useMeetingRecording({
     [
       enqueueChunkUpload,
       getSupportedMimeType,
+      selectedCameraId,
       selectedMicId,
       syncRecorderMediaState,
     ],
@@ -624,7 +606,7 @@ export function useMeetingRecording({
     if (mediaRecorderRef.current && !stoppingRef.current) {
       stoppingRef.current = true;
       void (async () => {
-        await new Promise((resolve) => setTimeout(resolve, 5000));
+        await new Promise((resolve) => setTimeout(resolve, 10000));
         await stopLocalChunkRecorder();
       })();
     }

@@ -1,5 +1,12 @@
 import type { MeetingSchedule } from "@repo/types/api";
-import { CalendarDays, Clock3, LoaderCircle, Repeat, Users, CalendarClock } from "lucide-react";
+import {
+  CalendarDays,
+  Clock3,
+  LoaderCircle,
+  Repeat,
+  Users,
+  CalendarClock,
+} from "lucide-react";
 import { motion } from "motion/react";
 import { MeetingJoinPopover } from "@/components/Meetings";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -7,10 +14,21 @@ import { http } from "@/https";
 import { toast } from "sonner";
 import { getHttpErrorMessage } from "@/lib/httpError";
 import { useMemo, useState } from "react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { DatePickerTime } from "@/components/ui/TimePicker";
 import { Button } from "@/components/ui/button";
-import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 type UpcomingMeetingsProps = {
   schedules: MeetingSchedule[];
@@ -18,7 +36,15 @@ type UpcomingMeetingsProps = {
   isError?: boolean;
   errorMessage?: string;
   joiningScheduleId?: string | null;
-  onJoinSchedule: (scheduleId: string, devices: { micId?: string; cameraId?: string }) => Promise<void>;
+  onJoinSchedule: (
+    scheduleId: string,
+    devices: {
+      micId?: string;
+      cameraId?: string;
+      initialMicOff?: boolean;
+      initialVideoOff?: boolean;
+    },
+  ) => Promise<void>;
   onScheduleMeeting: () => void;
   compact?: boolean;
   isDashboard?: boolean;
@@ -36,13 +62,20 @@ export function UpcomingMeetings({
   isDashboard = false,
 }: UpcomingMeetingsProps) {
   const queryClient = useQueryClient();
-  const [rescheduleScheduleId, setRescheduleScheduleId] = useState<string | null>(null);
-  const [rescheduleStartTime, setRescheduleStartTime] = useState<Date | null>(null);
+  const [rescheduleScheduleId, setRescheduleScheduleId] = useState<
+    string | null
+  >(null);
+  const [rescheduleStartTime, setRescheduleStartTime] = useState<Date | null>(
+    null,
+  );
   const [page, setPage] = useState(1);
 
   const upcoming = schedules
     .slice()
-    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+    .sort(
+      (a, b) =>
+        new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+    );
 
   const pageSize = 4;
   const totalPages = Math.ceil(upcoming.length / pageSize);
@@ -51,8 +84,9 @@ export function UpcomingMeetings({
     : upcoming.slice((page - 1) * pageSize, page * pageSize);
 
   const activeSchedule = useMemo(
-    () => upcoming.find((schedule) => schedule.id === rescheduleScheduleId) ?? null,
-    [upcoming, rescheduleScheduleId]
+    () =>
+      upcoming.find((schedule) => schedule.id === rescheduleScheduleId) ?? null,
+    [upcoming, rescheduleScheduleId],
   );
 
   const rescheduleMutation = useMutation({
@@ -69,14 +103,20 @@ export function UpcomingMeetings({
       await queryClient.invalidateQueries({ queryKey: ["meetings"] });
     },
     onError: (error) => {
-      toast.error(getHttpErrorMessage(error, "Could not reschedule the meeting."));
+      toast.error(
+        getHttpErrorMessage(error, "Could not reschedule the meeting."),
+      );
     },
   });
 
   const handleOpenReschedule = (schedule: MeetingSchedule, open: boolean) => {
     if (!open) {
-      setRescheduleScheduleId((current) => (current === schedule.id ? null : current));
-      setRescheduleStartTime((current) => (rescheduleScheduleId === schedule.id ? null : current));
+      setRescheduleScheduleId((current) =>
+        current === schedule.id ? null : current,
+      );
+      setRescheduleStartTime((current) =>
+        rescheduleScheduleId === schedule.id ? null : current,
+      );
       return;
     }
     setRescheduleScheduleId(schedule.id);
@@ -95,7 +135,7 @@ export function UpcomingMeetings({
   };
 
   return (
-    <div className={`${!compact ? 'px-8 py-7' : ''}`}>
+    <div className={`${!compact ? "px-8 py-7" : ""}`}>
       <div className="mb-8 flex items-start justify-between">
         <div>
           <p className="text-[10.5px] font-medium uppercase tracking-[0.14em] text-[#f5a623]/55">
@@ -106,7 +146,8 @@ export function UpcomingMeetings({
           </h2>
           {!isDashboard && (
             <p className="mt-2 text-sm text-white/45 font-light max-w-2xl leading-relaxed">
-              Hosts can start the room from here, and invited participants can join once it goes live.
+              Hosts can start the room from here, and invited participants can
+              join once it goes live.
             </p>
           )}
         </div>
@@ -155,14 +196,18 @@ export function UpcomingMeetings({
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-[15px] font-medium text-white/85">{schedule.title}</p>
+                    <p className="text-[15px] font-medium text-white/85">
+                      {schedule.title}
+                    </p>
                     <span className="text-[10px] font-medium px-2 py-0.5 rounded-full border border-white/15 text-white/50">
                       {schedule.isHost ? "Host" : "Participant"}
                     </span>
                   </div>
 
                   {schedule.description ? (
-                    <p className="mt-2 text-sm leading-relaxed text-white/45">{schedule.description}</p>
+                    <p className="mt-2 text-sm leading-relaxed text-white/45">
+                      {schedule.description}
+                    </p>
                   ) : null}
 
                   <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-white/35">
@@ -172,11 +217,15 @@ export function UpcomingMeetings({
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock3 className="size-3" />
-                      {start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      {start.toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </span>
                     <span className="flex items-center gap-1">
                       <Users className="size-3" />
-                      {schedule.participantCount} participant{schedule.participantCount !== 1 ? "s" : ""}
+                      {schedule.participantCount} participant
+                      {schedule.participantCount !== 1 ? "s" : ""}
                     </span>
                     {schedule.isRecurring ? (
                       <span className="flex items-center gap-1">
@@ -186,13 +235,15 @@ export function UpcomingMeetings({
                     ) : null}
                   </div>
                 </div>
-                
+
                 {!isDashboard && (
                   <div className="flex items-center gap-2">
                     {schedule.isHost ? (
                       <Popover
                         open={isRescheduleOpen}
-                        onOpenChange={(open) => handleOpenReschedule(schedule, open)}
+                        onOpenChange={(open) =>
+                          handleOpenReschedule(schedule, open)
+                        }
                       >
                         <PopoverTrigger asChild>
                           <button
@@ -212,9 +263,12 @@ export function UpcomingMeetings({
                               <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#f5a623]/75">
                                 Reschedule meeting
                               </p>
-                              <h3 className="mt-1 text-base font-medium text-white">{schedule.title}</h3>
+                              <h3 className="mt-1 text-base font-medium text-white">
+                                {schedule.title}
+                              </h3>
                               <p className="mt-1 text-sm leading-relaxed text-white/45">
-                                Pick a new start time and attendees will receive an updated reminder.
+                                Pick a new start time and attendees will receive
+                                an updated reminder.
                               </p>
                             </div>
 
@@ -227,17 +281,26 @@ export function UpcomingMeetings({
 
                             <div className="flex items-center justify-between px-4 py-3 text-sm text-white/50 bg-white/5 rounded-xl border border-white/8">
                               <span>Current start</span>
-                              <span className="font-medium text-white">{start.toLocaleString()}</span>
+                              <span className="font-medium text-white">
+                                {start.toLocaleString()}
+                              </span>
                             </div>
 
                             <Button
                               type="button"
                               onClick={() => void handleSubmitReschedule()}
-                              disabled={rescheduleMutation.isPending || !rescheduleStartTime}
+                              disabled={
+                                rescheduleMutation.isPending ||
+                                !rescheduleStartTime
+                              }
                               className="h-11 w-full font-semibold text-black hover:brightness-105 cursor-pointer disabled:pointer-events-none disabled:opacity-50"
                               style={{ background: "#f5a623" }}
                             >
-                              {rescheduleMutation.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <CalendarClock className="size-4" />}
+                              {rescheduleMutation.isPending ? (
+                                <LoaderCircle className="size-4 animate-spin" />
+                              ) : (
+                                <CalendarClock className="size-4" />
+                              )}
                               Save new time
                             </Button>
                           </div>
@@ -248,7 +311,9 @@ export function UpcomingMeetings({
                     <MeetingJoinPopover
                       triggerLabel={buttonLabel}
                       scheduleId={schedule.id}
-                      cancelMeetingLabel={schedule.isHost ? "Cancel meeting" : null}
+                      cancelMeetingLabel={
+                        schedule.isHost ? "Cancel meeting" : null
+                      }
                       busy={joiningScheduleId === schedule.id}
                       onJoin={(devices) => onJoinSchedule(schedule.id, devices)}
                     />
@@ -264,7 +329,9 @@ export function UpcomingMeetings({
                 <PaginationContent>
                   <PaginationItem>
                     <PaginationPrevious
-                      onClick={() => setPage((current) => Math.max(1, current - 1))}
+                      onClick={() =>
+                        setPage((current) => Math.max(1, current - 1))
+                      }
                       aria-disabled={page === 1}
                       tabIndex={page === 1 ? -1 : 0}
                       className="cursor-pointer"
@@ -283,7 +350,9 @@ export function UpcomingMeetings({
                   ))}
                   <PaginationItem>
                     <PaginationNext
-                      onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                      onClick={() =>
+                        setPage((current) => Math.min(totalPages, current + 1))
+                      }
                       aria-disabled={page === totalPages}
                       tabIndex={page === totalPages ? -1 : 0}
                       className="cursor-pointer"

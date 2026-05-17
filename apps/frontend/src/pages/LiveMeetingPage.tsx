@@ -58,6 +58,8 @@ export function LiveMeetingPage() {
   const initialRecordingState = searchParams.get("recordingState") === "true";
   const selectedMicId = searchParams.get("micId") || "";
   const selectedCameraId = searchParams.get("cameraId") || "";
+  const initialMicOff = searchParams.get("micOff") === "true";
+  const initialVideoOff = searchParams.get("videoOff") === "true";
 
   const wrappedCekMutation = useMutation<
     RegisterWrappedCekResponse,
@@ -136,6 +138,8 @@ export function LiveMeetingPage() {
     displayName,
     selectedCameraId,
     selectedMicId,
+    initialMuted: initialMicOff,
+    initialVideoOff,
     enabled:
       joinMutation.status === "success" &&
       wrappedCekMutation.status === "success",
@@ -162,6 +166,7 @@ export function LiveMeetingPage() {
     isMuted,
     isVideoOff,
     selectedMicId,
+    selectedCameraId,
   });
 
   const {

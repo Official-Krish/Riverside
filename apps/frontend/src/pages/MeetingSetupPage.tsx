@@ -1,10 +1,28 @@
 import { AnimatePresence, motion } from "motion/react";
-import { LogIn, Mic, Plus, Video, Volume2 } from "lucide-react";
+import {
+  LogIn,
+  Mic,
+  MicOff,
+  Plus,
+  Video,
+  VideoOff,
+  Volume2,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { CreateMeetingForm, DevicePreview, JoinMeetingForm } from "../components/Meetings";
+import {
+  CreateMeetingForm,
+  DevicePreview,
+  JoinMeetingForm,
+} from "../components/Meetings";
 import { useAuth } from "../hooks/useAuth";
 import { useMeetingSetup } from "../hooks/useMeetingSetup";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
 
 export function MeetingSetupPage() {
   const navigate = useNavigate();
@@ -12,21 +30,43 @@ export function MeetingSetupPage() {
 
   const {
     videoRef,
-    mode, setMode,
-    createRoomName, setCreateRoomName,
-    createPasscode, setCreatePasscode,
-    joinMeetingId, setJoinMeetingId,
-    joinPasscode, setJoinPasscode,
-    inviteEmail, setInviteEmail,
+    mode,
+    setMode,
+    createRoomName,
+    setCreateRoomName,
+    createPasscode,
+    setCreatePasscode,
+    joinMeetingId,
+    setJoinMeetingId,
+    joinPasscode,
+    setJoinPasscode,
+    inviteEmail,
+    setInviteEmail,
     invites,
-    cameraDevices, micDevices,
-    selectedCameraId, setSelectedCameraId,
-    selectedMicId, setSelectedMicId,
-    micLevel, micMonitorEnabled, monitorAudioRef, toggleMicMonitor,
-    previewError, errorMessage,
-    addInvite, removeInvite,
-    createMeetingMutation, joinMeetingMutation,
-    isBusy, busyLabel, submitCreate, submitJoin,
+    cameraDevices,
+    micDevices,
+    selectedCameraId,
+    setSelectedCameraId,
+    selectedMicId,
+    setSelectedMicId,
+    joinWithMicOff,
+    setJoinWithMicOff,
+    joinWithVideoOff,
+    setJoinWithVideoOff,
+    micLevel,
+    micMonitorEnabled,
+    monitorAudioRef,
+    toggleMicMonitor,
+    previewError,
+    errorMessage,
+    addInvite,
+    removeInvite,
+    createMeetingMutation,
+    joinMeetingMutation,
+    isBusy,
+    busyLabel,
+    submitCreate,
+    submitJoin,
   } = useMeetingSetup({ displayNameFallback: name || "", navigate });
 
   return (
@@ -44,8 +84,14 @@ export function MeetingSetupPage() {
             <div className="mb-3 flex items-center gap-2">
               <svg width="22" height="22" viewBox="0 0 32 32" fill="none">
                 <rect width="32" height="32" rx="7" fill="#111009" />
-                <path d="M5 9 L11 23 L16 12 L21 23 L27 9"
-                  stroke="url(#wg)" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                <path
+                  d="M5 9 L11 23 L16 12 L21 23 L27 9"
+                  stroke="url(#wg)"
+                  strokeWidth="3.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
                 <defs>
                   <linearGradient id="wg" x1="0" y1="0" x2="1" y2="1">
                     <stop offset="0%" stopColor="#ffcf6b" />
@@ -53,9 +99,13 @@ export function MeetingSetupPage() {
                   </linearGradient>
                 </defs>
               </svg>
-              <span className="text-[16px] font-extrabold tracking-tight text-[#fff5de]">Weave</span>
+              <span className="text-[16px] font-extrabold tracking-tight text-[#fff5de]">
+                Weave
+              </span>
             </div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#f5a623]/55">Ready to record</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#f5a623]/55">
+              Ready to record
+            </p>
             <h1 className="mt-1 text-[22px] font-black leading-tight tracking-tight text-[#fff5de]">
               {mode === "create" ? "Create a meeting" : "Join a meeting"}
             </h1>
@@ -79,11 +129,19 @@ export function MeetingSetupPage() {
                 ].join(" ")}
               >
                 <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#f5a623]/10 text-[#f5a623]">
-                  {m === "create" ? <Plus className="size-3.5" /> : <LogIn className="size-3.5" />}
+                  {m === "create" ? (
+                    <Plus className="size-3.5" />
+                  ) : (
+                    <LogIn className="size-3.5" />
+                  )}
                 </span>
                 <div>
-                  <p className="text-[13px] font-bold text-[#fff5de]">{m === "create" ? "Create" : "Join"}</p>
-                  <p className="text-[11px] text-[#b49650]/55">{m === "create" ? "Start a new room" : "Enter a room ID"}</p>
+                  <p className="text-[13px] font-bold text-[#fff5de]">
+                    {m === "create" ? "Create" : "Join"}
+                  </p>
+                  <p className="text-[11px] text-[#b49650]/55">
+                    {m === "create" ? "Start a new room" : "Enter a room ID"}
+                  </p>
                 </div>
               </button>
             ))}
@@ -156,9 +214,12 @@ export function MeetingSetupPage() {
         <div className="flex flex-col gap-4 rounded-3xl border border-[#f5a623]/12 bg-[#0f0d0a] p-7">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#f5a623]/55">Camera preview</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#f5a623]/55">
+                Camera preview
+              </p>
               <p className="mt-1 text-[12px] leading-relaxed text-[#c8a870]/58">
-                Check framing, verify your mic, and make sure the room feels ready before you enter.
+                Check framing, verify your mic, and make sure the room feels
+                ready before you enter.
               </p>
             </div>
             <span className="rounded-full border border-[#f5a623]/14 bg-[#f5a623]/8 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#f5d08d]">
@@ -166,10 +227,7 @@ export function MeetingSetupPage() {
             </span>
           </div>
 
-          <DevicePreview
-            videoRef={videoRef}
-            previewError={previewError}
-          />
+          <DevicePreview videoRef={videoRef} previewError={previewError} />
 
           {/* Device selectors */}
           <div className="flex flex-col gap-2.5">
@@ -189,12 +247,67 @@ export function MeetingSetupPage() {
             />
           </div>
 
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setJoinWithVideoOff((current) => !current)}
+              className={[
+                "flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition cursor-pointer",
+                joinWithVideoOff
+                  ? "border-[#f5a623]/24 bg-[#f5a623]/10 text-[#fff5de]"
+                  : "border-white/8 bg-white/4 text-[#fff5de]/78 hover:border-[#f5a623]/18 hover:bg-[#f5a623]/6",
+              ].join(" ")}
+            >
+              <span>
+                <span className="block text-[11px] font-bold uppercase tracking-[0.14em]">
+                  Join with camera off
+                </span>
+                <span className="mt-1 block text-[12px] text-[#c8a870]/65">
+                  Enter dark, then turn camera on when you are ready.
+                </span>
+              </span>
+              {joinWithVideoOff ? (
+                <VideoOff className="size-4 text-[#f5a623]" />
+              ) : (
+                <Video className="size-4 text-[#f5a623]" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setJoinWithMicOff((current) => !current)}
+              className={[
+                "flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition cursor-pointer",
+                joinWithMicOff
+                  ? "border-[#f5a623]/24 bg-[#f5a623]/10 text-[#fff5de]"
+                  : "border-white/8 bg-white/4 text-[#fff5de]/78 hover:border-[#f5a623]/18 hover:bg-[#f5a623]/6",
+              ].join(" ")}
+            >
+              <span>
+                <span className="block text-[11px] font-bold uppercase tracking-[0.14em]">
+                  Join muted
+                </span>
+                <span className="mt-1 block text-[12px] text-[#c8a870]/65">
+                  Helpful when a recording is already live and you join late.
+                </span>
+              </span>
+              {joinWithMicOff ? (
+                <MicOff className="size-4 text-[#f5a623]" />
+              ) : (
+                <Mic className="size-4 text-[#f5a623]" />
+              )}
+            </button>
+          </div>
+
           <div className="rounded-2xl border border-[#f5a623]/12 bg-black/20 p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#f5a623]/60">Mic test</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#f5a623]/60">
+                  Mic test
+                </p>
                 <p className="mt-1 text-[12px] leading-relaxed text-[#c8a870]/60">
-                  Listen to your own voice and watch the input level move in real time.
+                  Listen to your own voice and watch the input level move in
+                  real time.
                 </p>
               </div>
               <button
@@ -229,10 +342,17 @@ export function MeetingSetupPage() {
             </p>
           </div>
 
-          <audio ref={monitorAudioRef} autoPlay playsInline className="hidden" />
+          <audio
+            ref={monitorAudioRef}
+            autoPlay
+            playsInline
+            className="hidden"
+          />
 
           <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#f5a623]/60">Before you continue</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#f5a623]/60">
+              Before you continue
+            </p>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {[
                 "Frame your face in the center of the preview.",
@@ -240,7 +360,10 @@ export function MeetingSetupPage() {
                 "Invite teammates now or share the room after joining.",
                 "Network drops will not affect local capture quality.",
               ].map((tip) => (
-                <div key={tip} className="rounded-xl border border-white/7 bg-black/18 px-3 py-3 text-[12px] leading-5 text-[#fff5de]/78">
+                <div
+                  key={tip}
+                  className="rounded-xl border border-white/7 bg-black/18 px-3 py-3 text-[12px] leading-5 text-[#fff5de]/78"
+                >
                   {tip}
                 </div>
               ))}
@@ -256,15 +379,24 @@ export function MeetingSetupPage() {
               { label: "Mic detected", ok: micDevices.length > 0 },
               { label: "Local recording", ok: true },
             ].map(({ label, ok }) => (
-              <div key={label} className="flex items-center gap-1.5 text-[11px] text-[#b49650]/60">
-                <span className={["size-1.5 rounded-full", ok ? "bg-green-400/80" : "bg-red-400/70"].join(" ")} />
+              <div
+                key={label}
+                className="flex items-center gap-1.5 text-[11px] text-[#b49650]/60"
+              >
+                <span
+                  className={[
+                    "size-1.5 rounded-full",
+                    ok ? "bg-green-400/80" : "bg-red-400/70",
+                  ].join(" ")}
+                />
                 {label}
               </div>
             ))}
           </div>
 
           <p className="rounded-xl border border-[#f5a623]/10 bg-[#f5a623]/6 px-3.5 py-2.5 text-[11px] leading-relaxed text-[#c8a870]/60">
-            Recording happens locally on each device — network quality never affects your audio or video.
+            Recording happens locally on each device — network quality never
+            affects your audio or video.
           </p>
         </div>
       </motion.div>
@@ -280,7 +412,13 @@ type DeviceSelectProps = {
   onChange: (id: string) => void;
 };
 
-function DeviceSelect({ icon, label, devices, value, onChange }: DeviceSelectProps) {
+function DeviceSelect({
+  icon,
+  label,
+  devices,
+  value,
+  onChange,
+}: DeviceSelectProps) {
   const hasDevices = devices.length > 0;
 
   return (
@@ -291,16 +429,30 @@ function DeviceSelect({ icon, label, devices, value, onChange }: DeviceSelectPro
       </p>
       <Select value={value} onValueChange={onChange} disabled={!hasDevices}>
         <SelectTrigger className="h-11 w-full rounded-xl border border-white/8 bg-white/4 px-3 text-[12px] font-medium text-[#fff5de]/80 shadow-none outline-none transition focus-visible:border-[#f5a623]/45 focus-visible:ring-2 focus-visible:ring-[#f5a623]/20">
-          <SelectValue placeholder={hasDevices ? `Select ${label.toLowerCase()}` : `No ${label.toLowerCase()} found`} />
+          <SelectValue
+            placeholder={
+              hasDevices
+                ? `Select ${label.toLowerCase()}`
+                : `No ${label.toLowerCase()} found`
+            }
+          />
         </SelectTrigger>
         <SelectContent className="border border-[#f5a623]/12 bg-[#100e09] text-[#fff5de] shadow-xl">
           {devices.map((device) => (
-            <SelectItem key={device.deviceId} value={device.deviceId} className="text-[12px] focus:bg-[#f5a623]/12 focus:text-[#fff5de]">
+            <SelectItem
+              key={device.deviceId}
+              value={device.deviceId}
+              className="text-[12px] focus:bg-[#f5a623]/12 focus:text-[#fff5de]"
+            >
               {device.label || `${label} ${device.deviceId.slice(0, 6)}`}
             </SelectItem>
           ))}
           {!hasDevices && (
-            <SelectItem value="none" disabled className="text-[12px] text-[#b49650]/55">
+            <SelectItem
+              value="none"
+              disabled
+              className="text-[12px] text-[#b49650]/55"
+            >
               No {label.toLowerCase()} found
             </SelectItem>
           )}

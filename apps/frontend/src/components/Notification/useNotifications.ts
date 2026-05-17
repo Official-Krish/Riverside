@@ -9,7 +9,11 @@ import type { JoinMeetingResponse } from "@repo/types/api";
 
 export const notificationsQueryKey = ["notifications"];
 
-export function useNotifications(isAuthenticated: boolean, name?: string, navigate?: (url: string) => void) {
+export function useNotifications(
+  isAuthenticated: boolean,
+  name?: string,
+  navigate?: (url: string) => void,
+) {
   const queryClient = useQueryClient();
   const [activeFilter, setActiveFilter] = useState<Filter>("All");
   const displayName = name?.trim() || "Guest";
@@ -27,9 +31,13 @@ export function useNotifications(isAuthenticated: boolean, name?: string, naviga
     mutationFn: api.markRead,
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: notificationsQueryKey });
-      const prev = queryClient.getQueryData<Notification[]>(notificationsQueryKey);
-      queryClient.setQueryData<Notification[]>(notificationsQueryKey, (old = []) =>
-        old.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+      const prev = queryClient.getQueryData<Notification[]>(
+        notificationsQueryKey,
+      );
+      queryClient.setQueryData<Notification[]>(
+        notificationsQueryKey,
+        (old = []) =>
+          old.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
       );
       return { prev };
     },
@@ -37,18 +45,23 @@ export function useNotifications(isAuthenticated: boolean, name?: string, naviga
       queryClient.setQueryData(notificationsQueryKey, ctx?.prev);
       toast.error("Failed to mark notification as read");
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: notificationsQueryKey }),
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: notificationsQueryKey }),
   });
 
   const markAllRead = useMutation({
     mutationFn: api.markAllRead,
     onMutate: async (notificationIds) => {
       await queryClient.cancelQueries({ queryKey: notificationsQueryKey });
-      const prev = queryClient.getQueryData<Notification[]>(notificationsQueryKey);
-      queryClient.setQueryData<Notification[]>(notificationsQueryKey, (old = []) =>
-        old.map((n) =>
-          notificationIds.includes(n.id) ? { ...n, isRead: true } : n
-        )
+      const prev = queryClient.getQueryData<Notification[]>(
+        notificationsQueryKey,
+      );
+      queryClient.setQueryData<Notification[]>(
+        notificationsQueryKey,
+        (old = []) =>
+          old.map((n) =>
+            notificationIds.includes(n.id) ? { ...n, isRead: true } : n,
+          ),
       );
       return { prev };
     },
@@ -56,16 +69,20 @@ export function useNotifications(isAuthenticated: boolean, name?: string, naviga
       queryClient.setQueryData(notificationsQueryKey, ctx?.prev);
       toast.error("Failed to mark notifications as read");
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: notificationsQueryKey }),
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: notificationsQueryKey }),
   });
 
   const deleteNotif = useMutation({
     mutationFn: api.deleteNotification,
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: notificationsQueryKey });
-      const prev = queryClient.getQueryData<Notification[]>(notificationsQueryKey);
-      queryClient.setQueryData<Notification[]>(notificationsQueryKey, (old = []) =>
-        old.filter((n) => n.id !== id)
+      const prev = queryClient.getQueryData<Notification[]>(
+        notificationsQueryKey,
+      );
+      queryClient.setQueryData<Notification[]>(
+        notificationsQueryKey,
+        (old = []) => old.filter((n) => n.id !== id),
       );
       return { prev };
     },
@@ -73,21 +90,26 @@ export function useNotifications(isAuthenticated: boolean, name?: string, naviga
       queryClient.setQueryData(notificationsQueryKey, ctx?.prev);
       toast.error("Failed to delete notification");
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: notificationsQueryKey }),
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: notificationsQueryKey }),
   });
 
   const acceptRecording = useMutation({
     mutationFn: api.approveRecordingRequest,
     onSuccess: async (_d, vars) => {
       await api.deleteNotification(vars.notificationId);
-      queryClient.setQueryData<Notification[]>(notificationsQueryKey, (old = []) =>
-        old.filter((n) => n.id !== vars.notificationId)
+      queryClient.setQueryData<Notification[]>(
+        notificationsQueryKey,
+        (old = []) => old.filter((n) => n.id !== vars.notificationId),
       );
       toast.success("Recording access approved");
     },
     onError: (error) =>
-      toast.error(getHttpErrorMessage(error, "Could not approve recording access")),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: notificationsQueryKey }),
+      toast.error(
+        getHttpErrorMessage(error, "Could not approve recording access"),
+      ),
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: notificationsQueryKey }),
   });
 
   const acceptInvite = useMutation({
@@ -98,7 +120,12 @@ export function useNotifications(isAuthenticated: boolean, name?: string, naviga
     }: {
       targetId: string;
       notifId: string;
-      devices: { micId?: string; cameraId?: string };
+      devices: {
+        micId?: string;
+        cameraId?: string;
+        initialMicOff?: boolean;
+        initialVideoOff?: boolean;
+      };
     }) => api.acceptMeetingInvite(targetId),
     onSuccess: (response, vars) => {
       markRead.mutate(vars.notifId);
@@ -117,7 +144,9 @@ export function useNotifications(isAuthenticated: boolean, name?: string, naviga
           recordingState: data.recordingState === "RECORDING",
           micId: vars.devices.micId,
           cameraId: vars.devices.cameraId,
-        })
+          initialMicOff: vars.devices.initialMicOff,
+          initialVideoOff: vars.devices.initialVideoOff,
+        }),
       );
     },
     onError: (error) =>
@@ -128,14 +157,18 @@ export function useNotifications(isAuthenticated: boolean, name?: string, naviga
     mutationFn: api.denyRecordingRequest,
     onSuccess: async (_d, vars) => {
       await api.deleteNotification(vars.notificationId);
-      queryClient.setQueryData<Notification[]>(notificationsQueryKey, (old = []) =>
-        old.filter((n) => n.id !== vars.notificationId)
+      queryClient.setQueryData<Notification[]>(
+        notificationsQueryKey,
+        (old = []) => old.filter((n) => n.id !== vars.notificationId),
       );
       toast.success("Recording request declined");
     },
     onError: (error) =>
-      toast.error(getHttpErrorMessage(error, "Could not decline recording request")),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: notificationsQueryKey }),
+      toast.error(
+        getHttpErrorMessage(error, "Could not decline recording request"),
+      ),
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: notificationsQueryKey }),
   });
 
   return {

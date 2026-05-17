@@ -5,6 +5,8 @@ export function buildMeetingLivePath(args: {
   recordingState?: boolean;
   micId?: string;
   cameraId?: string;
+  initialMicOff?: boolean;
+  initialVideoOff?: boolean;
 }) {
   const params = new URLSearchParams({
     name: args.name || (args.role === "host" ? "Host" : "Guest"),
@@ -21,6 +23,14 @@ export function buildMeetingLivePath(args: {
 
   if (args.cameraId) {
     params.set("cameraId", args.cameraId);
+  }
+
+  if (args.initialMicOff) {
+    params.set("micOff", "true");
+  }
+
+  if (args.initialVideoOff) {
+    params.set("videoOff", "true");
   }
 
   return `/meeting/live/${args.roomId}?${params.toString()}`;
