@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: weave-frontend
-          image: krishanand01/weave-frontend:v1
+          image: krishanand01/weave-frontend:v1.1
           imagePullPolicy: Always
           ports:
             - containerPort: 80
@@ -88,7 +88,7 @@ spec:
     spec:
       containers:
         - name: weave-backend
-          image: krishanand01/weave-backend:v1
+          image: krishanand01/weave-backend:v1.1
           imagePullPolicy: Always
 
           ports:
@@ -144,7 +144,7 @@ spec:
 
       containers:
         - name: weave-merger-worker
-          image: krishanand01/weave-merger-worker:v1
+          image: krishanand01/weave-merger-worker:v1.1
           imagePullPolicy: Always
 
           resources:
@@ -264,7 +264,7 @@ spec:
 
       containers:
         - name: weave-transcoder
-          image: krishanand01/weave-transcoder:v1
+          image: krishanand01/weave-transcoder:v1.1
           imagePullPolicy: Always
 
           resources:
@@ -322,7 +322,7 @@ spec:
     spec:
       containers:
         - name: weave-ws-relayer
-          image: krishanand01/weave-ws-relayer:v1
+          image: krishanand01/weave-ws-relayer:v1.1
           imagePullPolicy: Always
 
           ports:

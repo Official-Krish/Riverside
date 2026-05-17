@@ -17,7 +17,7 @@
     "@types/bun": "latest",
     "@repo/db": "workspace:*",
     "@repo/amazons3": "workspace:*",
-    "vitest": "^1.0.0"
+    "vitest": "^4.1.6"
   },
   "peerDependencies": {
     "typescript": "^5"
