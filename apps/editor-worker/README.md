@@ -5,6 +5,7 @@ A background worker service for processing video editor projects, handling expor
 ## Overview
 
 The editor-worker handles:
+
 - Export job processing (video rendering)
 - Transition effects rendering
 - Overlay rendering (text, images, shapes)
@@ -21,7 +22,9 @@ The editor-worker handles:
 ## Key Features
 
 ### Export Jobs
+
 Processes video export requests:
+
 1. Load project tracks, clips, and overlays
 2. Generate frames using Konva canvas
 3. Apply transitions between clips
@@ -30,18 +33,23 @@ Processes video export requests:
 6. Upload to S3 and report status
 
 ### Timeline System
+
 - **Track Types**: Video, Audio, Text
 - **Clips**: Segments from source assets with timeline positioning
 - **Overlays**: Non-destructive visual elements
 
 ### Transitions
+
 Supported transitions between clips:
+
 - **Fade**: Cross-fade between clips
 - **Cut**: Immediate cut (no transition)
 - Custom transitions via TransitionRenderer
 
 ### Presets
+
 Built-in visual effects:
+
 - `zoom-pop` - Zoom animation with pop
 - `shake` - Screen shake effect
 - `glitch` - Digital glitch effect
@@ -56,6 +64,7 @@ Built-in visual effects:
 - `chapter-title` - Chapter marker
 
 ### Asset Management
+
 - Source assets from meeting recordings
 - Waveform generation for audio
 - Thumbnail generation for preview
@@ -137,14 +146,14 @@ CONCURRENCY=4
 
 ## Configuration
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `CONCURRENCY` | 4 | Number of concurrent export jobs |
-| `QUEUE_NAME` | "EditorExport" | Redis queue name |
-| `FFMPEG_BIN` | "ffmpeg" | FFmpeg binary path |
-| `OUTPUT_WIDTH` | 1920 | Default export width |
-| `OUTPUT_HEIGHT` | 1080 | Default export height |
-| `OUTPUT_FPS` | 30 | Default frame rate |
+| Variable        | Default        | Description                      |
+| --------------- | -------------- | -------------------------------- |
+| `CONCURRENCY`   | 4              | Number of concurrent export jobs |
+| `QUEUE_NAME`    | "EditorExport" | Redis queue name                 |
+| `FFMPEG_BIN`    | "ffmpeg"       | FFmpeg binary path               |
+| `OUTPUT_WIDTH`  | 1920           | Default export width             |
+| `OUTPUT_HEIGHT` | 1080           | Default export height            |
+| `OUTPUT_FPS`    | 30             | Default frame rate               |
 
 ## Performance
 
@@ -152,3 +161,82 @@ CONCURRENCY=4
 - Canvas-based rendering for flexibility
 - Efficient frame caching
 - Progress reporting during export
+
+## Tests
+
+Comprehensive test suite covering FFmpeg operations, effects, and worker integration.
+
+### Test Files
+
+**Integration Tests (with REAL_FFMPEG):**
+
+- `ffmpeg.real.test.ts` — Basic FFmpeg video generation and transcoding
+- `ffmpeg.fullflow.test.ts` — Full video+audio composition with all effects
+- `ffmpeg.worker.integration.test.ts` — End-to-end worker job processing
+- `ffmpeg.overlays.test.ts` — Text and image overlay compositing
+- `ffmpeg.transitions.test.ts` — XFade transition crossfades
+- `ffmpeg.chromakey.test.ts` — Green screen chroma key removal
+- `ffmpeg.lut.test.ts` — LUT 3D color grading
+- `ffmpeg.speed.test.ts` — Speed ramps and variable playback
+- `ffmpeg.blur.test.ts` — Blur and selective focus effects
+- `ffmpeg.colorgrade.test.ts` — Color grading (EQ, hue, channel mixer)
+- `ffmpeg.audio.test.ts` — Audio normalization, filtering, compression
+
+**Unit Tests:**
+
+- `processRender.flow.test.ts` — Render flow logic
+- `unit.flow.test.ts` — Overlay generation, speed graph, concatenation
+- `more.flow.test.ts` — Color normalization, audio mixing, LUT generation
+
+### Running Tests
+
+**Full effect test suite (with real FFmpeg):**
+
+```bash
+cd apps/editor-worker
+REAL_FFMPEG=1 LOCAL_ONLY=1 NODE_ENV=test bunx vitest src/__tests__/ffmpeg.*.test.ts --run
+```
+
+**All tests (unit + integration):**
+
+```bash
+cd apps/editor-worker
+NODE_ENV=test bunx vitest --run
+```
+
+**Specific test file:**
+
+```bash
+cd apps/editor-worker
+REAL_FFMPEG=1 LOCAL_ONLY=1 NODE_ENV=test bunx vitest src/__tests__/ffmpeg.fullflow.test.ts --run
+```
+
+### Test Environment Variables
+
+| Variable              | Impact                                                   |
+| --------------------- | -------------------------------------------------------- |
+| `REAL_FFMPEG=1`       | Use real FFmpeg binary instead of mocked short-circuit   |
+| `LOCAL_ONLY=1`        | Use local disk (recordings/local_s3) instead of S3       |
+| `NODE_ENV=test`       | Enable test mode with stub Prisma (no database required) |
+| `FORCE_FFMPEG_FAIL=1` | Inject FFmpeg failures for retry testing                 |
+
+### Test Coverage
+
+Tests validate:
+
+- ✅ FFmpeg filter syntax and stream handling
+- ✅ Audio/video stream combinations and guards
+- ✅ File path handling and special characters
+- ✅ Timeline math and clip positioning
+- ✅ Color encoding and normalization
+- ✅ Effect application and parameter validation
+- ✅ Transition rendering and blending
+- ✅ Audio processing and mixing
+- ✅ Full end-to-end job processing
+- ✅ Local storage and file operations
+
+Tests do NOT cover (by design—Prisma is stubbed):
+
+- Database constraint validation
+- Complex query logic (minimal in this codebase)
+- Transaction isolation issues

@@ -15,14 +15,21 @@ import {
 } from "@repo/amazons3";
 import { GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 
-const storage = resolveStorageContext();
+const LOCAL_ONLY = process.env.LOCAL_ONLY === "1";
+
+let storage: any = undefined;
+if (!LOCAL_ONLY) {
+  storage = resolveStorageContext();
+}
+
+const LOCAL_S3_ROOT = path.resolve(process.cwd(), "../../recordings/local_s3");
 
 export function normalizeS3Key(value: string) {
   return sharedNormalizeS3Key(value);
 }
 
 export function getCdnBaseUrl() {
-  return storage.cdnBaseUrl;
+  return storage?.cdnBaseUrl;
 }
 
 export function keyToCdnUrl(key: string) {
@@ -44,6 +51,14 @@ export function extractS3Key(value: string | null | undefined): string | null {
  */
 async function streamS3ToLocal(key: string, localPath: string): Promise<void> {
   const normalizedKey = normalizeS3Key(key);
+  if (LOCAL_ONLY) {
+    // In local-only mode, treat LOCAL_S3_ROOT as the S3 root and copy from there
+    const localS3Path = path.join(LOCAL_S3_ROOT, normalizedKey);
+    await fs.mkdir(path.dirname(localPath), { recursive: true });
+    await fs.copyFile(localS3Path, localPath);
+    return;
+  }
+
   const response = await storage.s3Client.send(
     new GetObjectCommand({
       Bucket: storage.bucketName,
@@ -102,11 +117,19 @@ export async function uploadLocalFileToS3(
   key: string,
   contentType?: string,
 ) {
+  const norm = normalizeS3Key(key);
+  if (LOCAL_ONLY) {
+    const dest = path.join(LOCAL_S3_ROOT, norm);
+    await fs.mkdir(path.dirname(dest), { recursive: true });
+    await fs.copyFile(localPath, dest);
+    return;
+  }
+
   const body = await fs.readFile(localPath);
   await putObjectToS3({
     s3Client: storage.s3Client,
     bucketName: storage.bucketName,
-    key: normalizeS3Key(key),
+    key: norm,
     body,
     contentType,
   });
@@ -117,11 +140,22 @@ export async function uploadLocalFileToS3(
  * Returns the ContentLength in bytes, or null if the object doesn't exist.
  */
 export async function getS3ObjectSize(key: string): Promise<number | null> {
+  const norm = normalizeS3Key(key);
+  if (LOCAL_ONLY) {
+    try {
+      const p = path.join(LOCAL_S3_ROOT, norm);
+      const s = await fs.stat(p);
+      return s.size;
+    } catch {
+      return null;
+    }
+  }
+
   try {
     const response = await storage.s3Client.send(
       new HeadObjectCommand({
         Bucket: storage.bucketName,
-        Key: normalizeS3Key(key),
+        Key: norm,
       }),
     );
     return response.ContentLength ?? null;
@@ -131,17 +165,31 @@ export async function getS3ObjectSize(key: string): Promise<number | null> {
 }
 
 export async function deleteObjectFromS3(key: string) {
+  const norm = normalizeS3Key(key);
+  if (LOCAL_ONLY) {
+    const p = path.join(LOCAL_S3_ROOT, norm);
+    await fs.rm(p, { force: true }).catch(() => {});
+    return;
+  }
+
   await sharedDeleteObjectFromS3({
     s3Client: storage.s3Client,
     bucketName: storage.bucketName,
-    key: normalizeS3Key(key),
+    key: norm,
   });
 }
 
 export async function deleteS3Prefix(prefix: string) {
+  const norm = normalizeS3Key(prefix);
+  if (LOCAL_ONLY) {
+    const dir = path.join(LOCAL_S3_ROOT, norm);
+    await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    return;
+  }
+
   await sharedDeletePrefixFromS3({
     s3Client: storage.s3Client,
     bucketName: storage.bucketName,
-    prefix: normalizeS3Key(prefix),
+    prefix: norm,
   });
 }

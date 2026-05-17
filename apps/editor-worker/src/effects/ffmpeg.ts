@@ -1,6 +1,7 @@
 import type { RenderClip } from "../types";
 import type { ClipEffects, SpeedPoint } from "./types";
 import { hasEnabledClipEffects, normalizeClipEffects } from "./normalize";
+import { normalizeFfmpegColor } from "../ffmpegUtils";
 
 type VisualGraphBuildResult = {
   filterParts: string[];
@@ -24,7 +25,7 @@ function nextLabel(prefix: string, indexRef: { value: number }) {
 }
 
 function toFfmpegColor(color: string) {
-  return `0x${color.replace("#", "")}`;
+  return normalizeFfmpegColor(color, "000000");
 }
 
 function escapePath(filePath: string) {
@@ -287,7 +288,11 @@ export function buildVisualEffectsGraph(
   if (effects.chromaKey.enabled) {
     const out = nextLabel(labelPrefix, labelIndex);
     filterParts.push(
-      `[${current}]format=rgba,colorkey=${toFfmpegColor(effects.chromaKey.color)}:${clamp(effects.chromaKey.similarity, 0, 1).toFixed(3)}:${clamp(effects.chromaKey.blend, 0, 1).toFixed(3)}[${current}fg]`,
+      `[${current}]format=rgba,colorkey=${toFfmpegColor(
+        effects.chromaKey.color,
+      )}:${clamp(effects.chromaKey.similarity, 0, 1).toFixed(
+        3,
+      )}:${clamp(effects.chromaKey.blend, 0, 1).toFixed(3)}[${current}fg]`,
     );
     const backgroundColor =
       effects.chromaKey.backgroundMode === "solid"
@@ -316,6 +321,7 @@ export function buildSpeedGraph(
   clip: RenderClip,
   labelPrefix: string,
 ): SpeedGraphBuildResult {
+  const hasAudio = Boolean((clip as any).hasAudio);
   const effects = normalizeClipEffects(clip.effects);
   const filterParts: string[] = [];
   const videoLabels: string[] = [];
@@ -368,21 +374,28 @@ export function buildSpeedGraph(
       );
       videoLabels.push(`[${label}]`);
 
-      if (effects.speed.preservePitch) {
-        const aLabel = `${labelPrefix}ma${segmentIndex}`;
-        filterParts.push(
-          `[0:a]atrim=start=${(cursorSourceMs / 1000).toFixed(3)}:duration=${(actualSourceDurationMs / 1000).toFixed(3)},` +
-            `${buildAtempoChain(speed)},asetpts=PTS-STARTPTS[${aLabel}]`,
-        );
-        audioLabels.push(`[${aLabel}]`);
+      const aLabel = `${labelPrefix}ma${segmentIndex}`;
+      if (hasAudio) {
+        if (effects.speed.preservePitch) {
+          filterParts.push(
+            `[0:a]atrim=start=${(cursorSourceMs / 1000).toFixed(3)}:duration=${(actualSourceDurationMs / 1000).toFixed(3)},` +
+              `${buildAtempoChain(speed)},asetpts=PTS-STARTPTS[${aLabel}]`,
+          );
+        } else {
+          filterParts.push(
+            `[0:a]atrim=start=${(cursorSourceMs / 1000).toFixed(3)}:duration=${(actualSourceDurationMs / 1000).toFixed(3)},` +
+              `asetrate=48000*${speed.toFixed(5)},aresample=48000,asetpts=PTS-STARTPTS[${aLabel}]`,
+          );
+        }
       } else {
-        const aLabel = `${labelPrefix}ma${segmentIndex}`;
+        // Source has no audio — synthesize silence for the required duration
         filterParts.push(
-          `[0:a]atrim=start=${(cursorSourceMs / 1000).toFixed(3)}:duration=${(actualSourceDurationMs / 1000).toFixed(3)},` +
-            `asetrate=48000*${speed.toFixed(5)},aresample=48000,asetpts=PTS-STARTPTS[${aLabel}]`,
+          `anullsrc=r=48000:cl=stereo,atrim=duration=${(
+            actualSourceDurationMs / 1000
+          ).toFixed(3)},asetpts=PTS-STARTPTS[${aLabel}]`,
         );
-        audioLabels.push(`[${aLabel}]`);
       }
+      audioLabels.push(`[${aLabel}]`);
 
       cursorSourceMs = sourceEndMs;
       segmentIndex += 1;

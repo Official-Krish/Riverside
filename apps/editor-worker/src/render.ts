@@ -4,7 +4,7 @@ import { prisma } from "@repo/db/client";
 import type { RenderPayload } from "./types";
 import { log } from "./logger";
 import { CONFIG } from "./config";
-import { recordingsRoot, ensureDir, runBinary } from "./helpers";
+import { recordingsRoot, ensureDir, runBinaryWithRetries } from "./helpers";
 import { verifySourceExists, updateProgress } from "./utils";
 import { collectRenderClips } from "./clips";
 import {
@@ -101,6 +101,7 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
   ]);
 
   const sourceMap = new Map<string, string>();
+  const sourceHasAudio = new Map<string, boolean>();
 
   await Promise.all(
     [...sourcePaths].map(async (sourcePath) => {
@@ -111,6 +112,15 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
         );
         sourceMap.set(sourcePath, resolved);
         await verifySourceExists(resolved);
+        try {
+          const hasAudio = await (
+            await import("./ffmpegUtils")
+          ).hasAudioStream(resolved);
+          sourceHasAudio.set(sourcePath, Boolean(hasAudio));
+        } catch (_err: any) {
+          // If probing fails, assume no audio to avoid FFmpeg filter errors.
+          sourceHasAudio.set(sourcePath, false);
+        }
       } catch (err: any) {
         log("error", "Failed to resolve source", {
           jobId,
@@ -125,6 +135,7 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
   const resolvedVideoClipsBase = videoClips.map((clip) => ({
     ...clip,
     sourcePath: sourceMap.get(clip.sourcePath) || clip.sourcePath,
+    hasAudio: sourceHasAudio.get(clip.sourcePath) ?? false,
   }));
 
   const resolvedAudioClips = audioClips.map((clip) => ({
@@ -139,7 +150,7 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
 
   const firstClip = resolvedVideoClipsBase[0]!;
 
-  await runBinary(CONFIG.FFMPEG_BIN, [
+  await runBinaryWithRetries(CONFIG.FFMPEG_BIN, [
     "-y",
     "-ss",
     (firstClip.sourceStartMs / 1000).toFixed(3),
@@ -182,7 +193,7 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
     if (resolvedVideoClips.length === 1) {
       const c = resolvedVideoClips[0]!;
       const args = buildClipRenderArgs(c, videoOnlyPath, width, height, fps);
-      await runBinary(CONFIG.FFMPEG_BIN, args);
+      await runBinaryWithRetries(CONFIG.FFMPEG_BIN, args);
 
       const videoOnlyStats = await fs.stat(videoOnlyPath);
       log("info", "Video encoding complete", {
@@ -196,6 +207,7 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
     } else {
       const clipParts: Array<{
         path: string;
+        durationMs: number;
         transition?: { type: string; durationMs: number } | null;
       }> = [];
       for (let i = 0; i < resolvedVideoClips.length; i++) {
@@ -205,7 +217,7 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
         const args = buildClipRenderArgs(c, partPath, width, height, fps);
 
         try {
-          await runBinary(CONFIG.FFMPEG_BIN, args);
+          await runBinaryWithRetries(CONFIG.FFMPEG_BIN, args);
         } catch (err: any) {
           log("error", `Failed to encode part ${i + 1}`, {
             jobId,
@@ -218,16 +230,14 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
         const nextClip = resolvedVideoClips[i + 1];
         const transition = nextClip
           ? (getTransitionPlan(c, "end") ??
-            (getTransitionPlan(nextClip, "start")
-              ? {
-                  type: (nextClip.transitionIn as string) ?? "fade",
-                  durationMs:
-                    (nextClip.transitionStart as any)?.durationMs ?? 500,
-                }
-              : null))
+            getTransitionPlan(nextClip, "start"))
           : null;
 
-        clipParts.push({ path: partPath, transition });
+        clipParts.push({
+          path: partPath,
+          durationMs: c.durationMs,
+          transition,
+        });
         tempFiles.push(partPath);
         await updateProgress(
           jobId,
@@ -242,7 +252,7 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
       );
       if (crossfadeResult) {
         try {
-          await runBinary(CONFIG.FFMPEG_BIN, crossfadeResult.args);
+          await runBinaryWithRetries(CONFIG.FFMPEG_BIN, crossfadeResult.args);
         } catch (err: any) {
           log("error", "Crossfade concat failed", { jobId, err: err.message });
           throw err;
@@ -254,7 +264,7 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
         );
         concatListPath = listPath;
         try {
-          await runBinary(CONFIG.FFMPEG_BIN, args);
+          await runBinaryWithRetries(CONFIG.FFMPEG_BIN, args);
         } catch (err: any) {
           log("error", "Simple concat failed", { jobId, err: err.message });
           throw err;
@@ -294,7 +304,7 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
         height,
       );
       try {
-        await runBinary(CONFIG.FFMPEG_BIN, overlayArgs);
+        await runBinaryWithRetries(CONFIG.FFMPEG_BIN, overlayArgs);
       } catch (err: any) {
         log("error", "Overlay burn-in failed", { jobId, err: err.message });
         throw err;
@@ -311,7 +321,7 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
         resolvedAudioClips,
         outputPath,
       );
-      await runBinary(CONFIG.FFMPEG_BIN, mixArgs);
+      await runBinaryWithRetries(CONFIG.FFMPEG_BIN, mixArgs);
       await updateProgress(jobId, 98);
       // Clean up intermediate files (will be skipped in finally block)
       await fs.rm(videoOnlyPath, { force: true });

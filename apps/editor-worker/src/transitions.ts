@@ -331,6 +331,7 @@ export function buildClipRenderArgs(
 export function buildCrossfadeConcatArgs(
   parts: Array<{
     path: string;
+    durationMs: number;
     transition?: { type: string; durationMs: number } | null;
   }>,
   outputPath: string,
@@ -340,55 +341,53 @@ export function buildCrossfadeConcatArgs(
 
   const args = ["-y"];
   const filterParts: string[] = [];
-  const inputLabels: string[] = [];
-  let inputIndex = 0;
 
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i]!;
     args.push("-i", part.path);
-    filterParts.push(`[${inputIndex}:v]setpts=PTS-STARTPTS[v${inputIndex}]`);
-    inputLabels.push(`[v${inputIndex}]`);
-    inputIndex += 1;
+    filterParts.push(`[${i}:v:0]setpts=PTS-STARTPTS[v${i}]`);
   }
 
-  if (parts.length === 2) {
-    const transition = parts[0]!.transition;
-    if (transition) {
-      const fadeType = getXFadeTransition(transition.type);
-      const durationSec = (transition.durationMs / 1000).toFixed(3);
-      const offset = Math.max(0, (0 - transition.durationMs) / 1000).toFixed(3);
-      args.push(
-        "-filter_complex",
-        `${inputLabels.join("")}xfade=transition=${fadeType}:duration=${durationSec}:offset=${offset}[vout]`,
-        "-map",
-        "[vout]",
+  // Chain pairwise transitions left-to-right.
+  // Example for 3 clips: [v0]+[v1] -> [x0], then [x0]+[v2] -> [vout]
+  let currentLabel = "v0";
+  let currentDurationMs = Math.max(1, parts[0]!.durationMs);
+  for (let i = 0; i < parts.length - 1; i++) {
+    const currentTransition = parts[i]!.transition;
+    const nextDurationMs = Math.max(1, parts[i + 1]!.durationMs);
+    const nextLabel = `v${i + 1}`;
+    const outLabel = i === parts.length - 2 ? "vout" : `x${i}`;
+
+    if (currentTransition) {
+      const fadeType = getXFadeTransition(currentTransition.type);
+      const maxTransitionMs = Math.max(
+        100,
+        Math.min(currentDurationMs - 1, nextDurationMs - 1),
       );
+      const transitionMs = Math.min(
+        currentTransition.durationMs,
+        maxTransitionMs,
+      );
+      const durationSec = (transitionMs / 1000).toFixed(3);
+      const offsetSec = Math.max(
+        0,
+        (currentDurationMs - transitionMs) / 1000,
+      ).toFixed(3);
+      filterParts.push(
+        `[${currentLabel}][${nextLabel}]xfade=transition=${fadeType}:duration=${durationSec}:offset=${offsetSec}[${outLabel}]`,
+      );
+      currentDurationMs = currentDurationMs + nextDurationMs - transitionMs;
     } else {
-      args.push(
-        "-filter_complex",
-        `${inputLabels.join("")}concat=n=2:v=1:a=0[vout]`,
-        "-map",
-        "[vout]",
+      filterParts.push(
+        `[${currentLabel}][${nextLabel}]concat=n=2:v=1:a=0[${outLabel}]`,
       );
-    }
-  } else {
-    for (let i = 0; i < parts.length - 1; i++) {
-      const currentTransition = parts[i]!.transition;
-      if (currentTransition) {
-        const fadeType = getXFadeTransition(currentTransition.type);
-        const durationSec = (currentTransition.durationMs / 1000).toFixed(3);
-        filterParts.push(
-          `[v${i}][v${i + 1}]xfade=transition=${fadeType}:duration=${durationSec}:offset=0[v${i}_faded]`,
-        );
-      } else {
-        filterParts.push(`[v${i}][v${i + 1}]concat=v=1:a=0[n${i}]`);
-      }
+      currentDurationMs += nextDurationMs;
     }
 
-    const lastLabel =
-      parts.length === 2 ? "[vout]" : `[v${parts.length - 2}_faded]`;
-    args.push("-filter_complex", filterParts.join(";"), "-map", lastLabel);
+    currentLabel = outLabel;
   }
+
+  args.push("-filter_complex", filterParts.join(";"), "-map", "[vout]");
 
   args.push(
     "-r",

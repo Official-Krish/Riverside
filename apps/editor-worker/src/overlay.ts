@@ -1,15 +1,28 @@
 import { sanitizeDrawtext, normalizeHexColor } from "./utils";
+import {
+  normalizeFfmpegColor,
+  formatFfmpegColorWithAlpha,
+} from "./ffmpegUtils";
 
 function applyTextTransform(text: string, transform: string): string {
   switch (transform) {
-    case "uppercase": return text.toUpperCase();
-    case "lowercase": return text.toLowerCase();
-    case "capitalize": return text.replace(/\b\w/g, (c) => c.toUpperCase());
-    default: return text;
+    case "uppercase":
+      return text.toUpperCase();
+    case "lowercase":
+      return text.toLowerCase();
+    case "capitalize":
+      return text.replace(/\b\w/g, (c) => c.toUpperCase());
+    default:
+      return text;
   }
 }
 
-function estimateWrappedText(text: string, maxWidth: number | undefined, fontSize: number, letterSpacing: number): string {
+function estimateWrappedText(
+  text: string,
+  maxWidth: number | undefined,
+  fontSize: number,
+  letterSpacing: number,
+): string {
   if (!maxWidth || maxWidth <= 0) return text;
 
   const approxCharWidth = Math.max(1, fontSize * 0.58 + letterSpacing);
@@ -41,14 +54,8 @@ function estimateWrappedText(text: string, maxWidth: number | undefined, fontSiz
 function buildSingleOverlayFilter(o: any, timelineOffsetMs = 0): string | null {
   let text = o.content?.text ?? "";
   if (!text) {
-    
     return null;
   }
-
-  
-  
-  
-  
 
   const textTransform = o.style?.textTransform || "none";
   text = applyTextTransform(text, textTransform);
@@ -61,7 +68,12 @@ function buildSingleOverlayFilter(o: any, timelineOffsetMs = 0): string | null {
   const fontSize = Number.isFinite(style.fontSize) ? style.fontSize : 24;
   const letterSpacing = Number(style.letterSpacing) || 0;
 
-  text = estimateWrappedText(text, Number(style.maxWidth), fontSize, letterSpacing);
+  text = estimateWrappedText(
+    text,
+    Number(style.maxWidth),
+    fontSize,
+    letterSpacing,
+  );
   text = sanitizeDrawtext(text).replace(/\r?\n/g, "\\n");
   if (!text) return null;
 
@@ -72,7 +84,10 @@ function buildSingleOverlayFilter(o: any, timelineOffsetMs = 0): string | null {
   const textAlign = style.textAlign || "left";
 
   const startSec = ((o.timelineStartMs - timelineOffsetMs) / 1000).toFixed(3);
-  const endSec = ((o.timelineStartMs + o.durationMs - timelineOffsetMs) / 1000).toFixed(3);
+  const endSec = (
+    (o.timelineStartMs + o.durationMs - timelineOffsetMs) /
+    1000
+  ).toFixed(3);
 
   let xValue: string;
   if (textAlign === "center") {
@@ -83,12 +98,13 @@ function buildSingleOverlayFilter(o: any, timelineOffsetMs = 0): string | null {
     xValue = `${positionX}`;
   }
 
-  const textOpacity = Number.isFinite(style.opacity) ? Math.max(0, Math.min(1, Number(style.opacity))) : 1;
-  const textAlphaHex = Math.round(textOpacity * 255).toString(16).padStart(2, "0");
+  const textOpacity = Number.isFinite(style.opacity)
+    ? Math.max(0, Math.min(1, Number(style.opacity)))
+    : 1;
 
   const parts: string[] = [
     `fontsize=${fontSize}`,
-    `fontcolor=0x${normalizeHexColor(style.color, "ffffff")}${textAlphaHex}`,
+    `fontcolor=${formatFfmpegColorWithAlpha(style.color, textOpacity, "ffffff")}`,
     `x=${xValue}`,
     `y=${positionY}`,
     `font=${fontFamily}`,
@@ -102,17 +118,28 @@ function buildSingleOverlayFilter(o: any, timelineOffsetMs = 0): string | null {
   const bgStyle = style.background ?? {};
   const bgEnabled = bgStyle.opacity > 0 && bgStyle.color;
   if (bgEnabled) {
-    const alphaHex = Math.round(Math.max(0, Math.min(1, bgStyle.opacity ?? 1)) * 255)
-      .toString(16).padStart(2, "0");
+    const bgAlpha = Math.max(0, Math.min(1, bgStyle.opacity ?? 1));
     parts.push(`box=1`);
-    parts.push(`boxcolor=0x${normalizeHexColor(bgStyle.color, "000000")}${alphaHex}`);
+    const boxColor = normalizeFfmpegColor(bgStyle.color, "000000");
+    if (/^[a-zA-Z]+$/.test(boxColor)) {
+      parts.push(`boxcolor=${boxColor}@${bgAlpha.toFixed(3)}`);
+    } else {
+      const alphaHex = Math.round(bgAlpha * 255)
+        .toString(16)
+        .padStart(2, "0");
+      parts.push(`boxcolor=${boxColor.replace(/^0x/, "0x")}${alphaHex}`);
+    }
     const paddingX = Number(bgStyle.paddingX) || 8;
     const paddingY = Number(bgStyle.paddingY) || paddingX;
     parts.push(`boxborderw=${Math.max(paddingX, paddingY)}`);
   }
 
   if (style.textShadow) {
-    let sx = 2, sy = 2, sColor = "000000", sAlpha = 0.66, sBlur = 0;
+    let sx = 2,
+      sy = 2,
+      sColor = "000000",
+      sAlpha = 0.66,
+      sBlur = 0;
     if (typeof style.textShadow === "object") {
       sx = Number(style.textShadow.x ?? 2);
       sy = Number(style.textShadow.y ?? 2);
@@ -120,14 +147,14 @@ function buildSingleOverlayFilter(o: any, timelineOffsetMs = 0): string | null {
       sAlpha = Number(style.textShadow.opacity ?? 0.66);
       sBlur = Number(style.textShadow.blur ?? 0);
     }
-    const sAlphaHex = Math.round(sAlpha * 255).toString(16).padStart(2, "0");
-    parts.push(`shadowx=${sx}`, `shadowy=${sy}`, `shadowcolor=0x${sColor}${sAlphaHex}`);
+    const sColorToken = formatFfmpegColorWithAlpha(sColor, sAlpha, "000000");
+    parts.push(`shadowx=${sx}`, `shadowy=${sy}`, `shadowcolor=${sColorToken}`);
     if (sBlur > 0) parts.push(`shadowblur=${sBlur}`);
   }
 
   if (Number.isFinite(style.strokeWidth) && style.strokeWidth > 0) {
-    const sc = normalizeHexColor(style.strokeColor, "000000");
-    parts.push(`borderw=${style.strokeWidth}`, `bordercolor=0x${sc}`);
+    const sc = normalizeFfmpegColor(style.strokeColor, "000000");
+    parts.push(`borderw=${style.strokeWidth}`, `bordercolor=${sc}`);
   }
 
   const animation = o.animation;
@@ -155,7 +182,7 @@ export function buildOverlayFilter(
   if (!overlays?.length) return null;
 
   const sorted = [...overlays]
-    .filter(o => o.content?.text)
+    .filter((o) => o.content?.text)
     .sort((a, b) => {
       const za = a?.zIndex ?? 0;
       const zb = b?.zIndex ?? 0;
@@ -164,7 +191,7 @@ export function buildOverlayFilter(
     });
 
   const filters = sorted
-    .map(o => buildSingleOverlayFilter(o, timelineOffsetMs))
+    .map((o) => buildSingleOverlayFilter(o, timelineOffsetMs))
     .filter(Boolean) as string[];
 
   return filters.length ? filters.join(",") : null;

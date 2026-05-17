@@ -17,6 +17,7 @@ export type RenderClip = {
   durationMs: number;
   name?: string | null;
   sourceDurationMs?: number | null;
+  hasAudio?: boolean;
   audioMode?: "replace" | "layer";
   transitionStart?: Record<string, unknown> | null;
   transitionEnd?: Record<string, unknown> | null;
