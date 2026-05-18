@@ -63,6 +63,9 @@ jobs:
       - name: Install Dependencies
         run: bun install
 
+      - name: Generate Prisma Client
+        run: bunx prisma generate --schema=packages/db/prisma/schema.prisma
+
       - name: Run Lint
         run: bun run lint
 

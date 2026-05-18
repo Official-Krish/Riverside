@@ -116,7 +116,7 @@ export async function collectUserChunks(
     });
 
     metadataByPath = new Map(
-      mediaChunks.map((record) => [
+      mediaChunks.map((record: (typeof mediaChunks)[number]) => [
         record.bucketLink,
         {
           isEncrypted: record.isEncrypted,
