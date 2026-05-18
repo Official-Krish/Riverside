@@ -23,12 +23,11 @@ const footerLinks: {
     { label: "Blog", href: "/blog" },
   ],
   social: [
-    { label: "GitHub", href: "#github" },
+    { label: "GitHub", href: "https://github.com/Official-Krish/Weave" },
     { label: "Twitter", href: "#twitter" },
     { label: "LinkedIn", href: "#linkedin" },
   ],
 };
-
 
 export function Footer({ isLanding = false }: { isLanding?: boolean }) {
   return (
@@ -48,23 +47,41 @@ export function Footer({ isLanding = false }: { isLanding?: boolean }) {
         ].join(" ")}
       >
         {/* Top divider */}
-        <div className={["mb-8 h-px", isLanding ? "bg-[#f5a623]/10" : "bg-border/40"].join(" ")} />
+        <div
+          className={[
+            "mb-8 h-px",
+            isLanding ? "bg-[#f5a623]/10" : "bg-border/40",
+          ].join(" ")}
+        />
 
         {/* Main grid */}
         <div className="grid gap-8 md:grid-cols-[1.5fr_1fr_1fr] md:items-start">
           {/* Brand col */}
           <div>
-            <p className={["text-[10px] font-semibold uppercase tracking-[0.22em]",
-              isLanding ? "text-[#f5a623]/45" : "text-muted-foreground"].join(" ")}>
+            <p
+              className={[
+                "text-[10px] font-semibold uppercase tracking-[0.22em]",
+                isLanding ? "text-[#f5a623]/45" : "text-muted-foreground",
+              ].join(" ")}
+            >
               Recorded locally. Delivered clean.
             </p>
-            <p className={["mt-2 font-syne text-[28px] font-extrabold leading-none tracking-tight",
-              isLanding ? "text-[#fff5de]" : "text-foreground"].join(" ")}>
+            <p
+              className={[
+                "mt-2 font-syne text-[28px] font-extrabold leading-none tracking-tight",
+                isLanding ? "text-[#fff5de]" : "text-foreground",
+              ].join(" ")}
+            >
               Weave
             </p>
-            <p className={["mt-3 max-w-70 text-[13px] leading-relaxed",
-              isLanding ? "text-[#a89880]" : "text-muted-foreground"].join(" ")}>
-              Built for interviews, podcasts, and remote sessions where quality and privacy cannot fail.
+            <p
+              className={[
+                "mt-3 max-w-70 text-[13px] leading-relaxed",
+                isLanding ? "text-[#a89880]" : "text-muted-foreground",
+              ].join(" ")}
+            >
+              Built for interviews, podcasts, and remote sessions where quality
+              and privacy cannot fail.
             </p>
             {isLanding && (
               <div className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-[#f5a623]/12 bg-[#f5a623]/4 px-2.5 py-1">
@@ -78,15 +95,26 @@ export function Footer({ isLanding = false }: { isLanding?: boolean }) {
 
           {/* Product col */}
           <div>
-            <p className={["text-[10px] font-semibold uppercase tracking-[0.2em]",
-              isLanding ? "text-[#f5a623]/50" : "text-muted-foreground"].join(" ")}>
+            <p
+              className={[
+                "text-[10px] font-semibold uppercase tracking-[0.2em]",
+                isLanding ? "text-[#f5a623]/50" : "text-muted-foreground",
+              ].join(" ")}
+            >
               Product
             </p>
             <div className="mt-3.5 flex flex-col gap-2.5">
               {footerLinks.product.map((link) => (
-                <a key={link.label} href={link.href}
-                  className={["text-[13px] transition-colors",
-                    isLanding ? "text-[#c4b49a] hover:text-[#fff5de]" : "text-muted-foreground hover:text-foreground"].join(" ")}>
+                <a
+                  key={link.label}
+                  href={link.href}
+                  className={[
+                    "text-[13px] transition-colors",
+                    isLanding
+                      ? "text-[#c4b49a] hover:text-[#fff5de]"
+                      : "text-muted-foreground hover:text-foreground",
+                  ].join(" ")}
+                >
                   {link.label}
                 </a>
               ))}
@@ -95,15 +123,26 @@ export function Footer({ isLanding = false }: { isLanding?: boolean }) {
 
           {/* Company col */}
           <div>
-            <p className={["text-[10px] font-semibold uppercase tracking-[0.2em]",
-              isLanding ? "text-[#f5a623]/50" : "text-muted-foreground"].join(" ")}>
+            <p
+              className={[
+                "text-[10px] font-semibold uppercase tracking-[0.2em]",
+                isLanding ? "text-[#f5a623]/50" : "text-muted-foreground",
+              ].join(" ")}
+            >
               Company
             </p>
             <div className="mt-3.5 flex flex-col gap-2.5">
               {footerLinks.company.map((link) => (
-                <a key={link.label} href={link.href}
-                  className={["text-[13px] transition-colors",
-                    isLanding ? "text-[#c4b49a] hover:text-[#fff5de]" : "text-muted-foreground hover:text-foreground"].join(" ")}>
+                <a
+                  key={link.label}
+                  href={link.href}
+                  className={[
+                    "text-[13px] transition-colors",
+                    isLanding
+                      ? "text-[#c4b49a] hover:text-[#fff5de]"
+                      : "text-muted-foreground hover:text-foreground",
+                  ].join(" ")}
+                >
                   {link.label}
                 </a>
               ))}
@@ -112,16 +151,41 @@ export function Footer({ isLanding = false }: { isLanding?: boolean }) {
         </div>
 
         {/* Bottom row */}
-        <div className={["mt-8 h-px", isLanding ? "bg-[#f5a623]/5" : "bg-border/40"].join(" ")} />
+        <div
+          className={[
+            "mt-8 h-px",
+            isLanding ? "bg-[#f5a623]/5" : "bg-border/40",
+          ].join(" ")}
+        />
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <p className={["text-xs", isLanding ? "text-[#6b5c45]" : "text-muted-foreground"].join(" ")}>
-            © 2026 Weave. All rights reserved.
-          </p>
+          <div
+            className={[
+              "space-y-1 text-xs",
+              isLanding ? "text-[#6b5c45]" : "text-muted-foreground",
+            ].join(" ")}
+          >
+            <p>© 2026 Weave. All rights reserved.</p>
+            <p
+              className={
+                isLanding ? "text-[#8a7a62]" : "text-muted-foreground/90"
+              }
+            >
+              Crafted and Engineered with{" "}
+              <span className="align-middle">❤️</span> by Krish Anand
+            </p>
+          </div>
           <div className="flex items-center gap-5">
             {footerLinks.social.map((link) => (
-              <a key={link.label} href={link.href}
-                className={["text-xs transition-colors",
-                  isLanding ? "text-[#8a7a62] hover:text-[#fff5de]" : "text-muted-foreground hover:text-foreground"].join(" ")}>
+              <a
+                key={link.label}
+                href={link.href}
+                className={[
+                  "text-xs transition-colors",
+                  isLanding
+                    ? "text-[#8a7a62] hover:text-[#fff5de]"
+                    : "text-muted-foreground hover:text-foreground",
+                ].join(" ")}
+              >
                 {link.label}
               </a>
             ))}

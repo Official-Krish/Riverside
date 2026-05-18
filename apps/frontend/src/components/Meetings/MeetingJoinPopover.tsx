@@ -1,15 +1,27 @@
 import { useEffect, useRef, useState } from "react";
-import { LoaderCircle, Mic, Video } from "lucide-react";
+import { LoaderCircle, Mic, MicOff, Video, VideoOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { DevicePreview } from "./DevicePreview";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { http } from "@/https";
 import { toast } from "sonner";
 import { getHttpErrorMessage } from "@/lib/httpError";
 
-function buildJoinPreviewAudioConstraints(selectedMicId: string): MediaTrackConstraints | boolean {
+function buildJoinPreviewAudioConstraints(
+  selectedMicId: string,
+): MediaTrackConstraints | boolean {
   return {
     deviceId: selectedMicId ? { exact: selectedMicId } : undefined,
     echoCancellation: true,
@@ -20,7 +32,9 @@ function buildJoinPreviewAudioConstraints(selectedMicId: string): MediaTrackCons
   };
 }
 
-function buildJoinPreviewVideoConstraints(selectedCameraId: string): MediaTrackConstraints | boolean {
+function buildJoinPreviewVideoConstraints(
+  selectedCameraId: string,
+): MediaTrackConstraints | boolean {
   return {
     deviceId: selectedCameraId ? { exact: selectedCameraId } : undefined,
     width: { ideal: 1920 },
@@ -34,7 +48,12 @@ type MeetingJoinPopoverProps = {
   triggerLabel: string;
   cancelMeetingLabel?: string | null;
   scheduleId?: string;
-  onJoin: (devices: { micId?: string; cameraId?: string }) => Promise<void> | void;
+  onJoin: (devices: {
+    micId?: string;
+    cameraId?: string;
+    initialMicOff?: boolean;
+    initialVideoOff?: boolean;
+  }) => Promise<void> | void;
   disabled?: boolean;
   busy?: boolean;
   variant?: "amber" | "blue";
@@ -54,6 +73,8 @@ export function MeetingJoinPopover({
   const [micDevices, setMicDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedCameraId, setSelectedCameraId] = useState("");
   const [selectedMicId, setSelectedMicId] = useState("");
+  const [joinWithMicOff, setJoinWithMicOff] = useState(false);
+  const [joinWithVideoOff, setJoinWithVideoOff] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isJoining, setIsJoining] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
@@ -62,7 +83,6 @@ export function MeetingJoinPopover({
 
   const cancelMeetingMutation = useMutation({
     mutationFn: async (id: string) => {
-
       const response = await http.post(`/meeting/cancel/schedule/${id}`);
       return response.data;
     },
@@ -76,7 +96,11 @@ export function MeetingJoinPopover({
   });
 
   useEffect(() => {
-    if (!open || typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+    if (
+      !open ||
+      typeof navigator === "undefined" ||
+      !navigator.mediaDevices?.getUserMedia
+    ) {
       return;
     }
 
@@ -103,8 +127,12 @@ export function MeetingJoinPopover({
         }
 
         const devices = await navigator.mediaDevices.enumerateDevices();
-        const cameras = devices.filter((device) => device.kind === "videoinput");
-        const microphones = devices.filter((device) => device.kind === "audioinput");
+        const cameras = devices.filter(
+          (device) => device.kind === "videoinput",
+        );
+        const microphones = devices.filter(
+          (device) => device.kind === "audioinput",
+        );
 
         if (!active) {
           return;
@@ -145,6 +173,8 @@ export function MeetingJoinPopover({
       await onJoin({
         micId: selectedMicId || undefined,
         cameraId: selectedCameraId || undefined,
+        initialMicOff: joinWithMicOff,
+        initialVideoOff: joinWithVideoOff,
       });
       setOpen(false);
     } finally {
@@ -183,13 +213,18 @@ export function MeetingJoinPopover({
           </button>
         </PopoverTrigger>
       </div>
-      <PopoverContent className="w-[360px] border border-white/10 bg-[#120f0b] p-4 text-[#fff5de]" align="end">
+      <PopoverContent
+        className="w-[360px] border border-white/10 bg-[#120f0b] p-4 text-[#fff5de]"
+        align="end"
+      >
         <div className="space-y-4">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#f5a623]/60">
               Device check
             </p>
-            <h3 className="mt-1 text-base font-bold text-[#fff5de]">Choose your camera and mic</h3>
+            <h3 className="mt-1 text-base font-bold text-[#fff5de]">
+              Choose your camera and mic
+            </h3>
           </div>
 
           <DevicePreview videoRef={videoRef} previewError={previewError} />
@@ -199,7 +234,11 @@ export function MeetingJoinPopover({
               <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#b49650]/60">
                 Camera
               </p>
-              <Select value={selectedCameraId} onValueChange={setSelectedCameraId} disabled={cameraDevices.length === 0}>
+              <Select
+                value={selectedCameraId}
+                onValueChange={setSelectedCameraId}
+                disabled={cameraDevices.length === 0}
+              >
                 <SelectTrigger className="h-11 border-white/10 bg-white/4 text-[#fff5de]">
                   <div className="inline-flex items-center gap-2">
                     <Video className="size-4 text-[#f5a623]" />
@@ -208,7 +247,10 @@ export function MeetingJoinPopover({
                 </SelectTrigger>
                 <SelectContent>
                   {cameraDevices.map((device, index) => (
-                    <SelectItem key={device.deviceId || index} value={device.deviceId}>
+                    <SelectItem
+                      key={device.deviceId || index}
+                      value={device.deviceId}
+                    >
                       {device.label || `Camera ${index + 1}`}
                     </SelectItem>
                   ))}
@@ -220,7 +262,11 @@ export function MeetingJoinPopover({
               <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#b49650]/60">
                 Microphone
               </p>
-              <Select value={selectedMicId} onValueChange={setSelectedMicId} disabled={micDevices.length === 0}>
+              <Select
+                value={selectedMicId}
+                onValueChange={setSelectedMicId}
+                disabled={micDevices.length === 0}
+              >
                 <SelectTrigger className="h-11 border-white/10 bg-white/4 text-[#fff5de]">
                   <div className="inline-flex items-center gap-2">
                     <Mic className="size-4 text-[#f5a623]" />
@@ -229,7 +275,10 @@ export function MeetingJoinPopover({
                 </SelectTrigger>
                 <SelectContent>
                   {micDevices.map((device, index) => (
-                    <SelectItem key={device.deviceId || index} value={device.deviceId}>
+                    <SelectItem
+                      key={device.deviceId || index}
+                      value={device.deviceId}
+                    >
                       {device.label || `Microphone ${index + 1}`}
                     </SelectItem>
                   ))}
@@ -238,13 +287,55 @@ export function MeetingJoinPopover({
             </div>
           </div>
 
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setJoinWithVideoOff((current) => !current)}
+              className={[
+                "flex items-center justify-between rounded-xl border px-3 py-2.5 text-left transition cursor-pointer",
+                joinWithVideoOff
+                  ? "border-[#f5a623]/24 bg-[#f5a623]/10 text-[#fff5de]"
+                  : "border-white/8 bg-white/4 text-[#fff5de]/78 hover:border-[#f5a623]/18 hover:bg-[#f5a623]/6",
+              ].join(" ")}
+            >
+              <span className="text-[11px] font-semibold">
+                Join with camera off
+              </span>
+              {joinWithVideoOff ? (
+                <VideoOff className="size-4 text-[#f5a623]" />
+              ) : (
+                <Video className="size-4 text-[#f5a623]" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setJoinWithMicOff((current) => !current)}
+              className={[
+                "flex items-center justify-between rounded-xl border px-3 py-2.5 text-left transition cursor-pointer",
+                joinWithMicOff
+                  ? "border-[#f5a623]/24 bg-[#f5a623]/10 text-[#fff5de]"
+                  : "border-white/8 bg-white/4 text-[#fff5de]/78 hover:border-[#f5a623]/18 hover:bg-[#f5a623]/6",
+              ].join(" ")}
+            >
+              <span className="text-[11px] font-semibold">Join muted</span>
+              {joinWithMicOff ? (
+                <MicOff className="size-4 text-[#f5a623]" />
+              ) : (
+                <Mic className="size-4 text-[#f5a623]" />
+              )}
+            </button>
+          </div>
+
           <Button
             type="button"
             onClick={() => void handleJoin()}
             disabled={disabled || busy || isJoining}
             className="h-11 w-full bg-[linear-gradient(135deg,#ffd166,#f5a623)] font-bold text-[#1b1100] hover:brightness-105 cursor-pointer disabled:pointer-events-none disabled:opacity-50"
           >
-            {isJoining || busy ? <LoaderCircle className="size-4 animate-spin" /> : null}
+            {isJoining || busy ? (
+              <LoaderCircle className="size-4 animate-spin" />
+            ) : null}
             Continue to meeting
           </Button>
         </div>

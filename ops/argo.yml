@@ -1,0 +1,60 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+
+metadata:
+  name: weave
+  namespace: argocd
+
+  labels:
+    app.kubernetes.io/name: weave
+    app.kubernetes.io/part-of: weave-platform
+
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/Official-Krish/Weave
+
+    targetRevision: main
+
+    path: ops
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: weave
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    retry:
+      limit: 5
+
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - RespectIgnoreDifferences=true
+      - ApplyOutOfSyncOnly=true
+
+  revisionHistoryLimit: 10
+
+  info:
+    - name: Environment
+      value: production
+
+    - name: Project
+      value: weave
+
+    - name: Managed-By
+      value: argocd

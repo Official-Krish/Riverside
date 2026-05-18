@@ -3,18 +3,23 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
+    "build:frontend": "turbo run build --filter=frontend",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
+    "typecheck": "turbo run check-types",
     "prisma:generate": "cd ./packages/db && bunx prisma generate && cd ../..",
     "backend": "cd ./apps/backend && bun run index.ts",
-    "worker": "cd ./apps/worker && bun run index.ts",
+    "ws-relayer": "cd ./apps/ws-relayer && bun run index.ts",
     "merger-worker": "cd ./apps/merger-worker && bun run index.ts",
     "transcoder": "cd ./apps/transcoder && bun run index.ts",
-    "editor-worker": "cd ./apps/editor-worker && bun run index.ts"
+    "editor-worker": "cd ./apps/editor-worker && bun run index.ts",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.4",
     "prettier": "^3.5.3",
     "turbo": "^2.5.3",
     "typescript": "5.8.2"
@@ -29,5 +34,14 @@
   ],
   "dependencies": {
     "prisma": "^7.0.0"
+  },
+  "lint-staged": {
+    "*.{js,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,yml,yaml,md}": [
+      "prettier --write"
+    ]
   }
 }

@@ -6,10 +6,18 @@ COPY package.json bun.lock turbo.json ./
 COPY apps/backend/package.json apps/backend/package.json
 COPY packages/db/package.json packages/db/package.json
 COPY packages/types/package.json packages/types/package.json
+COPY packages/amazonS3/package.json packages/amazonS3/package.json
 
 RUN bun install
 
-COPY . .
+COPY apps/backend ./apps/backend
+COPY packages/db ./packages/db
+COPY packages/types ./packages/types
+COPY packages/amazonS3 ./packages/amazonS3
+COPY packages/typescript-config ./packages/typescript-config
+COPY packages/eslint-config ./packages/eslint-config
+
+RUN cd packages/db && bunx prisma generate
 
 FROM oven/bun:1 AS runtime
 

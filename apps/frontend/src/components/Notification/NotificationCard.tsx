@@ -16,9 +16,22 @@ export function NotificationCard({
   notification: Notification;
   onMarkRead: (id: string) => void;
   onDelete: (id: string) => void;
-  onAcceptRecording: (roomId: string, requestedBy: string, notifId: string) => void;
+  onAcceptRecording: (
+    roomId: string,
+    requestedBy: string,
+    notifId: string,
+  ) => void;
   onDeclineRecording: (notifId: string) => void;
-  onAcceptInvite: (targetId: string, notifId: string, devices: { micId?: string; cameraId?: string }) => Promise<void> | void;
+  onAcceptInvite: (
+    targetId: string,
+    notifId: string,
+    devices: {
+      micId?: string;
+      cameraId?: string;
+      initialMicOff?: boolean;
+      initialVideoOff?: boolean;
+    },
+  ) => Promise<void> | void;
 }) {
   const config = TYPE_CONFIG[notification.type];
   const navigate = useNavigate();
@@ -38,9 +51,10 @@ export function NotificationCard({
       transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
       className={`
         relative group flex gap-4 rounded-[24px] border p-4 transition-all duration-200
-        ${notification.isRead
-          ? "border-white/8 bg-white/[0.025]"
-          : "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] shadow-[0_14px_40px_rgba(0,0,0,0.2)]"
+        ${
+          notification.isRead
+            ? "border-white/8 bg-white/[0.025]"
+            : "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] shadow-[0_14px_40px_rgba(0,0,0,0.2)]"
         }
         hover:-translate-y-0.5 hover:border-white/14
       `}
@@ -70,9 +84,10 @@ export function NotificationCard({
             <p
               className={`
                 mt-1 text-sm leading-6
-                ${notification.isRead
-                  ? "text-zinc-500"
-                  : "font-medium text-zinc-100"
+                ${
+                  notification.isRead
+                    ? "text-zinc-500"
+                    : "font-medium text-zinc-100"
                 }
               `}
             >
@@ -82,29 +97,46 @@ export function NotificationCard({
             {notification.metadata?.roomId && (
               <div className="flex items-center gap-1.5 mt-2">
                 <span className="inline-flex items-center gap-1 rounded-xl border border-white/8 bg-white/[0.04] px-2.5 py-1 text-[11px] font-mono text-zinc-400">
-                  <svg viewBox="0 0 12 12" className="w-2.5 h-2.5" fill="currentColor">
+                  <svg
+                    viewBox="0 0 12 12"
+                    className="w-2.5 h-2.5"
+                    fill="currentColor"
+                  >
                     <circle cx="6" cy="6" r="2" />
-                    <circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                    <circle
+                      cx="6"
+                      cy="6"
+                      r="5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                    />
                   </svg>
                   {notification.metadata.roomId}
                 </span>
               </div>
             )}
             {/* Scheduled time for reminders */}
-            {notification.type === "MEETING_REMINDER" && notification.metadata?.scheduledAt && (
-              <p className="text-xs text-zinc-500 mt-2">
-                Scheduled: {new Date(notification.metadata.scheduledAt).toLocaleString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </p>
-            )}
+            {notification.type === "MEETING_REMINDER" &&
+              notification.metadata?.scheduledAt && (
+                <p className="text-xs text-zinc-500 mt-2">
+                  Scheduled:{" "}
+                  {new Date(notification.metadata.scheduledAt).toLocaleString(
+                    "en-US",
+                    {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    },
+                  )}
+                </p>
+              )}
             {/* Failed reason */}
             {notification.type === "RECORDING_FAILED" && (
               <p className="font-mono text-xs text-red-300 mt-2">
-                ↳ {notification?.metadata?.reason} || Contact support if you think this is a mistake.
+                ↳ {notification?.metadata?.reason} || Contact support if you
+                think this is a mistake.
               </p>
             )}
             {/* Action buttons */}
@@ -122,7 +154,7 @@ export function NotificationCard({
                         onAcceptRecording(
                           notification.metadata!.roomId!,
                           notification.metadata!.requestedBy!,
-                          notification.id
+                          notification.id,
                         )
                       }
                       className="
@@ -131,9 +163,20 @@ export function NotificationCard({
                         hover:bg-[linear-gradient(135deg,#ffd166,#f5a623)] hover:brightness-110
                       "
                     >
-                      <svg viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
+                      <svg
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                        className="w-3 h-3"
+                      >
                         <path d="M2 4a2 2 0 012-2h5l4 4v6a2 2 0 01-2 2H4a2 2 0 01-2-2V4zm9.5 3.5l-4-4H4a.5.5 0 00-.5.5v8a.5.5 0 00.5.5h6a.5.5 0 00.5-.5V7.5z" />
-                        <path d="M5.5 9.5l1.5 1.5 3-3" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                        <path
+                          d="M5.5 9.5l1.5 1.5 3-3"
+                          stroke="currentColor"
+                          strokeWidth="1.2"
+                          fill="none"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
                       </svg>
                       Grant Access
                     </button>
@@ -160,12 +203,15 @@ export function NotificationCard({
                 className="flex items-center gap-2 pt-1"
                 onClick={(e) => e.stopPropagation()}
               >
-                {(notification.type === "RECORDING_READY" || notification.type === "RECORDING_REQUEST_APPROVED") && (
+                {(notification.type === "RECORDING_READY" ||
+                  notification.type === "RECORDING_REQUEST_APPROVED") && (
                   <>
                     <button
                       onClick={() => {
                         onMarkRead(notification.id);
-                        navigate(`/recordings/${notification?.metadata?.recordingId}`);
+                        navigate(
+                          `/recordings/${notification?.metadata?.recordingId}`,
+                        );
                       }}
                       className="
                         inline-flex items-center gap-1.5 rounded-xl bg-[linear-gradient(135deg,#ffd166,#f5a623)] px-3.5 py-2 text-xs font-semibold text-black cursor-pointer
@@ -214,7 +260,11 @@ export function NotificationCard({
                       return;
                     }
 
-                    await onAcceptInvite(notification.metadata.roomId, notification.id, devices);
+                    await onAcceptInvite(
+                      notification.metadata.roomId,
+                      notification.id,
+                      devices,
+                    );
                     onMarkRead(notification.id);
                   }}
                 />

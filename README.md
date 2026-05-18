@@ -1,22 +1,22 @@
 # Weave - Advanced Video Conferencing Platform
 
-**High-quality video conferencing with intelligent local recording technology**
+**High-quality video conferencing with intelligent local recording and end-to-end encryption**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-  [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-  [![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)](https://reactjs.org/)
-  [![Node.js](https://img.shields.io/badge/Node.js-43853D?logo=node.js&logoColor=white)](https://nodejs.org/)
-
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)](https://reactjs.org/)
+[![Bun](https://img.shields.io/badge/Bun-000000?logo=bun&logoColor=white)](https://bun.sh)
 
 ## 🚀 Overview
 
-Weave is a next-generation video conferencing platform that revolutionizes meeting recording by implementing **local recording technology**. Unlike traditional platforms like Zoom that depend on internet quality for recording, Weave Pro captures high-quality video and audio directly on each participant's device, then intelligently merges and processes recordings in the cloud.
+Weave is a next-generation video conferencing platform that revolutionizes meeting recording by implementing **local recording technology** with **end-to-end encryption**. Unlike traditional platforms like Zoom that depend on internet quality for recording, Weave captures high-quality video and audio directly on each participant's device in encrypted 60-second chunks, then intelligently merges and processes recordings in the cloud.
 
 ### 🎯 Key Innovation
 
-**Local Recording Technology**: Recordings happen locally on each user's device in 60-second chunks, ensuring:
+**Local Recording with Encryption**: Recordings happen locally on each user's device in 60-second chunks with AES-256-GCM encryption, ensuring:
 - **No quality loss** due to internet connectivity issues
 - **Consistent recording quality** regardless of network conditions
+- **End-to-end encryption** - chunks encrypted before upload, decrypted only during merge
 - **Reduced bandwidth usage** during meetings
 - **Automatic chunk upload** and cloud processing
 
@@ -24,97 +24,119 @@ Weave is a next-generation video conferencing platform that revolutionizes meeti
 
 ### 🎥 Core Functionality
 - **Real-time video conferencing** with Jitsi Meet integration
-- **Local recording** with automatic chunk upload
+- **Local recording** with automatic chunk upload and encryption
 - **Screen sharing** capabilities
 - **Participant management** with host controls
-- **Meeting scheduling** and passcode protection
+- **Meeting scheduling** with calendar integration (Google Calendar, Slack, Discord)
+- **Passcode protection** for meetings
+
+### 🔐 Security Features
+- **AES-256-GCM chunk encryption** - Each recording chunk is encrypted locally
+- **Per-meeting CEK (Content Encryption Key)** - Unique key per meeting
+- **RSA-OAEP-256 key wrapping** - CEK wrapped with server's RSA public key
+- **Server keypair** - RSA-4096 keypair for secure key management
+- **JWT authentication** with role-based access control
+- **Rate limiting** on API endpoints
 
 ### 🔧 Technical Features
 - **Chunk-based recording** (60-second intervals)
 - **Automatic video merging** using FFmpeg
 - **Grid layout generation** for multi-participant recordings
+- **HLS transcoding** with multiple quality profiles (360p-1080p)
 - **Cloud storage integration** (Google Cloud Storage)
-- **Real-time processing** with Kubernetes workers
-- **Database tracking** of recording chunks and final outputs
-
-### 🛡️ Security & Performance
-- **End-to-end encryption** for sensitive meetings
-- **JWT authentication** system
-- **Role-based access control**
-- **Automatic cleanup** of temporary files
-- **Scalable microservices architecture**
+- **Real-time WebSocket** for chat and events
+- **Video editor** with timeline, transitions, and presets
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Frontend      │    │   Backend API   │    │   Worker        │
-│   (React/TS)    │◄──►│   (Express)     │◄──►│   (Chunk Upload)│
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Jitsi Meet    │    │   PostgreSQL    │    │   Redis Queue   │
-│   Integration   │    │   Database      │    │   Orchestrator  │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Local         │    │   Merger        │    │   K8s Worker    │
-│   Recording     │    │   Worker        │    │   (FFmpeg)      │
-│   (Chunks)      │    │   (Video Merge) │    │                 │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Google Cloud  │    │   Final Video   │    │   User Dashboard│
-│   Storage       │    │   (Grid Layout) │    │   (Recordings)  │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              FRONTEND (React + Vite)                        │
+│   /dashboard  /meeting/live/:id  /edit/:id  /recordings/:id                 │
+└──────────────────────────────┬──────────────────────────────────────────────┘
+                               │ HTTP / WebSocket
+                               ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           BACKEND (Express + Bun)                           │
+│   User Auth  │ Meeting Mgmt  │ Recording  │ Editor  │ Notifications        │
+│              │               │            │         │                      │
+│   ─────────────────────────────────────────────────────────────────────     │
+│   Real-time: ws-relayer (WebSocket server for chat/events)                 │
+└──────┬──────────────────┬───────────────────────────────┬──────────────────┘
+       │                  │                               │
+       ▼                  ▼                               ▼
+┌──────────────┐  ┌──────────────────┐  ┌─────────────────────────────────────┐
+│ PostgreSQL   │  │    Redis Queue   │  │       Amazon Cloud Storage         │
+│ (Prisma ORM) │  │  Job Processing  │  │   Chunk Storage / Final Videos     │
+└──────────────┘  └────────┬─────────┘  └─────────────────────────────────────┘
+                           │
+         ┌─────────────────┼─────────────────┐
+         ▼                 ▼                 ▼
+┌─────────────────┐ ┌──────────────┐ ┌─────────────────┐
+│  Merger Worker  │ │ Editor Worker│ │   Transcoder    │
+│  (FFmpeg Merge) │ │ (Video Edit) │ │   (HLS Convert)│
+└────────┬────────┘ └──────┬───────┘ └────────┬────────┘
+         │                 │                  │
+         └─────────────────┴──────────────────┘
+                          │
+                          ▼
+               ┌─────────────────────────┐
+               │   Final Grid Video +    │
+               │   HLS Adaptive Stream   │
+               └─────────────────────────┘
 ```
+
+### Services
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| **frontend** | 5173 | React Vite dev server |
+| **backend** | 3000 | REST API server |
+| **ws-relayer** | 9093 | WebSocket relay for real-time |
+| **merger-worker** | - | Merges chunks into grid video |
+| **editor-worker** | - | Video editor processing |
+| **transcoder** | - | HLS transcoding |
 
 ## 🛠️ Technology Stack
 
 ### Frontend
-- **React 18** with TypeScript
+- **React 19** with TypeScript
 - **Vite** for fast development and building
-- **Tailwind CSS** for styling
+- **Tailwind CSS 4** for styling
 - **Framer Motion** for animations
-- **Redux Toolkit** for state management
+- **TanStack Query** for server state
 - **Jitsi Meet SDK** for video conferencing
+- **Konva + React-Konva** for canvas-based editor
 
 ### Backend
-- **Node.js** with Express
+- **Bun / Node.js** runtime
+- **Express.js** for API
 - **TypeScript** for type safety
 - **PostgreSQL** with Prisma ORM
 - **Redis** for queue management
 - **JWT** for authentication
 
-### Infrastructure
-- **Google Cloud Storage** for file storage
-- **Kubernetes** for container orchestration
+### Workers
 - **FFmpeg** for video processing
-- **Docker** for containerization
+- **Bun** runtime for worker services
+- **Google Cloud Storage** for file storage
 
 ## 📦 Project Structure
 
 ```
 video_voice_confrence/
 ├── apps/
-│   ├── frontend/               # Active V1 frontend application
-│   ├── client/                 # Legacy frontend (reference only)
+│   ├── frontend/               # React frontend (Vite)
 │   ├── backend/                # Express API server
-│   ├── worker/                 # Chunk upload worker
+│   ├── ws-relayer/             # WebSocket relay (Bun)
 │   ├── merger-worker/          # Video merging service
-│   ├── k8s-worker/             # Kubernetes video processor
-│   ├── redis-orchastrator/     # Queue management
-│   └── ws-relayer/             # WebSocket relay service
+│   ├── editor-worker/          # Video editor processing
+│   └── transcoder/             # HLS transcoder
 ├── packages/
-│   ├── db/                     # Database schema and migrations
+│   ├── db/                     # Prisma schema and client
 │   ├── types/                  # Shared TypeScript types
 │   ├── ui/                     # Shared UI components
+│   ├── amazons3/               # S3 storage utilities
 │   └── eslint-config/          # ESLint configurations
 ├── docker/                     # Docker configurations
 ├── ops/                        # Kubernetes deployments
@@ -124,10 +146,9 @@ video_voice_confrence/
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 18+ or Bun
+- Bun 1.2+ or Node.js 18+
 - PostgreSQL 14+
 - Redis 6+
-- Docker & Kubernetes (for production)
 - Google Cloud Storage account
 
 ### Development Setup
@@ -140,8 +161,6 @@ video_voice_confrence/
 
 2. **Install dependencies**
    ```bash
-   npm install
-   # or
    bun install
    ```
 
@@ -149,7 +168,7 @@ video_voice_confrence/
    ```bash
    # Copy environment templates
    cp apps/backend/.env.example apps/backend/.env
-   cp apps/client/.env.example apps/client/.env
+   cp apps/frontend/.env.example apps/frontend/.env
    
    # Configure your environment variables
    # See Environment Variables section below
@@ -158,8 +177,8 @@ video_voice_confrence/
 4. **Database Setup**
    ```bash
    cd packages/db
-   npx prisma generate
-   npx prisma db push
+   bunx prisma generate
+   bunx prisma db push
    ```
 
 5. **Start Development Servers**
@@ -168,9 +187,11 @@ video_voice_confrence/
    npm run dev
    
    # Or start individually
-   npm run dev:backend
-   npm run dev:client
-   npm run dev:worker
+   npm run backend      # Port 3000
+   npm run dev          # Frontend on 5173
+   npm run editor-worker
+   npm run merger-worker
+   npm run transcoder
    ```
 
 ## 🔧 Environment Variables
@@ -179,23 +200,22 @@ video_voice_confrence/
 ```env
 DATABASE_URL="postgresql://user:password@localhost:5432/weave"
 JWT_SECRET="your-jwt-secret"
-REDIS_URL="redis://localhost:6379"
-GOOGLE_CLOUD_PROJECT="your-gcp-project"
-GOOGLE_CLOUD_BUCKET="your-storage-bucket"
+REDIS_HOST=localhost
+REDIS_PORT=6379
+CDN_BASE_URL="https://cdn.yourdomain.com"
 ```
 
-### Client
+### Frontend
 ```env
 VITE_API_URL="http://localhost:3000"
-VITE_WORKER_URL="http://localhost:3001"
+VITE_WS_URL="ws://localhost:9093"
 VITE_JITSI_DOMAIN="meet.jit.si"
 ```
 
 ### Worker Services
 ```env
-BUCKET_NAME="your-storage-bucket"
-PROJECT_ID="your-gcp-project"
-K8S_WORKER_URL="http://k8s-worker-service"
+REDIS_HOST=localhost
+REDIS_PORT=6379
 ```
 
 ## 📱 Usage
@@ -204,45 +224,55 @@ K8S_WORKER_URL="http://k8s-worker-service"
 
 1. **Create Account**: Sign up at the landing page
 2. **Start Meeting**: Create a new meeting or join with a meeting ID
-3. **Automatic Recording**: Only host can start and stop recording 
-4. **Access Recordings**: View processed recordings in your dashboard
+3. **Recording**: Host can start/stop recording (chunks encrypted automatically)
+4. **Access Recordings**: View processed recordings in dashboard
+5. **Edit Video**: Use the video editor to trim, add overlays, transitions
 
 ### For Developers
 
-1. **API Integration**: Use the REST API for meeting management
-2. **WebSocket Events**: Listen for real-time meeting updates
-3. **Custom Recording**: Implement custom recording logic using the chunk system
+1. **API Integration**: Use the REST API at `/api/v1/*`
+2. **WebSocket**: Connect to ws-relayer for real-time events
+3. **Recording Flow**: Implement chunk upload with encryption
 
-## 🔄 Recording Process
+## 🔄 Recording Process (with Encryption)
 
-### 1. Local Recording
-- Each participant's device records video/audio in 60-second chunks
-- Chunks are automatically uploaded to cloud storage
-- No quality loss due to internet issues
+### 1. Meeting Start
+- Generate a random 256-bit Content Encryption Key (CEK) for the meeting
+- Retrieve server's RSA public key
+- Wrap CEK with RSA-OAEP-256 and store in Redis
 
-### 2. Chunk Processing
-- Worker services monitor for new chunks
-- Chunks are validated and stored in database
-- Queue system manages processing order
+### 2. Local Recording (every 60 seconds)
+- Capture video/audio chunk from local MediaStream
+- Generate random 96-bit IV
+- Encrypt chunk: AES-256-GCM(plaintext, CEK, IV)
+- Extract authentication tag
+- Upload: encrypted chunk + wrapped CEK + IV + algorithm metadata
 
-### 3. Video Merging
-- Merger worker downloads all chunks for a meeting
-- FFmpeg processes and concatenates video chunks
-- Grid layout is generated for multi-participant view
+### 3. Chunk Upload
+- Backend stores chunk with encryption metadata in database
+- S3 stores the encrypted binary data
 
-### 4. Final Output
-- Processed video is uploaded to cloud storage
-- Database is updated with final recording links
-- Users can access recordings through dashboard
+### 4. Meeting End → Merge
+- Merger-worker downloads all chunks
+- Reads encryption metadata from database
+- Unwraps CEK using server's RSA private key
+- Decrypts each chunk with AES-GCM
+- Concatenates decrypted chunks per user
+- Creates grid layout video with FFmpeg
 
+### 5. Transcoding
+- Transcoder converts final MP4 to HLS
+- Generates multiple quality profiles (360p, 480p, 720p, 1080p)
+- Creates thumbnail sprites and poster
 
 ## 📊 Performance
 
 - **Recording Quality**: 1920x1080 @ 60fps
 - **Chunk Size**: 60 seconds per chunk
+- **Encryption**: AES-256-GCM (authenticated encryption)
+- **Key Wrapping**: RSA-OAEP-256 with 4096-bit keys
 - **Processing Time**: ~2-3 minutes for 1-hour meeting
-- **Storage**: Automatic cleanup of temporary files
-- **Scalability**: Kubernetes-based auto-scaling
+- **HLS Profiles**: 4 quality levels for adaptive streaming
 
 ## 🤝 Contributing
 
@@ -252,18 +282,16 @@ K8S_WORKER_URL="http://k8s-worker-service"
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 
 ## 🙏 Acknowledgments
 
 - **Jitsi Meet** for the video conferencing foundation
 - **FFmpeg** for video processing capabilities
-- **Google Cloud Platform** for scalable infrastructure
+- **Amazon Cloud Platform** for scalable infrastructure
+- **Bun** for high-performance JavaScript runtime
 - **Open Source Community** for various dependencies
 
 ---
-

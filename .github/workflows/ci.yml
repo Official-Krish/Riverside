@@ -1,0 +1,212 @@
+name: CI
+
+on:
+  pull_request:
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "docker/**"
+      - "ops/**"
+      - ".github/workflows/**"
+      - "turbo.json"
+      - "package.json"
+      - "bun.lock"
+
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "docker/**"
+      - "ops/**"
+      - ".github/workflows/**"
+      - "turbo.json"
+      - "package.json"
+      - "bun.lock"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint / Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      NODE_ENV: production
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache Bun Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+            .turbo
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+
+      - name: Install Dependencies
+        run: bun install
+
+      - name: Run Lint
+        run: bun run lint
+
+      - name: Run Build
+        run: bun run build
+
+  detect-changes:
+    name: Detect Changed Services
+    runs-on: ubuntu-latest
+    needs: quality
+
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      ws_relayer: ${{ steps.filter.outputs.ws_relayer }}
+      merger_worker: ${{ steps.filter.outputs.merger_worker }}
+      editor_worker: ${{ steps.filter.outputs.editor_worker }}
+      transcoder: ${{ steps.filter.outputs.transcoder }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect Changed Files
+        id: filter
+        run: |
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
+
+          echo "backend=false" >> $GITHUB_OUTPUT
+          echo "frontend=false" >> $GITHUB_OUTPUT
+          echo "ws_relayer=false" >> $GITHUB_OUTPUT
+          echo "merger_worker=false" >> $GITHUB_OUTPUT
+          echo "editor_worker=false" >> $GITHUB_OUTPUT
+          echo "transcoder=false" >> $GITHUB_OUTPUT
+
+          if echo "$CHANGED_FILES" | grep -q '^apps/backend/'; then
+            echo "backend=true" >> $GITHUB_OUTPUT
+          fi
+
+          if echo "$CHANGED_FILES" | grep -q '^apps/frontend/'; then
+            echo "frontend=true" >> $GITHUB_OUTPUT
+          fi
+
+          if echo "$CHANGED_FILES" | grep -q '^apps/ws-relayer/'; then
+            echo "ws_relayer=true" >> $GITHUB_OUTPUT
+          fi
+
+          if echo "$CHANGED_FILES" | grep -q '^apps/merger-worker/'; then
+            echo "merger_worker=true" >> $GITHUB_OUTPUT
+          fi
+
+          if echo "$CHANGED_FILES" | grep -q '^apps/editor-worker/'; then
+            echo "editor_worker=true" >> $GITHUB_OUTPUT
+          fi
+
+          if echo "$CHANGED_FILES" | grep -q '^apps/transcoder/'; then
+            echo "transcoder=true" >> $GITHUB_OUTPUT
+          fi
+
+          if echo "$CHANGED_FILES" | grep -q '^packages/'; then
+            echo "backend=true" >> $GITHUB_OUTPUT
+            echo "frontend=true" >> $GITHUB_OUTPUT
+            echo "ws_relayer=true" >> $GITHUB_OUTPUT
+            echo "merger_worker=true" >> $GITHUB_OUTPUT
+            echo "editor_worker=true" >> $GITHUB_OUTPUT
+            echo "transcoder=true" >> $GITHUB_OUTPUT
+          fi
+
+  docker-build:
+    name: Docker Build & Push
+    runs-on: ubuntu-latest
+
+    needs:
+      - quality
+      - detect-changes
+
+    if: |
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main'
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        include:
+          - service: backend
+            dockerfile: docker/backend.dockerfile
+            image: weave-backend
+            changed: ${{ needs.detect-changes.outputs.backend }}
+
+          - service: frontend
+            dockerfile: docker/frontend.dockerfile
+            image: weave-frontend
+            changed: ${{ needs.detect-changes.outputs.frontend }}
+
+          - service: ws-relayer
+            dockerfile: docker/ws-relayer.dockerfile
+            image: weave-ws-relayer
+            changed: ${{ needs.detect-changes.outputs.ws_relayer }}
+
+          - service: merger-worker
+            dockerfile: docker/merger-worker.dockerfile
+            image: weave-merger-worker
+            changed: ${{ needs.detect-changes.outputs.merger_worker }}
+
+          - service: editor-worker
+            dockerfile: docker/editor-worker.dockerfile
+            image: weave-editor-worker
+            changed: ${{ needs.detect-changes.outputs.editor_worker }}
+
+          - service: transcoder
+            dockerfile: docker/transcoder.dockerfile
+            image: weave-transcoder
+            changed: ${{ needs.detect-changes.outputs.transcoder }}
+
+    steps:
+      - name: Checkout
+        if: matrix.changed == 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        if: matrix.changed == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        if: matrix.changed == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push
+        if: matrix.changed == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}:v1.2.${{ github.run_number }}
+
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -53,6 +53,7 @@ createMeetingRouter.post("/create", authMiddleware, async (req, res) => {
         userId,
         isHost: true,
         passcode: passcode ?? randomPasscode,
+        startedAt: new Date(),
         participants: {
           create: [
             // host
@@ -74,13 +75,16 @@ createMeetingRouter.post("/create", authMiddleware, async (req, res) => {
 
     // send notifications to invited users
     if (invitedUsers.length > 0) {
-      await redisPublisher.lpush("MeetingInvitations", JSON.stringify({
-        roomId: meeting.roomId,
-        message: `You have been invited to join the meeting "${roomName}" by ${user.name}.`, 
-        participants: invitedUsers.map((u) => ({
-          userId: u.id,
-        })),
-      }));
+      await redisPublisher.lpush(
+        "MeetingInvitations",
+        JSON.stringify({
+          roomId: meeting.roomId,
+          message: `You have been invited to join the meeting "${roomName}" by ${user.name}.`,
+          participants: invitedUsers.map((u) => ({
+            userId: u.id,
+          })),
+        }),
+      );
     }
 
     return res.status(200).json({

@@ -7,6 +7,12 @@ metadata:
     app: weave-frontend
 spec:
   replicas: 1
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: weave-frontend
@@ -17,17 +23,41 @@ spec:
     spec:
       containers:
         - name: weave-frontend
-          image: krishanand01/weave-frontend:v1
+          image: krishanand01/weave-frontend:v1.2
+          imagePullPolicy: Always
           ports:
-            - containerPort: 5173
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 15
+
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
           volumeMounts:
             - name: env-file
-              mountPath: /app/.env
+              mountPath: /app/apps/frontend/.env
               subPath: env
+
       volumes:
         - name: env-file
           secret:
             secretName: weave-frontend-env
+
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -36,25 +66,47 @@ metadata:
   namespace: weave
   labels:
     app: weave-backend
+
 spec:
   replicas: 1
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
   selector:
     matchLabels:
       app: weave-backend
+
   template:
     metadata:
       labels:
         app: weave-backend
+
     spec:
       containers:
         - name: weave-backend
-          image: krishanand01/weave-backend:v1
+          image: krishanand01/weave-backend:v1.1
+          imagePullPolicy: Always
+
           ports:
             - containerPort: 3000
+
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
           volumeMounts:
             - name: env-file
               mountPath: /app/apps/backend/.env
               subPath: env
+
       volumes:
         - name: env-file
           secret:
@@ -64,123 +116,282 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: weave-worker
+  name: weave-merger-worker
   namespace: weave
   labels:
-    app: weave-worker
+    app: weave-merger-worker
+
 spec:
   replicas: 1
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
   selector:
     matchLabels:
-      app: weave-worker
+      app: weave-merger-worker
+
   template:
     metadata:
       labels:
-        app: weave-worker
+        app: weave-merger-worker
+
     spec:
+      restartPolicy: Always
+
       containers:
-        - name: weave-worker
-          image: krishanand01/weave-worker:v1
-          ports:
-            - containerPort: 8080
+        - name: weave-merger-worker
+          image: krishanand01/weave-merger-worker:v1.1
+          imagePullPolicy: Always
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+
           volumeMounts:
             - name: env-file
-              mountPath: /app/apps/worker/.env
+              mountPath: /app/apps/merger-worker/.env
               subPath: env
-            - name: gcp-key-volume
-              mountPath: /app/apps/worker/gcp-key.json
-              readOnly: true
+
+            - name: merger-worker-storage
+              mountPath: /app/recordings
+
       volumes:
         - name: env-file
           secret:
-            secretName: weave-worker-env
-        - name: gcp-key-volume
-          secret:
-            secretName: gcp-key-secret
+            secretName: weave-merger-worker-env
+
+        - name: merger-worker-storage
+          emptyDir:
+            sizeLimit: 20Gi
+
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: weave-k8s-worker
+  name: weave-editor-worker
   namespace: weave
   labels:
-    app: weave-k8s-worker
+    app: weave-editor-worker
+
 spec:
   replicas: 1
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
   selector:
     matchLabels:
-      app: weave-k8s-worker
+      app: weave-editor-worker
+
   template:
     metadata:
       labels:
-        app: weave-k8s-worker
+        app: weave-editor-worker
+
     spec:
+      restartPolicy: Always
+
       containers:
-        - name: weave-k8s-worker
-          image: krishanand01/weave-k8s-worker:v1.1
-          ports:
-            - containerPort: 9000
+        - name: weave-editor-worker
+          image: krishanand01/weave-editor-worker:v1.1
+          imagePullPolicy: Always
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+
           volumeMounts:
             - name: env-file
-              mountPath: /app/apps/k8s-worker/.env
+              mountPath: /app/apps/editor-worker/.env
               subPath: env
+
+            - name: editor-worker-storage
+              mountPath: /app/recordings
+
       volumes:
         - name: env-file
           secret:
-            secretName: weave-k8s-worker-env
+            secretName: weave-editor-worker-env
+
+        - name: editor-worker-storage
+          emptyDir:
+            sizeLimit: 20Gi
+
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: weave-redis-orchastrator
+  name: weave-transcoder
   namespace: weave
   labels:
-    app: weave-redis-orchastrator
+    app: weave-transcoder
+
 spec:
   replicas: 1
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
   selector:
     matchLabels:
-      app: weave-redis-orchastrator
+      app: weave-transcoder
+
   template:
     metadata:
       labels:
-        app: weave-redis-orchastrator
+        app: weave-transcoder
+
     spec:
+      restartPolicy: Always
+
       containers:
-        - name: weave-redis-orchastrator
-          image: krishanand01/weave-redis-orchastrator:v1
+        - name: weave-transcoder
+          image: krishanand01/weave-transcoder:v1.2
+          imagePullPolicy: Always
+
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+
           volumeMounts:
             - name: env-file
-              mountPath: /app/apps/redis-orchastrator/.env
+              mountPath: /app/apps/transcoder/.env
               subPath: env
+
+            - name: transcoder-storage
+              mountPath: /app/recordings
+
       volumes:
         - name: env-file
           secret:
-            secretName: weave-redis-orchastrator-env
+            secretName: weave-transcoder-env
+
+        - name: transcoder-storage
+          emptyDir:
+            sizeLimit: 20Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: weave-ws-relayer
+  namespace: weave
+  labels:
+    app: weave-ws-relayer
+
+spec:
+  replicas: 1
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
+  selector:
+    matchLabels:
+      app: weave-ws-relayer
+
+  template:
+    metadata:
+      labels:
+        app: weave-ws-relayer
+
+    spec:
+      containers:
+        - name: weave-ws-relayer
+          image: krishanand01/weave-ws-relayer:v1.1
+          imagePullPolicy: Always
+
+          ports:
+            - containerPort: 9093
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+
+          volumeMounts:
+            - name: env-file
+              mountPath: /app/apps/ws-relayer/.env
+              subPath: env
+
+      volumes:
+        - name: env-file
+          secret:
+            secretName: weave-ws-relayer-env
+
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: redis
   namespace: weave
+
 spec:
   replicas: 1
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
   selector:
     matchLabels:
       app: redis
+
   template:
     metadata:
       labels:
         app: redis
+
     spec:
       containers:
-      - name: redis
-        image: redis:7-alpine
-        ports:
-        - containerPort: 6379
-        volumeMounts:
-        - name: redis-data
-          mountPath: /data
+        - name: redis
+          image: redis:7-alpine
+          imagePullPolicy: Always
+
+          ports:
+            - containerPort: 6379
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+
       volumes:
-      - name: redis-data
-        emptyDir: {}
+        - name: redis-data
+          emptyDir: {}

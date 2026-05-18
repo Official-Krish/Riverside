@@ -1,4 +1,5 @@
 import type { PresetType, PresetConfig } from "./types";
+import { normalizeFfmpegColor } from "./ffmpegUtils";
 
 export interface GeneratedOverlay {
   content: { text: string };
@@ -8,7 +9,12 @@ export interface GeneratedOverlay {
   style?: Record<string, unknown>;
 }
 
-export function generateTemplateOverlays(preset: PresetType, durationMs: number, width = 1920, height = 1080): GeneratedOverlay[] {
+export function generateTemplateOverlays(
+  preset: PresetType,
+  durationMs: number,
+  width = 1920,
+  height = 1080,
+): GeneratedOverlay[] {
   switch (preset) {
     case "intro-template":
       return [
@@ -16,7 +22,12 @@ export function generateTemplateOverlays(preset: PresetType, durationMs: number,
           content: { text: "INTRO" },
           timelineStartMs: 0,
           durationMs: Math.min(durationMs, 3000),
-          transform: { x: width / 2 - 100, y: height / 2 - 30, width: 200, height: 60 },
+          transform: {
+            x: width / 2 - 100,
+            y: height / 2 - 30,
+            width: 200,
+            height: 60,
+          },
           style: {
             fontSize: 48,
             fontWeight: "bold" as const,
@@ -52,7 +63,12 @@ export function generateTemplateOverlays(preset: PresetType, durationMs: number,
           content: { text: "BOTTOM TEXT" },
           timelineStartMs: 0,
           durationMs,
-          transform: { x: width / 2 - 150, y: height - 90, width: 300, height: 50 },
+          transform: {
+            x: width / 2 - 150,
+            y: height - 90,
+            width: 300,
+            height: 50,
+          },
           style: {
             fontSize: 32,
             fontWeight: "bold" as const,
@@ -132,8 +148,13 @@ export function buildPresetFilter(
   }
 }
 
-function buildZoomPopFilter(intensity: number, width: number, height: number, fps: number): string | null {
-  const zoomAmount = 1 + (intensity * 0.15);
+function buildZoomPopFilter(
+  intensity: number,
+  width: number,
+  height: number,
+  fps: number,
+): string | null {
+  const zoomAmount = 1 + intensity * 0.15;
   return `zoompan=z='min(zoom+0.005,${zoomAmount})':d=1:s=${width}x${height}:fps=${fps}`;
 }
 
@@ -143,22 +164,27 @@ function buildShakeFilter(intensity: number): string | null {
 }
 
 function buildGlitchFilter(intensity: number): string | null {
-  const shift = Math.round(intensity * 3);
   return `colorbalance=rs=${intensity * 0.1}:gs=0:bs=-${intensity * 0.1},format=yuv420p`;
 }
 
-function buildCinematicBarsFilter(color: string, width: number, height: number): string | null {
-  const padColor = color.startsWith("0x") ? color.replace("0x", "") : color.replace("#", "");
+// normalized by import from ffmpegUtils.ts
+
+function buildCinematicBarsFilter(
+  color: string,
+  width: number,
+  height: number,
+): string | null {
+  const padColor = normalizeFfmpegColor(color, "000000");
   const barHeight = Math.max(1, Math.round(height * 0.25));
-  return `drawbox=x=0:y=0:w=${width}:h=${barHeight}:color=0x${padColor || "000000"}:t=fill,drawbox=x=0:y=${height - barHeight}:w=${width}:h=${barHeight}:color=0x${padColor || "000000"}:t=fill`;
+  return `drawbox=x=0:y=0:w=${width}:h=${barHeight}:color=${padColor}:t=fill,drawbox=x=0:y=${height - barHeight}:w=${width}:h=${barHeight}:color=${padColor}:t=fill`;
 }
 
-function buildVHSFilter(intensity: number): string | null {
+function buildVHSFilter(_intensity: number): string | null {
   return `eq=brightness=-0.03:saturation=1.15:contrast=1.05,format=yuv420p`;
 }
 
 function buildChromaKeyFilter(color: string, threshold: number): string | null {
-  const keyColor = color.startsWith("0x") ? color : `0x${color.replace("#", "")}`;
+  const keyColor = normalizeFfmpegColor(color, "00ff00");
   return `colorkey=${keyColor}:${threshold}:0.15`;
 }
 
@@ -174,7 +200,6 @@ function buildPodcastLayoutFilter(): string | null {
   return null;
 }
 
-
 function buildLowerThirdFilter(width: number, height: number): string | null {
   const padColor = "0x000000";
   const cropHeight = Math.max(1, Math.round(height * 0.22));
@@ -189,21 +214,33 @@ function buildChapterTitleFilter(): string | null {
   return null;
 }
 
-export function applyPresetToClip(inputPath: string, outputPath: string, preset: PresetType, config?: PresetConfig, ffmpegBin = "ffmpeg"): string[] {
+export function applyPresetToClip(
+  inputPath: string,
+  outputPath: string,
+  preset: PresetType,
+  config?: PresetConfig,
+  _ffmpegBin = "ffmpeg",
+): string[] {
   const filter = buildPresetFilter(preset, config);
-  
+
   if (!filter) {
     return ["-y", "-i", inputPath, "-c", "copy", outputPath];
   }
 
   return [
     "-y",
-    "-i", inputPath,
-    "-vf", filter,
-    "-c:v", "libx264",
-    "-preset", "fast",
-    "-crf", "22",
-    "-c:a", "copy",
+    "-i",
+    inputPath,
+    "-vf",
+    filter,
+    "-c:v",
+    "libx264",
+    "-preset",
+    "fast",
+    "-crf",
+    "22",
+    "-c:a",
+    "copy",
     outputPath,
   ];
 }

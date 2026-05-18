@@ -62,16 +62,34 @@ export function OverlayLayer({
 }: OverlayLayerProps) {
   const overlayEditContainerRef = useRef<HTMLDivElement | null>(null);
   const overlayRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const [activeGuides, setActiveGuides] = useState<{ x: SnapGuide | null; y: SnapGuide | null }>({ x: null, y: null });
+  const [activeGuides, setActiveGuides] = useState<{
+    x: SnapGuide | null;
+    y: SnapGuide | null;
+  }>({ x: null, y: null });
 
   const SNAP_THRESHOLD_PX = 8;
   const DISTRIBUTION_THRESHOLD_PX = 14;
 
   const visibleOverlays = overlays.filter(
-    (o) => timelineTime >= o.timelineStartMs && timelineTime <= o.timelineStartMs + o.durationMs
+    (o) =>
+      timelineTime >= o.timelineStartMs &&
+      timelineTime <= o.timelineStartMs + o.durationMs,
   );
 
-  const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+  const stageAspect = stageWidth / stageHeight;
+  let displayWidth = containerSize.width;
+  let displayHeight = displayWidth / stageAspect;
+  if (displayHeight > containerSize.height) {
+    displayHeight = containerSize.height;
+    displayWidth = displayHeight * stageAspect;
+  }
+  const stageOffsetX = (containerSize.width - displayWidth) / 2;
+  const stageOffsetY = (containerSize.height - displayHeight) / 2;
+  const scaleX = displayWidth / stageWidth;
+  const scaleY = displayHeight / stageHeight;
+
+  const clamp = (value: number, min: number, max: number) =>
+    Math.max(min, Math.min(max, value));
 
   const estimateOverlayBounds = (overlay: Overlay): OverlayBounds => {
     const fontSize = overlay.style?.fontSize || 24;
@@ -81,9 +99,16 @@ export function OverlayLayer({
     const approxCharWidth = fontSize * 0.58;
     const estimatedWidth = Math.min(
       maxWidth,
-      Math.max(40, ...lines.map((line) => line.length * approxCharWidth), fontSize * 2)
+      Math.max(
+        40,
+        ...lines.map((line) => line.length * approxCharWidth),
+        fontSize * 2,
+      ),
     );
-    const estimatedHeight = Math.max(fontSize * lineHeight + 8, lines.length * fontSize * lineHeight + 8);
+    const estimatedHeight = Math.max(
+      fontSize * lineHeight + 8,
+      lines.length * fontSize * lineHeight + 8,
+    );
 
     return {
       x: overlay.transform.x,
@@ -93,7 +118,11 @@ export function OverlayLayer({
     };
   };
 
-  const getOverlayBounds = (overlay: Overlay, scaleX: number, scaleY: number): OverlayBounds => {
+  const getOverlayBounds = (
+    overlay: Overlay,
+    scaleX: number,
+    scaleY: number,
+  ): OverlayBounds => {
     const element = overlayRefs.current[overlay.id];
     const container = overlayEditContainerRef.current;
 
@@ -116,19 +145,33 @@ export function OverlayLayer({
     axis: Axis,
     size: number,
     stageSize: number,
-    otherBounds: OverlayBounds[]
+    otherBounds: OverlayBounds[],
   ): SnapCandidate[] => {
     const candidates: SnapCandidate[] = [];
 
     const lineTargets = [
-      { position: 0, label: axis === "x" ? "Left edge" : "Top edge", kind: "edge" as const },
-      { position: stageSize / 2, label: axis === "x" ? "Center" : "Middle", kind: "center" as const },
-      { position: stageSize, label: axis === "x" ? "Right edge" : "Bottom edge", kind: "edge" as const },
+      {
+        position: 0,
+        label: axis === "x" ? "Left edge" : "Top edge",
+        kind: "edge" as const,
+      },
+      {
+        position: stageSize / 2,
+        label: axis === "x" ? "Center" : "Middle",
+        kind: "center" as const,
+      },
+      {
+        position: stageSize,
+        label: axis === "x" ? "Right edge" : "Bottom edge",
+        kind: "edge" as const,
+      },
     ];
 
     for (const target of lineTargets) {
       const candidatePosition =
-        target.kind === "center" ? target.position - size / 2 : target.position - (target.position === stageSize ? size : 0);
+        target.kind === "center"
+          ? target.position - size / 2
+          : target.position - (target.position === stageSize ? size : 0);
 
       candidates.push({
         position: candidatePosition,
@@ -179,11 +222,14 @@ export function OverlayLayer({
       }
     }
 
-    const sorted = [...otherBounds].sort((a, b) => (axis === "x" ? a.x - b.x : a.y - b.y));
+    const sorted = [...otherBounds].sort((a, b) =>
+      axis === "x" ? a.x - b.x : a.y - b.y,
+    );
     for (let i = 0; i < sorted.length - 1; i += 1) {
       const first = sorted[i];
       const second = sorted[i + 1];
-      const firstEnd = axis === "x" ? first.x + first.width : first.y + first.height;
+      const firstEnd =
+        axis === "x" ? first.x + first.width : first.y + first.height;
       const secondStart = axis === "x" ? second.x : second.y;
       const gap = secondStart - firstEnd - size;
 
@@ -203,7 +249,11 @@ export function OverlayLayer({
     return candidates;
   };
 
-  const snapAxis = (value: number, candidates: SnapCandidate[], threshold: number) => {
+  const snapAxis = (
+    value: number,
+    candidates: SnapCandidate[],
+    threshold: number,
+  ) => {
     let snappedValue = value;
     let activeGuide: SnapGuide | null = null;
     let closestDistance = Number.POSITIVE_INFINITY;
@@ -228,24 +278,47 @@ export function OverlayLayer({
     proposedX: number,
     proposedY: number,
     movingBounds: OverlayBounds,
-    otherBounds: OverlayBounds[]
+    otherBounds: OverlayBounds[],
   ) => {
-    const xCandidates = buildAxisCandidates("x", movingBounds.width, stageWidth, otherBounds);
-    const yCandidates = buildAxisCandidates("y", movingBounds.height, stageHeight, otherBounds);
+    const xCandidates = buildAxisCandidates(
+      "x",
+      movingBounds.width,
+      stageWidth,
+      otherBounds,
+    );
+    const yCandidates = buildAxisCandidates(
+      "y",
+      movingBounds.height,
+      stageHeight,
+      otherBounds,
+    );
 
     const snappedX = snapAxis(proposedX, xCandidates, SNAP_THRESHOLD_PX);
     const snappedY = snapAxis(proposedY, yCandidates, SNAP_THRESHOLD_PX);
 
     return {
       x: clamp(snappedX.value, 0, Math.max(0, stageWidth - movingBounds.width)),
-      y: clamp(snappedY.value, 0, Math.max(0, stageHeight - movingBounds.height)),
+      y: clamp(
+        snappedY.value,
+        0,
+        Math.max(0, stageHeight - movingBounds.height),
+      ),
       guideX: snappedX.guide,
       guideY: snappedY.guide,
     };
   };
 
-  const snapResizeWidth = (proposedWidth: number, leftEdge: number, otherBounds: OverlayBounds[]) => {
-    const widthCandidates = buildAxisCandidates("x", 0, stageWidth, otherBounds).map((candidate) => ({
+  const snapResizeWidth = (
+    proposedWidth: number,
+    leftEdge: number,
+    otherBounds: OverlayBounds[],
+  ) => {
+    const widthCandidates = buildAxisCandidates(
+      "x",
+      0,
+      stageWidth,
+      otherBounds,
+    ).map((candidate) => ({
       position: candidate.guide.position,
       guide: candidate.guide,
     }));
@@ -299,15 +372,32 @@ export function OverlayLayer({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedOverlayId, editingOverlayId, overlays, handleUpdateOverlay, stageWidth, stageHeight]);
+  }, [
+    selectedOverlayId,
+    editingOverlayId,
+    overlays,
+    handleUpdateOverlay,
+    stageWidth,
+    stageHeight,
+  ]);
 
   return (
-    <div ref={overlayEditContainerRef} className="absolute inset-0 pointer-events-none z-30">
-      {/* Overlay position indicators (visible overlays as draggable chips) */}
-      {visibleOverlays.map((overlay) => {
+    <div className="absolute inset-0 pointer-events-none z-30">
+      <div
+        ref={overlayEditContainerRef}
+        className="absolute pointer-events-none"
+        style={{
+          left: stageOffsetX,
+          top: stageOffsetY,
+          width: stageWidth,
+          height: stageHeight,
+          transform: `scale(${scaleX}, ${scaleY})`,
+          transformOrigin: "top left",
+        }}
+      >
+        {/* Overlay position indicators (visible overlays as draggable chips) */}
+        {visibleOverlays.map((overlay) => {
           if (!overlay.id) return null;
-          const scaleX = containerSize.width / stageWidth;
-          const scaleY = containerSize.height / stageHeight;
           const isSelected = selectedOverlayId === overlay.id;
           const overlayBounds = getOverlayBounds(overlay, scaleX, scaleY);
 
@@ -318,26 +408,35 @@ export function OverlayLayer({
                 overlayRefs.current[overlay.id] = el;
               }}
               className={`absolute pointer-events-auto cursor-move select-none transition-all duration-100
-                ${isSelected
-                  ? "ring-2 ring-[#f5a623] ring-offset-1 ring-offset-transparent rounded"
-                  : "hover:ring-1 hover:ring-[#f5a623]/40 rounded"
+                ${
+                  isSelected
+                    ? "ring-2 ring-[#f5a623] ring-offset-1 ring-offset-transparent rounded"
+                    : "hover:ring-1 hover:ring-[#f5a623]/40 rounded"
                 }`}
               style={{
-                left: overlay.transform.x * scaleX,
-                top: overlay.transform.y * scaleY,
-                fontSize: (overlay.style?.fontSize || 24) * scaleX,
-                fontFamily: overlay.style?.fontFamily || "Inter, system-ui, sans-serif",
+                left: overlay.transform.x,
+                top: overlay.transform.y,
+                fontSize: overlay.style?.fontSize || 24,
+                fontFamily:
+                  overlay.style?.fontFamily || "Inter, system-ui, sans-serif",
                 fontWeight: overlay.style?.fontWeight || "normal",
                 fontStyle: overlay.style?.fontStyle || "normal",
                 color: overlay.style?.color || "#fff5de",
-                minWidth: 40 * scaleX,
-                minHeight: 20 * scaleY,
+                minWidth: 40,
+                minHeight: 20,
                 padding: "2px 4px",
-                maxWidth: overlay.style?.maxWidth ? overlay.style.maxWidth * scaleX : undefined,
+                maxWidth: overlay.style?.maxWidth,
                 lineHeight: overlay.style?.lineHeight || 1.2,
                 letterSpacing: overlay.style?.letterSpacing || 0,
-                background: editingOverlayId === overlay.id ? "transparent" : (isSelected ? "rgba(245,166,35,0.1)" : "rgba(0,0,0,0.2)"),
-                border: isSelected ? "1px solid rgba(245,166,35,0.45)" : "1px dashed rgba(245,166,35,0.2)",
+                background:
+                  editingOverlayId === overlay.id
+                    ? "transparent"
+                    : isSelected
+                      ? "rgba(245,166,35,0.1)"
+                      : "rgba(0,0,0,0.2)",
+                border: isSelected
+                  ? "1px solid rgba(245,166,35,0.45)"
+                  : "1px dashed rgba(245,166,35,0.2)",
                 borderRadius: 6,
                 whiteSpace: "pre-wrap",
                 direction: overlay.style?.textDirection || "ltr",
@@ -345,9 +444,20 @@ export function OverlayLayer({
                 // Hide interactive DOM overlays while the video is playing to avoid
                 // duplicate rendering (canvas already draws overlays during playback).
                 // Keep the overlay interactive when editing.
-                opacity: editingOverlayId === overlay.id ? 0 : (isPlaying ? 0 : 1),
-                visibility: editingOverlayId === overlay.id ? "hidden" : (isPlaying ? "hidden" : "visible"),
-                pointerEvents: editingOverlayId === overlay.id ? "none" : (isPlaying ? "none" : "auto"),
+                opacity:
+                  editingOverlayId === overlay.id ? 0 : isPlaying ? 0 : 1,
+                visibility:
+                  editingOverlayId === overlay.id
+                    ? "hidden"
+                    : isPlaying
+                      ? "hidden"
+                      : "visible",
+                pointerEvents:
+                  editingOverlayId === overlay.id
+                    ? "none"
+                    : isPlaying
+                      ? "none"
+                      : "auto",
               }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -374,7 +484,12 @@ export function OverlayLayer({
                   const unclampedX = origX + dx;
                   const unclampedY = origY + dy;
 
-                  const snapped = snapMove(unclampedX, unclampedY, movingBounds, otherBounds);
+                  const snapped = snapMove(
+                    unclampedX,
+                    unclampedY,
+                    movingBounds,
+                    otherBounds,
+                  );
 
                   setActiveGuides({ x: snapped.guideX, y: snapped.guideY });
 
@@ -403,9 +518,12 @@ export function OverlayLayer({
                   style={{
                     whiteSpace: "pre-wrap",
                     direction: overlay.style?.textDirection || "ltr",
-                    textShadow: overlay.style?.textShadow ? "0 1px 3px rgba(0,0,0,0.65)" : undefined,
+                    textShadow: overlay.style?.textShadow
+                      ? "0 1px 3px rgba(0,0,0,0.65)"
+                      : undefined,
                     WebkitTextStroke:
-                      overlay.style?.strokeWidth && overlay.style?.strokeWidth > 0
+                      overlay.style?.strokeWidth &&
+                      overlay.style?.strokeWidth > 0
                         ? `${Math.max(0.5, overlay.style.strokeWidth * 0.4)}px ${overlay.style.strokeColor || "#000"}`
                         : undefined,
                   }}
@@ -424,16 +542,23 @@ export function OverlayLayer({
 
                     const startX = e.clientX;
                     const initialWidth = overlay.style?.maxWidth || 320;
-                      const otherBounds = visibleOverlays
-                        .filter((o) => o.id !== overlay.id)
-                        .map((o) => getOverlayBounds(o, scaleX, scaleY));
+                    const otherBounds = visibleOverlays
+                      .filter((o) => o.id !== overlay.id)
+                      .map((o) => getOverlayBounds(o, scaleX, scaleY));
 
                     const onMove = (moveE: MouseEvent) => {
                       const delta = (moveE.clientX - startX) / scaleX;
-                      const raw = Math.max(80, Math.min(1200, Math.round(initialWidth + delta)));
-                        const snapped = snapResizeWidth(raw, overlay.transform.x, otherBounds);
-                        const next = snapped.width;
-                        setActiveGuides({ x: snapped.guide, y: null });
+                      const raw = Math.max(
+                        80,
+                        Math.min(1200, Math.round(initialWidth + delta)),
+                      );
+                      const snapped = snapResizeWidth(
+                        raw,
+                        overlay.transform.x,
+                        otherBounds,
+                      );
+                      const next = snapped.width;
+                      setActiveGuides({ x: snapped.guide, y: null });
                       handleUpdateOverlay(overlay.id!, {
                         style: {
                           ...overlay.style,
@@ -472,16 +597,26 @@ export function OverlayLayer({
                     const startY = e.clientY;
                     const initialWidth = overlay.style?.maxWidth || 320;
                     const initialSize = overlay.style?.fontSize || 24;
-                      const otherBounds = visibleOverlays
-                        .filter((o) => o.id !== overlay.id)
-                        .map((o) => getOverlayBounds(o, scaleX, scaleY));
+                    const otherBounds = visibleOverlays
+                      .filter((o) => o.id !== overlay.id)
+                      .map((o) => getOverlayBounds(o, scaleX, scaleY));
 
                     const onMove = (moveE: MouseEvent) => {
                       const deltaW = (moveE.clientX - startX) / scaleX;
                       const deltaS = (moveE.clientY - startY) / scaleY;
-                      const rawWidth = Math.max(80, Math.min(1200, Math.round(initialWidth + deltaW)));
-                        const nextWidth = snapResizeWidth(rawWidth, overlay.transform.x, otherBounds).width;
-                      const nextSize = Math.max(12, Math.min(140, Math.round(initialSize + deltaS * 0.2)));
+                      const rawWidth = Math.max(
+                        80,
+                        Math.min(1200, Math.round(initialWidth + deltaW)),
+                      );
+                      const nextWidth = snapResizeWidth(
+                        rawWidth,
+                        overlay.transform.x,
+                        otherBounds,
+                      ).width;
+                      const nextSize = Math.max(
+                        12,
+                        Math.min(140, Math.round(initialSize + deltaS * 0.2)),
+                      );
                       handleUpdateOverlay(overlay.id!, {
                         style: {
                           ...overlay.style,
@@ -511,6 +646,7 @@ export function OverlayLayer({
             </div>
           );
         })}
+      </div>
 
       {/* Alignment guides while dragging */}
       {(activeGuides.x !== null || activeGuides.y !== null) && (
@@ -518,7 +654,7 @@ export function OverlayLayer({
           {activeGuides.x !== null && (
             <div
               className={`absolute top-0 bottom-0 z-40 pointer-events-none ${activeGuides.x.kind === "distribution" ? "border-l-2 border-dotted border-[#f5a623]/95" : "border-l border-dashed border-[#22d3ee]/90"}`}
-              style={{ left: activeGuides.x.position * (containerSize.width / stageWidth) }}
+              style={{ left: stageOffsetX + activeGuides.x.position * scaleX }}
             >
               <div
                 className={`absolute top-2 rounded px-1.5 py-0.5 text-[10px] font-medium shadow ${activeGuides.x.kind === "distribution" ? "bg-[#f5a623] text-black" : "bg-[#22d3ee] text-black"}`}
@@ -531,7 +667,7 @@ export function OverlayLayer({
           {activeGuides.y !== null && (
             <div
               className={`absolute left-0 right-0 z-40 pointer-events-none ${activeGuides.y.kind === "distribution" ? "border-t-2 border-dotted border-[#f5a623]/95" : "border-t border-dashed border-[#22d3ee]/90"}`}
-              style={{ top: activeGuides.y.position * (containerSize.height / stageHeight) }}
+              style={{ top: stageOffsetY + activeGuides.y.position * scaleY }}
             >
               <div
                 className={`absolute left-2 rounded px-1.5 py-0.5 text-[10px] font-medium shadow ${activeGuides.y.kind === "distribution" ? "bg-[#f5a623] text-black" : "bg-[#22d3ee] text-black"}`}
@@ -545,69 +681,68 @@ export function OverlayLayer({
       )}
 
       {/* Inline text editing input (contentEditable for richer UX) */}
-      {editingOverlayId && (() => {
-        const overlay = overlays.find(o => o.id === editingOverlayId);
-        if (!overlay) return null;
+      {editingOverlayId &&
+        (() => {
+          const overlay = overlays.find((o) => o.id === editingOverlayId);
+          if (!overlay) return null;
 
-        const scaleX = containerSize.width / stageWidth;
-        const scaleY = containerSize.height / stageHeight;
-
-        return (
-          <>
-            <div
-              className="fixed inset-0 z-50 pointer-events-auto"
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                handleCommitTextEdit();
-              }}
-            />
-
-            {/* Textarea for editing */}
-            <textarea
-              value={editText}
-              onChange={(e) => setEditText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") {
-                  setEditingOverlayId(null);
-                }
-                if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+          return (
+            <>
+              <div
+                className="fixed inset-0 z-50 pointer-events-auto"
+                onMouseDown={(e) => {
+                  e.stopPropagation();
                   e.preventDefault();
                   handleCommitTextEdit();
-                }
-                if (e.key === "Backspace" && editText === "") {
-                  handleDeleteOverlay(overlay.id!);
-                }
-              }}
-              onBlur={() => handleCommitTextEdit()}
-              className="pointer-events-auto resize-none rounded px-2 py-1"
-              autoFocus
-              placeholder="Type text..."
-              style={{
-                position: "absolute",
-                left: overlay.transform.x * scaleX,
-                top: overlay.transform.y * scaleY,
-                fontSize: (overlay.style?.fontSize || 24) * scaleX,
-                fontFamily: overlay.style?.fontFamily || "Inter, system-ui, sans-serif",
-                color: overlay.style?.color || "#ffffff",
-                background: "rgba(0,0,0,0.8)",
-                border: "2px solid #f5a623",
-                borderRadius: overlay.style?.background?.radius || 6,
-                padding: "6px 10px",
-                outline: "none",
-                minWidth: 120,
-                zIndex: 61,
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                direction: overlay.style?.textDirection || "ltr",
-                unicodeBidi: "plaintext",
-                width: (overlay.style?.maxWidth || 320) * scaleX,
-                minHeight: "1.5em",
-              }}
-            />
-          </>
-        );
-      })()}
+                }}
+              />
+
+              {/* Textarea for editing */}
+              <textarea
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setEditingOverlayId(null);
+                  }
+                  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                    e.preventDefault();
+                    handleCommitTextEdit();
+                  }
+                  if (e.key === "Backspace" && editText === "") {
+                    handleDeleteOverlay(overlay.id!);
+                  }
+                }}
+                onBlur={() => handleCommitTextEdit()}
+                className="pointer-events-auto resize-none rounded px-2 py-1"
+                autoFocus
+                placeholder="Type text..."
+                style={{
+                  position: "absolute",
+                  left: stageOffsetX + overlay.transform.x * scaleX,
+                  top: stageOffsetY + overlay.transform.y * scaleY,
+                  fontSize: (overlay.style?.fontSize || 24) * scaleX,
+                  fontFamily:
+                    overlay.style?.fontFamily || "Inter, system-ui, sans-serif",
+                  color: overlay.style?.color || "#ffffff",
+                  background: "rgba(0,0,0,0.8)",
+                  border: "2px solid #f5a623",
+                  borderRadius: overlay.style?.background?.radius || 6,
+                  padding: "6px 10px",
+                  outline: "none",
+                  minWidth: 120,
+                  zIndex: 61,
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                  direction: overlay.style?.textDirection || "ltr",
+                  unicodeBidi: "plaintext",
+                  width: (overlay.style?.maxWidth || 320) * scaleX,
+                  minHeight: "1.5em",
+                }}
+              />
+            </>
+          );
+        })()}
     </div>
   );
 }

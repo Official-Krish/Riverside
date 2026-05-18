@@ -4,28 +4,27 @@ metadata:
   name: ingress-nginx
   namespace: weave
   annotations:
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"  
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"  
-    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"   
-    nginx.ingress.kubernetes.io/backend-protocol: "HTTP" 
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/proxy-body-size: "5g"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
 spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - api.weave.krishdev.xyz
+        - weave.krishlabs.tech
+      secretName: weave-frontend-tls
+    - hosts:
+        - api.weave.krishlabs.tech
       secretName: weave-backend-tls
     - hosts:
-        - worker.weave.krishdev.xyz
-      secretName: weave-worker-tls
-    - hosts:
-        - k8s-worker.weave.krishdev.xyz 
-      secretName: weave-k8s-worker-tls
-    - hosts:
-        - wss.weave.krishdev.xyz
+        - wss.weave.krishlabs.tech
       secretName: weave-ws-relayer-tls
 
   rules:
-    - host: weave.krishdev.xyz
+    - host: weave.krishlabs.tech
       http:
         paths:
           - path: /
@@ -36,7 +35,7 @@ spec:
                 port:
                   number: 80
 
-    - host: api.weave.krishdev.xyz
+    - host: api.weave.krishlabs.tech
       http:
         paths:
           - path: /
@@ -46,35 +45,14 @@ spec:
                 name: weave-backend
                 port:
                   number: 80
-    - host: worker.weave.krishdev.xyz
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: weave-worker
-                port:
-                  number: 80
-    - host: k8s-worker.weave.krishdev.xyz
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: weave-k8s-worker
-                port:
-                  number: 80
 
-    - host: wss.weave.krishdev.xyz
+    - host: wss.weave.krishlabs.tech
       http:
         paths:
-        - path: /
-          pathType: Prefix
-          backend:
-            service:
-              name: weave-ws-relayer
-              port:
-                number: 80
----
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: weave-ws-relayer
+                port:
+                  number: 80

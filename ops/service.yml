@@ -7,9 +7,10 @@ spec:
   selector:
     app: weave-frontend
   ports:
-    - protocol: TCP
+    - name: http
+      protocol: TCP
       port: 80
-      targetPort: 5173
+      targetPort: 80
   type: ClusterIP
 ---
 apiVersion: v1
@@ -21,37 +22,10 @@ spec:
   selector:
     app: weave-backend
   ports:
-    - protocol: TCP
+    - name: http
+      protocol: TCP
       port: 80
       targetPort: 3000
-  type: ClusterIP
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: weave-k8s-worker
-  namespace: weave
-spec:
-  selector:
-    app: weave-k8s-worker
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 9000
-  type: ClusterIP
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: weave-worker
-  namespace: weave
-spec:
-  selector:
-    app: weave-worker
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 8080
   type: ClusterIP
 ---
 apiVersion: v1
@@ -63,7 +37,8 @@ spec:
   selector:
     app: weave-ws-relayer
   ports:
-    - protocol: TCP
+    - name: websocket
+      protocol: TCP
       port: 80
       targetPort: 9093
   type: ClusterIP
@@ -78,6 +53,8 @@ spec:
   selector:
     app: redis
   ports:
-    - port: 6379
+    - name: redis
+      protocol: TCP
+      port: 6379
       targetPort: 6379
   type: ClusterIP

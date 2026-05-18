@@ -4,12 +4,15 @@ WORKDIR /app
 
 COPY package.json bun.lock turbo.json ./
 COPY apps/frontend/package.json apps/frontend/package.json
-COPY packages/node-registry/package.json packages/node-registry/package.json
 COPY packages/types/package.json packages/types/package.json
 
 RUN bun install
 
-COPY . .
+COPY apps/frontend ./apps/frontend
+COPY packages/types ./packages/types
+COPY packages/typescript-config ./packages/typescript-config
+COPY packages/eslint-config ./packages/eslint-config
+COPY packages/ui ./packages/ui
 
 ARG VITE_BACKEND_URL=/api/v1
 ENV VITE_BACKEND_URL=${VITE_BACKEND_URL}

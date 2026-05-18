@@ -39,9 +39,17 @@ export function rateLimiter(options: RateLimiterOptions = {}) {
 
   return async function (req: Request, res: Response, next: NextFunction) {
     try {
+      // Skip rate limiting for admin users
+      if (req.userTier === "ADMIN") {
+        return next();
+      }
+
       // Allow a custom key (e.g. per-user) via keyGenerator, otherwise fall back to IP
       const generated = options.keyGenerator ? options.keyGenerator(req) : null;
-      const ip = (req.ip || req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown") as string;
+      const ip = (req.ip ||
+        req.headers["x-forwarded-for"] ||
+        req.socket.remoteAddress ||
+        "unknown") as string;
       const keyBase = generated ? generated : ip;
       const key = `${prefix}:${keyBase}`;
 
@@ -55,12 +63,24 @@ export function rateLimiter(options: RateLimiterOptions = {}) {
         const ttl = await redisPublisher.ttl(key);
         if (total > maxRequests) {
           res.setHeader("Retry-After", String(ttl > 0 ? ttl : windowSeconds));
-          return res.status(429).json({ message: "Too many requests", code: "RATE_LIMIT_EXCEEDED", retryAfter: ttl });
+          return res
+            .status(429)
+            .json({
+              message: "Too many requests",
+              code: "RATE_LIMIT_EXCEEDED",
+              retryAfter: ttl,
+            });
         }
 
         res.setHeader("X-RateLimit-Limit", String(maxRequests));
-        res.setHeader("X-RateLimit-Remaining", String(Math.max(0, maxRequests - total)));
-        res.setHeader("X-RateLimit-Reset", String(Date.now() + (ttl > 0 ? ttl : windowSeconds) * 1000));
+        res.setHeader(
+          "X-RateLimit-Remaining",
+          String(Math.max(0, maxRequests - total)),
+        );
+        res.setHeader(
+          "X-RateLimit-Reset",
+          String(Date.now() + (ttl > 0 ? ttl : windowSeconds) * 1000),
+        );
         return next();
       }
 
@@ -69,16 +89,28 @@ export function rateLimiter(options: RateLimiterOptions = {}) {
       const ttl = fallbackStore.ttl(key);
       if (total > maxRequests) {
         res.setHeader("Retry-After", String(ttl > 0 ? ttl : windowSeconds));
-        return res.status(429).json({ message: "Too many requests", code: "RATE_LIMIT_EXCEEDED", retryAfter: ttl });
+        return res
+          .status(429)
+          .json({
+            message: "Too many requests",
+            code: "RATE_LIMIT_EXCEEDED",
+            retryAfter: ttl,
+          });
       }
 
       res.setHeader("X-RateLimit-Limit", String(maxRequests));
-      res.setHeader("X-RateLimit-Remaining", String(Math.max(0, maxRequests - total)));
-      res.setHeader("X-RateLimit-Reset", String(Date.now() + (ttl > 0 ? ttl : windowSeconds) * 1000));
+      res.setHeader(
+        "X-RateLimit-Remaining",
+        String(Math.max(0, maxRequests - total)),
+      );
+      res.setHeader(
+        "X-RateLimit-Reset",
+        String(Date.now() + (ttl > 0 ? ttl : windowSeconds) * 1000),
+      );
       return next();
     } catch (err) {
       // If anything fails, don't block the request — fail open
-      // eslint-disable-next-line no-console
+
       console.error("Rate limiter error:", err);
       return next();
     }

@@ -1,6 +1,20 @@
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
+  name: weave-frontend-cert
+  namespace: weave
+spec:
+  secretName: weave-frontend-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: weave.krishlabs.tech
+  dnsNames:
+  - weave.krishlabs.tech
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
   name: weave-backend-cert
   namespace: weave
 spec:
@@ -8,37 +22,9 @@ spec:
   issuerRef:
     name: letsencrypt-prod
     kind: ClusterIssuer
-  commonName: api.weave.krishdev.xyz
+  commonName: api.weave.krishlabs.tech
   dnsNames:
-  - api.weave.krishdev.xyz
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: weave-worker-cert
-  namespace: weave
-spec:
-  secretName: weave-worker-tls
-  issuerRef:
-    name: letsencrypt-prod
-    kind: ClusterIssuer
-  commonName: worker.weave.krishdev.xyz
-  dnsNames:
-  - worker.weave.krishdev.xyz
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: weave-k8s-worker-cert
-  namespace: weave
-spec:
-  secretName: weave-k8s-worker-tls
-  issuerRef:
-    name: letsencrypt-prod
-    kind: ClusterIssuer
-  commonName: k8s-worker.weave.krishdev.xyz
-  dnsNames:
-  - k8s-worker.weave.krishdev.xyz
+  - api.weave.krishlabs.tech
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -50,6 +36,6 @@ spec:
   issuerRef:
     name: letsencrypt-prod
     kind: ClusterIssuer
-  commonName: wss.weave.krishdev.xyz
+  commonName: wss.weave.krishlabs.tech
   dnsNames:
-  - wss.weave.krishdev.xyz
+  - wss.weave.krishlabs.tech

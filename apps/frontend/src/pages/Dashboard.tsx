@@ -2,7 +2,10 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import type { GetAllMeetingsResponse, JoinMeetingResponse } from "@repo/types/api";
+import type {
+  GetAllMeetingsResponse,
+  JoinMeetingResponse,
+} from "@repo/types/api";
 import { toast } from "sonner";
 import { Meetings } from "../components/dashboard/Meetings";
 import { RecordingsPage } from "../components/dashboard/RecordingsPage";
@@ -19,16 +22,7 @@ type ThemeMode = "light" | "dark";
 type DashboardSection = "overview" | "meetings" | "recordings" | "upcoming";
 
 function getInitialTheme(): ThemeMode {
-  if (typeof window === "undefined") {
-    return "light";
-  }
-
-  const storedTheme = window.localStorage.getItem("weave-theme");
-  if (storedTheme === "light" || storedTheme === "dark") {
-    return storedTheme;
-  }
-
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return "dark";
 }
 
 export function Dashboard() {
@@ -40,18 +34,19 @@ export function Dashboard() {
 
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.toggle("dark", theme === "dark");
-    window.localStorage.setItem("weave-theme", theme);
+    root.classList.add("dark");
+    window.localStorage.setItem("weave-theme", "dark");
   }, [theme]);
 
   const toggleTheme = () => {
-    setTheme((current) => (current === "light" ? "dark" : "light"));
+    setTheme("dark");
   };
 
   const meetingsQuery = useQuery({
     queryKey: ["meetings"],
     queryFn: async () => {
-      const response = await http.get<GetAllMeetingsResponse>("/meeting/getAll");
+      const response =
+        await http.get<GetAllMeetingsResponse>("/meeting/getAll");
       return response.data;
     },
     enabled: isAuthenticated,
@@ -63,9 +58,16 @@ export function Dashboard() {
       devices,
     }: {
       scheduleId: string;
-      devices: { micId?: string; cameraId?: string };
+      devices: {
+        micId?: string;
+        cameraId?: string;
+        initialMicOff?: boolean;
+        initialVideoOff?: boolean;
+      };
     }) => {
-      const response = await http.post<JoinMeetingResponse | { message: string }>(`/meeting/join/${scheduleId}`, {});
+      const response = await http.post<
+        JoinMeetingResponse | { message: string }
+      >(`/meeting/join/${scheduleId}`, {});
       return {
         status: response.status,
         data: response.data,
@@ -87,11 +89,15 @@ export function Dashboard() {
           recordingState: data.recordingState === "RECORDING",
           micId: devices.micId,
           cameraId: devices.cameraId,
-        })
+          initialMicOff: devices.initialMicOff,
+          initialVideoOff: devices.initialVideoOff,
+        }),
       );
     },
     onError: (error) => {
-      toast.error(getHttpErrorMessage(error, "Could not join the scheduled meeting."));
+      toast.error(
+        getHttpErrorMessage(error, "Could not join the scheduled meeting."),
+      );
     },
   });
 
@@ -125,11 +131,7 @@ export function Dashboard() {
       />
 
       <div className="flex-1 overflow-auto flex flex-col">
-        <Topbar
-          name={name}
-          meetings={meetings}
-          schedules={schedules}
-        />
+        <Topbar name={name} meetings={meetings} schedules={schedules} />
 
         <AnimatePresence mode="wait">
           {section === "overview" ? (
@@ -137,9 +139,14 @@ export function Dashboard() {
               meetings={meetings}
               schedules={schedules}
               setSection={setSection}
-              joiningScheduleId={joinScheduledMeetingMutation.variables?.scheduleId ?? null}
+              joiningScheduleId={
+                joinScheduledMeetingMutation.variables?.scheduleId ?? null
+              }
               onJoinSchedule={async (scheduleId, devices) => {
-                await joinScheduledMeetingMutation.mutateAsync({ scheduleId, devices });
+                await joinScheduledMeetingMutation.mutateAsync({
+                  scheduleId,
+                  devices,
+                });
               }}
               onScheduleMeeting={() => navigate("/meeting/schedule")}
             />
@@ -155,9 +162,16 @@ export function Dashboard() {
                 meetings={meetings}
                 isLoading={meetingsQuery.isLoading}
                 isError={meetingsQuery.isError}
-                errorMessage={getHttpErrorMessage(meetingsQuery.error, "Could not load meetings.")}
-                onOpenMeeting={(meetingId) => navigate(`/meeting/live/${meetingId}`)}
-                onOpenRecording={(recordingId) => navigate(`/recordings/${recordingId}`)}
+                errorMessage={getHttpErrorMessage(
+                  meetingsQuery.error,
+                  "Could not load meetings.",
+                )}
+                onOpenMeeting={(meetingId) =>
+                  navigate(`/meeting/live/${meetingId}`)
+                }
+                onOpenRecording={(recordingId) =>
+                  navigate(`/recordings/${recordingId}`)
+                }
               />
             </motion.div>
           ) : section === "upcoming" ? (
@@ -172,10 +186,18 @@ export function Dashboard() {
                 schedules={schedules}
                 isLoading={meetingsQuery.isLoading}
                 isError={meetingsQuery.isError}
-                errorMessage={getHttpErrorMessage(meetingsQuery.error, "Could not load scheduled meetings.")}
-                joiningScheduleId={joinScheduledMeetingMutation.variables?.scheduleId ?? null}
+                errorMessage={getHttpErrorMessage(
+                  meetingsQuery.error,
+                  "Could not load scheduled meetings.",
+                )}
+                joiningScheduleId={
+                  joinScheduledMeetingMutation.variables?.scheduleId ?? null
+                }
                 onJoinSchedule={async (scheduleId, devices) => {
-                  await joinScheduledMeetingMutation.mutateAsync({ scheduleId, devices });
+                  await joinScheduledMeetingMutation.mutateAsync({
+                    scheduleId,
+                    devices,
+                  });
                 }}
                 onScheduleMeeting={() => navigate("/meeting/schedule")}
               />
@@ -193,7 +215,9 @@ export function Dashboard() {
                 isLoading={meetingsQuery.isLoading}
                 isError={meetingsQuery.isError}
                 error={meetingsQuery.error}
-                onOpenRecording={(recordingId) => navigate(`/recordings/${recordingId}`)}
+                onOpenRecording={(recordingId) =>
+                  navigate(`/recordings/${recordingId}`)
+                }
               />
             </motion.div>
           )}

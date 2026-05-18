@@ -1,10 +1,9 @@
 import "dotenv/config";
-import express from 'express';
-import cors from 'cors';
-import path from "node:path";
-import userRouter from './routes/user';
-import meetingRouter from './routes/meeting';
-import workerRouter from './routes/worker';
+import express from "express";
+import cors from "cors";
+import userRouter from "./routes/user";
+import meetingRouter from "./routes/meeting";
+import workerRouter from "./routes/worker";
 import GoogleRouter from "./routes/google";
 import NotificationRouter from "./routes/notifications";
 import { notificationWorker } from "./utils/redis";
@@ -14,14 +13,13 @@ import GithubRouter from "./routes/github";
 import chatRouter from "./routes/chat";
 import rateLimiter from "./utils/rateLimiter";
 import keysRouter from "./routes/keys";
+import JitsiRouter from "./routes/jitsi";
 import { ensureServerKeyPair } from "./utils/keys";
 
 const app = express();
-const recordingsRoot = path.resolve(process.cwd(), "../../recordings");
 
 app.use(express.json());
 app.use(cors());
-app.use("/api/v1/recordings", express.static(recordingsRoot));
 
 // Trust proxy if behind a load balancer / nginx so req.ip is correct
 app.set("trust proxy", true);
@@ -39,16 +37,17 @@ app.use("/api/v1/editor", editorRouter);
 app.use("/api/v1/github", GithubRouter);
 app.use("/api/v1/chat", chatRouter);
 app.use("/api/v1/keys", keysRouter);
+app.use("/api/v1/jitsi", JitsiRouter);
 
 notificationWorker().catch((error) => {
-    console.error("Error in sendInvitationEmail:", error);
+  console.error("Error in sendInvitationEmail:", error);
 });
 
 ensureServerKeyPair().catch((error) => {
-    console.error("Failed to bootstrap server keypair:", error);
-    process.exit(1);
+  console.error("Failed to bootstrap server keypair:", error);
+  process.exit(1);
 });
 
 app.listen(3000, () => {
-    console.log('Backend server is running on port 3000');
+  console.log("Backend server is running on port 3000");
 });

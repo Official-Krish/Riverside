@@ -1,0 +1,169 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: weave-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-weave}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - weave-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: weave-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - weave-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.dockerfile
+    container_name: weave-backend
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: "postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-weave}"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+      JITSI_BASE_URL: ${JITSI_BASE_URL:-http://localhost:8000}
+      BUCKET_NAME: ${BUCKET_NAME:-weave-recordings}
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - weave-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.dockerfile
+      args:
+        VITE_BACKEND_URL: ${VITE_BACKEND_URL:-/api/v1}
+    container_name: weave-frontend
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      - backend
+    networks:
+      - weave-network
+    restart: unless-stopped
+
+  editor-worker:
+    build:
+      context: .
+      dockerfile: docker/editor-worker.dockerfile
+    container_name: weave-editor-worker
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: "postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-weave}"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      BUCKET_NAME: ${BUCKET_NAME:-weave-recordings}
+      CONCURRENCY: ${EDITOR_WORKER_CONCURRENCY:-2}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - weave-network
+    restart: unless-stopped
+    volumes:
+      - recordings:/app/recordings
+
+  merger-worker:
+    build:
+      context: .
+      dockerfile: docker/merger-worker.dockerfile
+    container_name: weave-merger-worker
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: "postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-weave}"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      BUCKET_NAME: ${BUCKET_NAME:-weave-recordings}
+      CONCURRENCY: ${MERGER_WORKER_CONCURRENCY:-2}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - weave-network
+    restart: unless-stopped
+    volumes:
+      - recordings:/app/recordings
+
+  transcoder:
+    build:
+      context: .
+      dockerfile: docker/transcoder.dockerfile
+    container_name: weave-transcoder
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      BUCKET_NAME: ${BUCKET_NAME:-weave-recordings}
+      CONCURRENCY: ${TRANSCODER_CONCURRENCY:-1}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - weave-network
+    restart: unless-stopped
+    volumes:
+      - recordings:/app/recordings
+
+  ws-relayer:
+    build:
+      context: .
+      dockerfile: docker/ws-relayer.dockerfile
+    container_name: weave-ws-relayer
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      PORT: 9093
+    ports:
+      - "${WS_RELAYER_PORT:-9093}:9093"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - weave-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  recordings:
+
+networks:
+  weave-network:
+    driver: bridge

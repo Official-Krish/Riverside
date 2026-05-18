@@ -13,7 +13,7 @@ function createOAuthClient() {
   return new google.auth.OAuth2(
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
-    GOOGLE_REDIRECT_URI
+    GOOGLE_REDIRECT_URI,
   );
 }
 
@@ -25,7 +25,7 @@ function createOAuthState() {
     JWT_SECRET,
     {
       expiresIn: "10m",
-    }
+    },
   );
 }
 
@@ -40,7 +40,9 @@ const GoogleRouter = express.Router();
 
 GoogleRouter.get("/auth/url", (_req, res) => {
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REDIRECT_URI) {
-    return res.status(500).json({ message: "Google OAuth is not configured correctly" });
+    return res
+      .status(500)
+      .json({ message: "Google OAuth is not configured correctly" });
   }
 
   const oauth2Client = createOAuthClient();
@@ -93,7 +95,9 @@ GoogleRouter.get("/auth/callback", async (req, res) => {
         googleId: googleId ?? undefined,
         name: name ?? undefined,
         isVerified: true,
-        ...(tokens.refresh_token && { googleRefreshToken: tokens.refresh_token }),
+        ...(tokens.refresh_token && {
+          googleRefreshToken: tokens.refresh_token,
+        }),
       },
       create: {
         email: normalizedEmail,
@@ -104,9 +108,15 @@ GoogleRouter.get("/auth/callback", async (req, res) => {
       },
     });
 
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "7d" });
+    const token = jwt.sign(
+      { userId: user.id, name: user.name, userTier: user.tier },
+      JWT_SECRET,
+      { expiresIn: "7d" },
+    );
 
-    return res.redirect(`${FRONTEND_URL}/auth/callback?token=${token}&name=${encodeURIComponent(user.name ?? "")}`);
+    return res.redirect(
+      `${FRONTEND_URL}/auth/callback?token=${token}&name=${encodeURIComponent(user.name ?? "")}`,
+    );
   } catch (err) {
     console.error("Google auth failed:", err);
     return res.redirect(`${FRONTEND_URL}/signin?error=google_auth_failed`);

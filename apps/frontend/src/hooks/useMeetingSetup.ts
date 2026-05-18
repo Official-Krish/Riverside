@@ -1,6 +1,9 @@
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CreateMeetingResponse, JoinMeetingResponse } from "@repo/types/api";
+import type {
+  CreateMeetingResponse,
+  JoinMeetingResponse,
+} from "@repo/types/api";
 import { http } from "../https";
 import { getHttpErrorMessage } from "../lib/httpError";
 import { toast } from "sonner";
@@ -11,7 +14,9 @@ type UseMeetingSetupArgs = {
   navigate: (path: string) => void;
 };
 
-function buildPreviewAudioConstraints(selectedMicId: string): MediaTrackConstraints | boolean {
+function buildPreviewAudioConstraints(
+  selectedMicId: string,
+): MediaTrackConstraints | boolean {
   return {
     deviceId: selectedMicId ? { exact: selectedMicId } : undefined,
     echoCancellation: true,
@@ -22,7 +27,9 @@ function buildPreviewAudioConstraints(selectedMicId: string): MediaTrackConstrai
   };
 }
 
-function buildPreviewVideoConstraints(selectedCameraId: string): MediaTrackConstraints | boolean {
+function buildPreviewVideoConstraints(
+  selectedCameraId: string,
+): MediaTrackConstraints | boolean {
   return {
     deviceId: selectedCameraId ? { exact: selectedCameraId } : undefined,
     width: { ideal: 1920 },
@@ -32,7 +39,10 @@ function buildPreviewVideoConstraints(selectedCameraId: string): MediaTrackConst
   };
 }
 
-export function useMeetingSetup({ displayNameFallback, navigate }: UseMeetingSetupArgs) {
+export function useMeetingSetup({
+  displayNameFallback,
+  navigate,
+}: UseMeetingSetupArgs) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const monitorAudioRef = useRef<HTMLAudioElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -51,6 +61,8 @@ export function useMeetingSetup({ displayNameFallback, navigate }: UseMeetingSet
   const [micDevices, setMicDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedCameraId, setSelectedCameraId] = useState("");
   const [selectedMicId, setSelectedMicId] = useState("");
+  const [joinWithMicOff, setJoinWithMicOff] = useState(false);
+  const [joinWithVideoOff, setJoinWithVideoOff] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
   const [micMonitorEnabled, setMicMonitorEnabled] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -99,7 +111,10 @@ export function useMeetingSetup({ displayNameFallback, navigate }: UseMeetingSet
   };
 
   useEffect(() => {
-    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+    if (
+      typeof navigator === "undefined" ||
+      !navigator.mediaDevices?.getUserMedia
+    ) {
       setPreviewError("Media device APIs are not available in this browser.");
       return;
     }
@@ -138,8 +153,12 @@ export function useMeetingSetup({ displayNameFallback, navigate }: UseMeetingSet
         }
 
         const devices = await navigator.mediaDevices.enumerateDevices();
-        const cameras = devices.filter((device) => device.kind === "videoinput");
-        const microphones = devices.filter((device) => device.kind === "audioinput");
+        const cameras = devices.filter(
+          (device) => device.kind === "videoinput",
+        );
+        const microphones = devices.filter(
+          (device) => device.kind === "audioinput",
+        );
 
         if (mounted) {
           setCameraDevices(cameras);
@@ -154,7 +173,11 @@ export function useMeetingSetup({ displayNameFallback, navigate }: UseMeetingSet
         }
 
         const audioTracks = stream.getAudioTracks();
-        if (mounted && audioTracks.length > 0 && typeof AudioContext !== "undefined") {
+        if (
+          mounted &&
+          audioTracks.length > 0 &&
+          typeof AudioContext !== "undefined"
+        ) {
           const audioContext = new AudioContext();
           audioContextRef.current = audioContext;
           if (audioContext.state === "suspended") {
@@ -179,7 +202,7 @@ export function useMeetingSetup({ displayNameFallback, navigate }: UseMeetingSet
             }
 
             analyser.getFloatTimeDomainData(timeDomainData);
-            
+
             // Find peak (max absolute value) - matches Chrome's behavior
             let peak = 0;
             for (let i = 0; i < timeDomainData.length; i++) {
@@ -197,9 +220,9 @@ export function useMeetingSetup({ displayNameFallback, navigate }: UseMeetingSet
 
             const normalizedLevel = Math.min(
               100,
-              Math.max(0, Math.round(((levelDb + 40) / 40) * 100))
+              Math.max(0, Math.round(((levelDb + 40) / 40) * 100)),
             );
-            
+
             setMicLevel(normalizedLevel);
             animationFrameRef.current = requestAnimationFrame(updateMicLevel);
           };
@@ -243,11 +266,14 @@ export function useMeetingSetup({ displayNameFallback, navigate }: UseMeetingSet
 
   const createMeetingMutation = useMutation({
     mutationFn: async (invitedParticipants: string[]) => {
-      const response = await http.post<CreateMeetingResponse>("/meeting/create", {
-        roomName: createRoomName,
-        passcode: createPasscode || undefined,
-        invitedParticipants,
-      });
+      const response = await http.post<CreateMeetingResponse>(
+        "/meeting/create",
+        {
+          roomName: createRoomName,
+          passcode: createPasscode || undefined,
+          invitedParticipants,
+        },
+      );
 
       return response.data;
     },
@@ -259,12 +285,17 @@ export function useMeetingSetup({ displayNameFallback, navigate }: UseMeetingSet
           role: "host",
           micId: selectedMicId,
           cameraId: selectedCameraId,
-        })
+          initialMicOff: joinWithMicOff,
+          initialVideoOff: joinWithVideoOff,
+        }),
       );
     },
     onError: (error) => {
       setErrorMessage(
-        getHttpErrorMessage(error, "Could not create the meeting. Please try again.")
+        getHttpErrorMessage(
+          error,
+          "Could not create the meeting. Please try again.",
+        ),
       );
     },
   });
@@ -275,7 +306,7 @@ export function useMeetingSetup({ displayNameFallback, navigate }: UseMeetingSet
         `/meeting/join/${joinMeetingId}`,
         {
           passcode: joinPasscode || undefined,
-        }
+        },
       );
 
       return response.data;
@@ -291,23 +322,29 @@ export function useMeetingSetup({ displayNameFallback, navigate }: UseMeetingSet
           recordingState,
           micId: selectedMicId,
           cameraId: selectedCameraId,
-        })
+          initialMicOff: joinWithMicOff,
+          initialVideoOff: joinWithVideoOff,
+        }),
       );
     },
     onError: (error) => {
       toast.error(
-        getHttpErrorMessage(error, "Could not join the meeting. Check the meeting ID and passcode.")
+        getHttpErrorMessage(
+          error,
+          "Could not join the meeting. Check the meeting ID and passcode.",
+        ),
       );
       setErrorMessage(
         getHttpErrorMessage(
           error,
-          "Could not join the meeting. Check the meeting ID and passcode."
-        )
+          "Could not join the meeting. Check the meeting ID and passcode.",
+        ),
       );
     },
   });
 
-  const isBusy = createMeetingMutation.isPending || joinMeetingMutation.isPending;
+  const isBusy =
+    createMeetingMutation.isPending || joinMeetingMutation.isPending;
 
   const busyLabel = useMemo(() => {
     if (createMeetingMutation.isPending) {
@@ -322,7 +359,9 @@ export function useMeetingSetup({ displayNameFallback, navigate }: UseMeetingSet
   const submitCreate = () => {
     const pendingInvite = getNormalizedInviteEmail();
     const nextInvites =
-      pendingInvite && pendingInvite.includes("@") && !invites.includes(pendingInvite)
+      pendingInvite &&
+      pendingInvite.includes("@") &&
+      !invites.includes(pendingInvite)
         ? [...invites, pendingInvite]
         : invites;
 
@@ -365,6 +404,10 @@ export function useMeetingSetup({ displayNameFallback, navigate }: UseMeetingSet
     setSelectedCameraId,
     selectedMicId,
     setSelectedMicId,
+    joinWithMicOff,
+    setJoinWithMicOff,
+    joinWithVideoOff,
+    setJoinWithVideoOff,
     micLevel,
     micMonitorEnabled,
     toggleMicMonitor,
