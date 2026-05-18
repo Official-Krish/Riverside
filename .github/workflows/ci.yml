@@ -61,7 +61,7 @@ jobs:
           key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
 
       - name: Install Dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       - name: Run Lint
         run: bun run lint
