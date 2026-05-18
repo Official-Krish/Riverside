@@ -119,8 +119,7 @@ export function FinalRecordingPage() {
         payloadEmails,
       };
     },
-    onSuccess: ({ responseData, payloadEmails }) => {
-      const updatedEmails = responseData?.visibleToEmails ?? payloadEmails;
+    onSuccess: () => {
       setDraftNewEmails([]);
       setEmailInput("");
       toast.success("Recording visibility updated");

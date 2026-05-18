@@ -284,18 +284,14 @@ export function LiveMeetingPage() {
 
   const allTiles = useMemo<MeetingTile[]>(() => {
     const remoteTiles = participants.flatMap((participant) => {
-      const cameraTrack =
-        participant.tracks.find(
-          (track) =>
-            track.getType?.() === "video" &&
-            track.getVideoType?.() !== "desktop",
-        ) || null;
-      const screenTrack =
-        participant.tracks.find(
-          (track) =>
-            track.getType?.() === "video" &&
-            track.getVideoType?.() === "desktop",
-        ) || null;
+      const cameraTrack = (participant.tracks.find(
+        (track) =>
+          track.getType?.() === "video" && track.getVideoType?.() !== "desktop",
+      ) || null) as MeetingTile["track"];
+      const screenTrack = (participant.tracks.find(
+        (track) =>
+          track.getType?.() === "video" && track.getVideoType?.() === "desktop",
+      ) || null) as MeetingTile["track"];
 
       const participantName = participant.displayName || participant.id;
       const mediaState = getParticipantMediaState(
@@ -401,18 +397,14 @@ export function LiveMeetingPage() {
 
   const participantList = useMemo<MeetingParticipantState[]>(() => {
     const remoteParticipants = participants.map((participant) => {
-      const cameraTrack =
-        participant.tracks.find(
-          (track) =>
-            track.getType?.() === "video" &&
-            track.getVideoType?.() !== "desktop",
-        ) || null;
-      const screenTrack =
-        participant.tracks.find(
-          (track) =>
-            track.getType?.() === "video" &&
-            track.getVideoType?.() === "desktop",
-        ) || null;
+      const cameraTrack = (participant.tracks.find(
+        (track) =>
+          track.getType?.() === "video" && track.getVideoType?.() !== "desktop",
+      ) || null) as MeetingTile["track"];
+      const screenTrack = (participant.tracks.find(
+        (track) =>
+          track.getType?.() === "video" && track.getVideoType?.() === "desktop",
+      ) || null) as MeetingTile["track"];
       const mediaState = getParticipantMediaState(
         participantMediaStates,
         participant.id,
