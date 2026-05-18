@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: weave-frontend
-          image: krishanand01/weave-frontend:v1.1
+          image: krishanand01/weave-frontend:v1.2
           imagePullPolicy: Always
           ports:
             - containerPort: 80
@@ -116,7 +116,7 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: weave-worker
+  name: weave-merger-worker
   namespace: weave
   labels:
     app: weave-merger-worker
@@ -149,11 +149,11 @@ spec:
 
           resources:
             requests:
-              cpu: "500m"
-              memory: "1Gi"
+              cpu: "100m"
+              memory: "256Mi"
             limits:
-              cpu: "2"
-              memory: "4Gi"
+              cpu: "1"
+              memory: "2Gi"
 
           volumeMounts:
             - name: env-file
@@ -209,11 +209,11 @@ spec:
 
           resources:
             requests:
-              cpu: "500m"
-              memory: "1Gi"
+              cpu: "100m"
+              memory: "256Mi"
             limits:
-              cpu: "2"
-              memory: "4Gi"
+              cpu: "1"
+              memory: "2Gi"
 
           volumeMounts:
             - name: env-file
@@ -264,16 +264,16 @@ spec:
 
       containers:
         - name: weave-transcoder
-          image: krishanand01/weave-transcoder:v1.1
+          image: krishanand01/weave-transcoder:v1.2
           imagePullPolicy: Always
 
           resources:
             requests:
-              cpu: "1"
-              memory: "2Gi"
+              cpu: "200m"
+              memory: "512Mi"
             limits:
-              cpu: "4"
-              memory: "8Gi"
+              cpu: "2"
+              memory: "4Gi"
 
           volumeMounts:
             - name: env-file

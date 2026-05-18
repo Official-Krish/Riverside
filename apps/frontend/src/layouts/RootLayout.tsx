@@ -9,18 +9,7 @@ import { useEffect, useState } from "react";
 type ThemeMode = "light" | "dark";
 
 function getInitialTheme(): ThemeMode {
-  if (typeof window === "undefined") {
-    return "light";
-  }
-
-  const storedTheme = window.localStorage.getItem("weave-theme");
-  if (storedTheme === "light" || storedTheme === "dark") {
-    return storedTheme;
-  }
-
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
+  return "dark";
 }
 
 export function RootLayout() {
@@ -33,18 +22,18 @@ export function RootLayout() {
 
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.toggle("dark", theme === "dark");
-    window.localStorage.setItem("weave-theme", theme);
+    root.classList.add("dark");
+    window.localStorage.setItem("weave-theme", "dark");
   }, [theme]);
 
   const toggleTheme = () => {
-    setTheme((current) => (current === "light" ? "dark" : "light"));
+    setTheme("dark");
   };
 
   return (
     <div className="relative min-h-screen">
       <GlobalBackground />
-      
+
       <div className="relative z-10 flex min-h-screen flex-col">
         {isDashboard || isLiveMeeting ? null : (
           <Appbar

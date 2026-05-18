@@ -1,3 +1,4 @@
+import "dotenv/config";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { spawn } from "node:child_process";

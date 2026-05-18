@@ -22,18 +22,7 @@ type ThemeMode = "light" | "dark";
 type DashboardSection = "overview" | "meetings" | "recordings" | "upcoming";
 
 function getInitialTheme(): ThemeMode {
-  if (typeof window === "undefined") {
-    return "light";
-  }
-
-  const storedTheme = window.localStorage.getItem("weave-theme");
-  if (storedTheme === "light" || storedTheme === "dark") {
-    return storedTheme;
-  }
-
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
+  return "dark";
 }
 
 export function Dashboard() {
@@ -45,12 +34,12 @@ export function Dashboard() {
 
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.toggle("dark", theme === "dark");
-    window.localStorage.setItem("weave-theme", theme);
+    root.classList.add("dark");
+    window.localStorage.setItem("weave-theme", "dark");
   }, [theme]);
 
   const toggleTheme = () => {
-    setTheme((current) => (current === "light" ? "dark" : "light"));
+    setTheme("dark");
   };
 
   const meetingsQuery = useQuery({
