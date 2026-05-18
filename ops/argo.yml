@@ -58,6 +58,3 @@ spec:
 
     - name: Managed-By
       value: argocd
-
-  orphanedResources:
-    warn: true
