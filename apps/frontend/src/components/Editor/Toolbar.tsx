@@ -1,12 +1,31 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import {
-  Play, Pause, Download, Plus, Scissors,
-  Undo2, Redo2, RotateCcw, Check,
-  ChevronDown, ChevronUp, Move, Maximize, Music2,
-  ZoomIn, Activity, Zap, Film, Palette, PlayCircle,
-  Sparkles, Mic, Sparkle,
+  Play,
+  Pause,
+  Download,
+  Plus,
+  Scissors,
+  Undo2,
+  Redo2,
+  RotateCcw,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Move,
+  Maximize,
+  Music2,
+  ZoomIn,
+  Activity,
+  Zap,
+  Film,
+  Palette,
+  PlayCircle,
+  Sparkles,
+  Mic,
+  Sparkle,
 } from "lucide-react";
 import { formatTime } from "./helpers";
 import { PRESET_DEFINITIONS, type PresetType } from "./types";
@@ -133,11 +152,21 @@ export function Toolbar({
 
         {/* Project Stats Badge */}
         <div className="flex items-center justify-center gap-4 px-3 py-1.5 bg-[#1a1a16]/50 rounded-md border border-[#f5a623]/10 text-[10px] text-[#8d7850]">
-          <span className="flex flex-col items-center"><strong className="text-[#bfa873]">{tracks.length}</strong> tracks</span>
+          <span className="flex flex-col items-center">
+            <strong className="text-[#bfa873]">{tracks.length}</strong> tracks
+          </span>
           <span className="w-px h-4 bg-[#f5a623]/20" />
-          <span className="flex flex-col items-center"><strong className="text-[#bfa873]">{tracks.reduce((acc, t) => acc + t.clips.length, 0)}</strong> clips</span>
+          <span className="flex flex-col items-center">
+            <strong className="text-[#bfa873]">
+              {tracks.reduce((acc, t) => acc + t.clips.length, 0)}
+            </strong>{" "}
+            clips
+          </span>
           <span className="w-px h-4 bg-[#f5a623]/20" />
-          <span className="flex flex-col items-center font-mono"><strong className="text-[#bfa873]">{formatTime(durationMs)}</strong> duration</span>
+          <span className="flex flex-col items-center font-mono">
+            <strong className="text-[#bfa873]">{formatTime(durationMs)}</strong>{" "}
+            duration
+          </span>
         </div>
       </div>
 
@@ -244,7 +273,9 @@ export function Toolbar({
                   max="3"
                   step="0.05"
                   value={canvasTransform.stretchX}
-                  onChange={(e) => canvasTransform.setStretchX(Number(e.target.value))}
+                  onChange={(e) =>
+                    canvasTransform.setStretchX(Number(e.target.value))
+                  }
                   className="w-full h-1.5 accent-[#f5a623] cursor-pointer"
                 />
               </div>
@@ -266,7 +297,9 @@ export function Toolbar({
                   max="3"
                   step="0.05"
                   value={canvasTransform.stretchY}
-                  onChange={(e) => canvasTransform.setStretchY(Number(e.target.value))}
+                  onChange={(e) =>
+                    canvasTransform.setStretchY(Number(e.target.value))
+                  }
                   className="w-full h-1.5 accent-[#f5a623] cursor-pointer"
                 />
               </div>
@@ -285,7 +318,9 @@ export function Toolbar({
                   max="500"
                   step="5"
                   value={canvasTransform.offsetX}
-                  onChange={(e) => canvasTransform.setOffsetX(Number(e.target.value))}
+                  onChange={(e) =>
+                    canvasTransform.setOffsetX(Number(e.target.value))
+                  }
                   className="w-full h-1.5 accent-[#f5a623] cursor-pointer"
                 />
               </div>
@@ -304,7 +339,9 @@ export function Toolbar({
                   max="300"
                   step="5"
                   value={canvasTransform.offsetY}
-                  onChange={(e) => canvasTransform.setOffsetY(Number(e.target.value))}
+                  onChange={(e) =>
+                    canvasTransform.setOffsetY(Number(e.target.value))
+                  }
                   className="w-full h-1.5 accent-[#f5a623] cursor-pointer"
                 />
               </div>
@@ -349,7 +386,9 @@ export function Toolbar({
           <div className="mt-3 space-y-3">
             {/* Effect Presets */}
             <div className="space-y-2">
-              <div className="text-[10px] text-[#8d7850] uppercase tracking-wider">Effects</div>
+              <div className="text-[10px] text-[#8d7850] uppercase tracking-wider">
+                Effects
+              </div>
               <div className="grid grid-cols-3 gap-2">
                 {PRESET_DEFINITIONS.slice(0, 6).map((preset) => (
                   <Button
@@ -361,16 +400,30 @@ export function Toolbar({
                       toast.success(`${preset.name} applied`);
                     }}
                     className={`flex flex-col h-auto py-2 text-[10px] border-[#f5a623]/20 bg-[#f5a623]/5 hover:bg-[#f5a623]/10 hover:border-[#f5a623]/30 ${
-                      activePreset === preset.type ? "ring-1 ring-[#f5a623]" : ""
+                      activePreset === preset.type
+                        ? "ring-1 ring-[#f5a623]"
+                        : ""
                     }`}
                     title={`${preset.name} (${preset.shortcut})`}
                   >
-                    {preset.type === "zoom-pop" && <ZoomIn className="h-4 w-4 mb-1 text-[#f5a623]" />}
-                    {preset.type === "shake" && <Activity className="h-4 w-4 mb-1 text-orange-400" />}
-                    {preset.type === "glitch" && <Zap className="h-4 w-4 mb-1 text-purple-400" />}
-                    {preset.type === "cinematic-bars" && <Maximize className="h-4 w-4 mb-1 text-blue-400" />}
-                    {preset.type === "vhs" && <Film className="h-4 w-4 mb-1 text-green-400" />}
-                    {preset.type === "chromakey" && <Palette className="h-4 w-4 mb-1 text-emerald-400" />}
+                    {preset.type === "zoom-pop" && (
+                      <ZoomIn className="h-4 w-4 mb-1 text-[#f5a623]" />
+                    )}
+                    {preset.type === "shake" && (
+                      <Activity className="h-4 w-4 mb-1 text-orange-400" />
+                    )}
+                    {preset.type === "glitch" && (
+                      <Zap className="h-4 w-4 mb-1 text-purple-400" />
+                    )}
+                    {preset.type === "cinematic-bars" && (
+                      <Maximize className="h-4 w-4 mb-1 text-blue-400" />
+                    )}
+                    {preset.type === "vhs" && (
+                      <Film className="h-4 w-4 mb-1 text-green-400" />
+                    )}
+                    {preset.type === "chromakey" && (
+                      <Palette className="h-4 w-4 mb-1 text-emerald-400" />
+                    )}
                     <span className="text-[#bfa873]">{preset.name}</span>
                   </Button>
                 ))}
@@ -379,7 +432,9 @@ export function Toolbar({
 
             {/* Template Presets */}
             <div className="space-y-2">
-              <div className="text-[10px] text-[#8d7850] uppercase tracking-wider">Templates</div>
+              <div className="text-[10px] text-[#8d7850] uppercase tracking-wider">
+                Templates
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 {PRESET_DEFINITIONS.slice(6).map((preset) => (
                   <Button
@@ -393,9 +448,15 @@ export function Toolbar({
                     className="flex flex-col h-auto py-2 text-[10px] border-[#22c55e]/20 bg-[#22c55e]/5 hover:bg-[#22c55e]/10 hover:border-[#22c55e]/30"
                     title={`${preset.name} (${preset.shortcut})`}
                   >
-                    {preset.type === "intro-template" && <PlayCircle className="h-4 w-4 mb-1 text-[#22c55e]" />}
-                    {preset.type === "meme-format" && <Sparkles className="h-4 w-4 mb-1 text-yellow-400" />}
-                    {preset.type === "podcast-layout" && <Mic className="h-4 w-4 mb-1 text-pink-400" />}
+                    {preset.type === "intro-template" && (
+                      <PlayCircle className="h-4 w-4 mb-1 text-[#22c55e]" />
+                    )}
+                    {preset.type === "meme-format" && (
+                      <Sparkles className="h-4 w-4 mb-1 text-yellow-400" />
+                    )}
+                    {preset.type === "podcast-layout" && (
+                      <Mic className="h-4 w-4 mb-1 text-pink-400" />
+                    )}
                     <span className="text-[#bfa873]">{preset.name}</span>
                   </Button>
                 ))}
@@ -406,8 +467,12 @@ export function Toolbar({
             {activePreset && (
               <div className="flex items-center justify-between px-2 py-1.5 bg-[#f5a623]/10 rounded-md border border-[#f5a623]/20">
                 <span className="text-[10px] text-[#bfa873]">
-                  Active: <span className="text-[#f5a623] font-medium">
-                    {PRESET_DEFINITIONS.find(p => p.type === activePreset)?.name}
+                  Active:{" "}
+                  <span className="text-[#f5a623] font-medium">
+                    {
+                      PRESET_DEFINITIONS.find((p) => p.type === activePreset)
+                        ?.name
+                    }
                   </span>
                 </span>
                 <Button

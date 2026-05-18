@@ -1,7 +1,5 @@
-import {
-  QueryClient,
-  QueryClientProvider,
-} from "@tanstack/react-query";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "../components/ui/sonner";
 
 const queryClient = new QueryClient({

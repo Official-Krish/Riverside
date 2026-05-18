@@ -1,11 +1,36 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+/* eslint-disable react-hooks/exhaustive-deps */
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
 import Hls, { Level } from "hls.js";
-import { FullscreenExitIcon, FullscreenEnterIcon, PauseIcon, PipIcon, PlayIcon, SeekBackIcon, SeekForwardIcon, SettingsIcon, VolumeHighIcon, VolumeLowIcon, VolumeOffIcon, ControlBtn } from "./icons";
+import {
+  FullscreenExitIcon,
+  FullscreenEnterIcon,
+  PauseIcon,
+  PipIcon,
+  PlayIcon,
+  SeekBackIcon,
+  SeekForwardIcon,
+  SettingsIcon,
+  VolumeHighIcon,
+  VolumeLowIcon,
+  VolumeOffIcon,
+  ControlBtn,
+} from "./icons";
 import { fmt, resolveThumbnailUrl, toSec } from "./helpers";
 import { SLIDER_STYLE } from "./SliderStyle";
 import type { HLSPlayerProps, Thumbnail } from "./types";
 
-export default function HLSPlayer({ src, poster, thumbnailVtt, className = "" }: HLSPlayerProps) {
+export default function HLSPlayer({
+  src,
+  poster,
+  thumbnailVtt,
+  className = "",
+}: HLSPlayerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);
@@ -45,8 +70,10 @@ export default function HLSPlayer({ src, poster, thumbnailVtt, className = "" }:
   // Seeking state (for track fill)
   const seekBarRef = useRef<HTMLInputElement | null>(null);
   const seekTrackRef = useRef<HTMLDivElement | null>(null);
+  const clickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [seekTrackWidth, setSeekTrackWidth] = useState(0);
 
-  // Style injection 
+  // Style injection
   useEffect(() => {
     const id = "hls-player-styles";
     if (!document.getElementById(id)) {
@@ -76,7 +103,10 @@ export default function HLSPlayer({ src, poster, thumbnailVtt, className = "" }:
       video.src = src;
     }
 
-    return () => { hlsRef.current?.destroy(); hlsRef.current = null; };
+    return () => {
+      hlsRef.current?.destroy();
+      hlsRef.current = null;
+    };
   }, [src]);
 
   // VTT parser
@@ -100,13 +130,17 @@ export default function HLSPlayer({ src, poster, thumbnailVtt, className = "" }:
 
           const start = toSec(startStr);
           const end = toSec(endStr);
-          if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) continue;
+          if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start)
+            continue;
 
           const hashIdx = urlLine.lastIndexOf("#xywh=");
           if (hashIdx === -1) continue;
 
           const rawUrl = urlLine.slice(0, hashIdx);
-          const [x, y, w, h] = urlLine.slice(hashIdx + 6).split(",").map(Number);
+          const [x, y, w, h] = urlLine
+            .slice(hashIdx + 6)
+            .split(",")
+            .map(Number);
 
           if ([x, y, w, h].some((value) => Number.isNaN(value))) continue;
 
@@ -119,13 +153,23 @@ export default function HLSPlayer({ src, poster, thumbnailVtt, className = "" }:
       .catch(console.error);
   }, [thumbnailVtt]);
 
-  //  Fullscreen change listener 
+  //  Fullscreen change listener
   useEffect(() => {
     const onFsChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
     document.addEventListener("fullscreenchange", onFsChange);
     return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
+  useLayoutEffect(() => {
+    const updateSeekTrackWidth = () => {
+      setSeekTrackWidth(seekTrackRef.current?.clientWidth ?? 0);
+    };
+
+    updateSeekTrackWidth();
+    window.addEventListener("resize", updateSeekTrackWidth);
+    return () => window.removeEventListener("resize", updateSeekTrackWidth);
   }, []);
 
   //  Controls auto-hide
@@ -140,18 +184,130 @@ export default function HLSPlayer({ src, poster, thumbnailVtt, className = "" }:
   }, []);
 
   // HotKeys
+  //  Video event handlers ─
+  const onTimeUpdate = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    setProgress(v.currentTime);
+    setDuration(v.duration || 0);
+
+    // update buffered
+    if (v.buffered.length > 0) {
+      setBuffered(v.buffered.end(v.buffered.length - 1));
+    }
+  };
+
+  const onPlay = () => setIsPlaying(true);
+  const onPause = () => {
+    setIsPlaying(false);
+    setControlsVisible(true);
+  };
+  const onEnded = () => {
+    setIsPlaying(false);
+    setControlsVisible(true);
+  };
+  const onLoadedMetadata = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    setDuration(v.duration);
+    setVolume(v.volume);
+  };
+
+  //  Controls
+  function togglePlay() {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) v.play();
+    else v.pause();
+  }
+
+  function seek(value: number) {
+    const v = videoRef.current;
+    if (!v) return;
+    v.currentTime = value;
+    setProgress(value);
+  }
+
+  function seekRelative(delta: number) {
+    const v = videoRef.current;
+    if (!v) return;
+    const next = Math.max(0, Math.min(v.duration, v.currentTime + delta));
+    v.currentTime = next;
+    setProgress(next);
+  }
+
+  function changeVolume(val: number) {
+    const v = videoRef.current;
+    if (!v) return;
+    v.volume = val;
+    v.muted = val === 0;
+    setVolume(val);
+    setIsMuted(val === 0);
+  }
+
+  function toggleMute() {
+    const v = videoRef.current;
+    if (!v) return;
+    const next = !v.muted;
+    v.muted = next;
+    setIsMuted(next);
+    if (!next && volume === 0) {
+      v.volume = 0.5;
+      setVolume(0.5);
+    }
+  }
+
+  function changeQuality(level: number) {
+    if (!hlsRef.current) return;
+    hlsRef.current.currentLevel = level;
+    setCurrentLevel(level);
+    setShowQuality(false);
+  }
+
+  function cycleSpeed() {
+    const rates = [0.5, 0.75, 1, 1.25, 1.5, 2];
+    const idx = rates.indexOf(playbackRate);
+    const next = rates[(idx + 1) % rates.length];
+    if (videoRef.current) videoRef.current.playbackRate = next;
+    setPlaybackRate(next);
+  }
+
+  function toggleFullscreen() {
+    const el = containerRef.current;
+    if (!el) return;
+    if (!document.fullscreenElement) {
+      el.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  }
+
+  async function togglePip() {
+    const v = videoRef.current;
+    if (!v) return;
+    if (document.pictureInPictureElement) {
+      await document.exitPictureInPicture();
+    } else {
+      await v.requestPictureInPicture();
+    }
+  }
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       const v = videoRef.current;
       if (!v) return;
       const active = document.activeElement as HTMLElement;
-      if ( active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable)) {
+      if (
+        active &&
+        (active.tagName === "INPUT" ||
+          active.tagName === "TEXTAREA" ||
+          active.isContentEditable)
+      ) {
         return;
       }
 
       // Only if player is focused
       if (!containerRef.current?.contains(active)) return;
-
 
       switch (e.key.toLowerCase()) {
         case " ":
@@ -186,7 +342,7 @@ export default function HLSPlayer({ src, poster, thumbnailVtt, className = "" }:
           toggleFullscreen();
           break;
 
-        case "l": 
+        case "l":
           seekRelative(10);
           break;
 
@@ -200,149 +356,66 @@ export default function HLSPlayer({ src, poster, thumbnailVtt, className = "" }:
     return () => window.removeEventListener("keydown", handleKey);
   }, [volume]);
 
-  //  Video event handlers ─
-  const onTimeUpdate = () => {
-    const v = videoRef.current;
-    if (!v) return;
-    setProgress(v.currentTime);
-    setDuration(v.duration || 0);
-
-    // update buffered
-    if (v.buffered.length > 0) {
-      setBuffered(v.buffered.end(v.buffered.length - 1));
-    }
-  };
-
-  const onPlay = () => setIsPlaying(true);
-  const onPause = () => { setIsPlaying(false); setControlsVisible(true); };
-  const onEnded = () => { setIsPlaying(false); setControlsVisible(true); };
-  const onLoadedMetadata = () => {
-    const v = videoRef.current;
-    if (!v) return;
-    setDuration(v.duration);
-    setVolume(v.volume);
-  };
-
-  //  Controls
-  const togglePlay = () => {
-    const v = videoRef.current;
-    if (!v) return;
-    if (v.paused) v.play(); else v.pause();
-  };
-
-  const seek = (value: number) => {
-    const v = videoRef.current;
-    if (!v) return;
-    v.currentTime = value;
-    setProgress(value);
-  };
-
-  const seekRelative = (delta: number) => {
-    const v = videoRef.current;
-    if (!v) return;
-    const next = Math.max(0, Math.min(v.duration, v.currentTime + delta));
-    v.currentTime = next;
-    setProgress(next);
-  };
-
-  const changeVolume = (val: number) => {
-    const v = videoRef.current;
-    if (!v) return;
-    v.volume = val;
-    v.muted = val === 0;
-    setVolume(val);
-    setIsMuted(val === 0);
-  };
-
-  const toggleMute = () => {
-    const v = videoRef.current;
-    if (!v) return;
-    const next = !v.muted;
-    v.muted = next;
-    setIsMuted(next);
-    if (!next && volume === 0) { v.volume = 0.5; setVolume(0.5); }
-  };
-
-  const changeQuality = (level: number) => {
-    if (!hlsRef.current) return;
-    hlsRef.current.currentLevel = level;
-    setCurrentLevel(level);
-    setShowQuality(false);
-  };
-
-  const cycleSpeed = () => {
-    const rates = [0.5, 0.75, 1, 1.25, 1.5, 2];
-    const idx = rates.indexOf(playbackRate);
-    const next = rates[(idx + 1) % rates.length];
-    if (videoRef.current) videoRef.current.playbackRate = next;
-    setPlaybackRate(next);
-  };
-
-  const toggleFullscreen = () => {
-    const el = containerRef.current;
-    if (!el) return;
-    if (!document.fullscreenElement) {
-      el.requestFullscreen();
-    } else {
-      document.exitFullscreen();
-    }
-  };
-
-  const togglePip = async () => {
-    const v = videoRef.current;
-    if (!v) return;
-    if (document.pictureInPictureElement) {
-      await document.exitPictureInPicture();
-    } else {
-      await v.requestPictureInPicture();
-    }
-  };
-
   //  Thumbnail lookup
-  const currentThumb = thumbnails.find(
-    (t) => hoverTime !== null && hoverTime >= t.start && hoverTime < t.end
-  ) ?? null;
+  const currentThumb =
+    thumbnails.find(
+      (t) => hoverTime !== null && hoverTime >= t.start && hoverTime < t.end,
+    ) ?? null;
 
-  const seekTrackWidth = seekTrackRef.current?.clientWidth ?? 0;
   const thumbnailLeft =
     currentThumb && seekTrackWidth > 0
-      ? Math.max(8, Math.min(hoverX - currentThumb.w / 2, seekTrackWidth - currentThumb.w - 8))
+      ? Math.max(
+          8,
+          Math.min(
+            hoverX - currentThumb.w / 2,
+            seekTrackWidth - currentThumb.w - 8,
+          ),
+        )
       : 0;
 
-  //  Seek bar fill percentage 
+  //  Seek bar fill percentage
   const progressPct = duration > 0 ? (progress / duration) * 100 : 0;
   const bufferedPct = duration > 0 ? (buffered / duration) * 100 : 0;
   const volumePct = isMuted ? 0 : volume * 100;
 
-  const VolumeIcon = isMuted || volume === 0
-    ? VolumeOffIcon
-    : volume < 0.5 ? VolumeLowIcon : VolumeHighIcon;
+  const VolumeIcon =
+    isMuted || volume === 0
+      ? VolumeOffIcon
+      : volume < 0.5
+        ? VolumeLowIcon
+        : VolumeHighIcon;
 
-  const qualityLabel = currentLevel === -1
-    ? "Auto"
-    : levels[currentLevel]
-      ? `${levels[currentLevel].height}p`
-      : "Auto";
+  const qualityLabel =
+    currentLevel === -1
+      ? "Auto"
+      : levels[currentLevel]
+        ? `${levels[currentLevel].height}p`
+        : "Auto";
 
-    let clickTimeout: ReturnType<typeof setTimeout> | undefined = undefined;
+  const handleClick = () => {
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+    }
+    clickTimeoutRef.current = setTimeout(() => {}, 200);
+  };
 
-    const handleClick = () => {
-      clearTimeout(clickTimeout);
-      clickTimeout = setTimeout(() => {
-      }, 200);
-    };
-
-    const handleDoubleClick = () => {
-      clearTimeout(clickTimeout);
-      toggleFullscreen();
-    };
+  const handleDoubleClick = () => {
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+    }
+    toggleFullscreen();
+  };
 
   return (
     <div
       ref={containerRef}
       tabIndex={0}
       className={`relative select-none outline-none focus:ring-2 focus:ring-white/30 focus:ring-offset-2 focus:ring-offset-black ${className}`}
-      style={{ background: "#000", borderRadius: isFullscreen ? 0 : 12, overflow: "hidden" }}
+      style={{
+        background: "#000",
+        borderRadius: isFullscreen ? 0 : 12,
+        overflow: "hidden",
+      }}
       onMouseMove={resetHideTimer}
       onMouseEnter={resetHideTimer}
       onClick={handleClick}
@@ -356,7 +429,11 @@ export default function HLSPlayer({ src, poster, thumbnailVtt, className = "" }:
       <video
         ref={videoRef}
         poster={poster}
-        style={{ width: "100%", display: "block", maxHeight: isFullscreen ? "100vh" : undefined }}
+        style={{
+          width: "100%",
+          display: "block",
+          maxHeight: isFullscreen ? "100vh" : undefined,
+        }}
         onTimeUpdate={onTimeUpdate}
         onPlay={onPlay}
         onPause={onPause}
@@ -392,7 +469,6 @@ export default function HLSPlayer({ src, poster, thumbnailVtt, className = "" }:
       >
         {/*  Seek bar area  */}
         <div style={{ padding: "0 16px", position: "relative" }}>
-
           {/* Thumbnail preview */}
           {currentThumb && hoverTime !== null && (
             <div
@@ -417,52 +493,65 @@ export default function HLSPlayer({ src, poster, thumbnailVtt, className = "" }:
                   boxShadow: "0 4px 20px rgba(0,0,0,0.6)",
                 }}
               />
-              <div style={{
-                color: "#fff",
-                fontSize: 11,
-                textAlign: "center",
-                marginTop: 4,
-                fontFamily: "monospace",
-                fontWeight: 600,
-                textShadow: "0 1px 3px rgba(0,0,0,0.9)",
-              }}>
+              <div
+                style={{
+                  color: "#fff",
+                  fontSize: 11,
+                  textAlign: "center",
+                  marginTop: 4,
+                  fontFamily: "monospace",
+                  fontWeight: 600,
+                  textShadow: "0 1px 3px rgba(0,0,0,0.9)",
+                }}
+              >
                 {fmt(hoverTime)}
               </div>
             </div>
           )}
 
           {/* Buffered + progress track */}
-          <div ref={seekTrackRef} style={{ position: "relative", height: 3, marginBottom: 8 }}>
+          <div
+            ref={seekTrackRef}
+            style={{ position: "relative", height: 3, marginBottom: 8 }}
+          >
             {/* Buffered */}
-            <div style={{
-              position: "absolute",
-              inset: 0,
-              background: "rgba(255,255,255,0.25)",
-              borderRadius: 9999,
-              overflow: "hidden",
-            }}>
-              <div style={{
-                height: "100%",
-                width: `${bufferedPct}%`,
-                background: "rgba(255,255,255,0.4)",
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: "rgba(255,255,255,0.25)",
                 borderRadius: 9999,
-                transition: "width 0.3s",
-              }} />
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  height: "100%",
+                  width: `${bufferedPct}%`,
+                  background: "rgba(255,255,255,0.4)",
+                  borderRadius: 9999,
+                  transition: "width 0.3s",
+                }}
+              />
             </div>
             {/* Progress */}
-            <div style={{
-              position: "absolute",
-              inset: 0,
-              borderRadius: 9999,
-              overflow: "hidden",
-              pointerEvents: "none",
-            }}>
-              <div style={{
-                height: "100%",
-                width: `${progressPct}%`,
-                background: "#fff",
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
                 borderRadius: 9999,
-              }} />
+                overflow: "hidden",
+                pointerEvents: "none",
+              }}
+            >
+              <div
+                style={{
+                  height: "100%",
+                  width: `${progressPct}%`,
+                  background: "#fff",
+                  borderRadius: 9999,
+                }}
+              />
             </div>
             {/* Seek input (transparent, on top) */}
             <input
@@ -493,34 +582,41 @@ export default function HLSPlayer({ src, poster, thumbnailVtt, className = "" }:
             />
 
             {/* Visible seek thumb on track */}
-            <div style={{
-              position: "absolute",
-              top: "50%",
-              left: `calc(${progressPct}% - 6px)`,
-              width: 13,
-              height: 13,
-              borderRadius: "50%",
-              background: "#fff",
-              boxShadow: "0 0 4px rgba(0,0,0,0.5)",
-              transform: "translateY(-50%)",
-              pointerEvents: "none",
-              zIndex: 4,
-            }} />
+            <div
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: `calc(${progressPct}% - 6px)`,
+                width: 13,
+                height: 13,
+                borderRadius: "50%",
+                background: "#fff",
+                boxShadow: "0 0 4px rgba(0,0,0,0.5)",
+                transform: "translateY(-50%)",
+                pointerEvents: "none",
+                zIndex: 4,
+              }}
+            />
           </div>
         </div>
 
         {/*  Controls row  */}
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 14px 12px",
-          gap: 4,
-        }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0 14px 12px",
+            gap: 4,
+          }}
+        >
           {/* Left group */}
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             {/* Play/pause */}
-            <ControlBtn onClick={togglePlay} title={isPlaying ? "Pause" : "Play"}>
+            <ControlBtn
+              onClick={togglePlay}
+              title={isPlaying ? "Pause" : "Play"}
+            >
               {isPlaying ? <PauseIcon /> : <PlayIcon />}
             </ControlBtn>
 
@@ -567,27 +663,38 @@ export default function HLSPlayer({ src, poster, thumbnailVtt, className = "" }:
                   }}
                 >
                   {/* Volume percentage */}
-                  <span style={{ color: "#fff", fontSize: 10, fontWeight: 600, fontFamily: "monospace" }}>
+                  <span
+                    style={{
+                      color: "#fff",
+                      fontSize: 10,
+                      fontWeight: 600,
+                      fontFamily: "monospace",
+                    }}
+                  >
                     {Math.round(isMuted ? 0 : volume * 100)}%
                   </span>
 
                   {/* Vertical slider track */}
                   <div style={{ position: "relative", width: 3, height: 80 }}>
-                    <div style={{
-                      position: "absolute",
-                      inset: 0,
-                      background: "rgba(255,255,255,0.2)",
-                      borderRadius: 9999,
-                    }} />
-                    <div style={{
-                      position: "absolute",
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      height: `${volumePct}%`,
-                      background: "#fff",
-                      borderRadius: 9999,
-                    }} />
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        background: "rgba(255,255,255,0.2)",
+                        borderRadius: 9999,
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        height: `${volumePct}%`,
+                        background: "#fff",
+                        borderRadius: 9999,
+                      }}
+                    />
                     <input
                       type="range"
                       min={0}
@@ -595,37 +702,47 @@ export default function HLSPlayer({ src, poster, thumbnailVtt, className = "" }:
                       step={0.01}
                       value={isMuted ? 0 : volume}
                       className="hls-vol-range"
-                      style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer", zIndex: 5 }}
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        opacity: 0,
+                        cursor: "pointer",
+                        zIndex: 5,
+                      }}
                       onChange={(e) => changeVolume(Number(e.target.value))}
                     />
                     {/* thumb indicator */}
-                    <div style={{
-                      position: "absolute",
-                      bottom: `calc(${volumePct}% - 6px)`,
-                      left: "50%",
-                      transform: "translateX(-50%)",
-                      width: 12,
-                      height: 12,
-                      borderRadius: "50%",
-                      background: "#fff",
-                      boxShadow: "0 0 4px rgba(0,0,0,0.5)",
-                      pointerEvents: "none",
-                    }} />
+                    <div
+                      style={{
+                        position: "absolute",
+                        bottom: `calc(${volumePct}% - 6px)`,
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        width: 12,
+                        height: 12,
+                        borderRadius: "50%",
+                        background: "#fff",
+                        boxShadow: "0 0 4px rgba(0,0,0,0.5)",
+                        pointerEvents: "none",
+                      }}
+                    />
                   </div>
                 </div>
               )}
             </div>
 
             {/* Time display */}
-            <span style={{
-              color: "#fff",
-              fontSize: 12,
-              fontFamily: "monospace",
-              fontWeight: 500,
-              marginLeft: 4,
-              letterSpacing: "0.02em",
-              opacity: 0.9,
-            }}>
+            <span
+              style={{
+                color: "#fff",
+                fontSize: 12,
+                fontFamily: "monospace",
+                fontWeight: 500,
+                marginLeft: 4,
+                letterSpacing: "0.02em",
+                opacity: 0.9,
+              }}
+            >
               {fmt(progress)} / {fmt(duration)}
             </span>
           </div>
@@ -633,8 +750,18 @@ export default function HLSPlayer({ src, poster, thumbnailVtt, className = "" }:
           {/* Right group */}
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             {/* Playback speed */}
-            <ControlBtn onClick={cycleSpeed} title="Playback speed" style={{ minWidth: 36 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, fontFamily: "monospace" }}>
+            <ControlBtn
+              onClick={cycleSpeed}
+              title="Playback speed"
+              style={{ minWidth: 36 }}
+            >
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  fontFamily: "monospace",
+                }}
+              >
                 {playbackRate}×
               </span>
             </ControlBtn>
@@ -642,42 +769,62 @@ export default function HLSPlayer({ src, poster, thumbnailVtt, className = "" }:
             {/* Quality selector */}
             <div style={{ position: "relative" }}>
               <ControlBtn
-                onClick={() => { setShowQuality((v) => !v); setShowVolume(false); }}
+                onClick={() => {
+                  setShowQuality((v) => !v);
+                  setShowVolume(false);
+                }}
                 title="Quality"
                 style={{ minWidth: 40 }}
               >
                 <SettingsIcon />
-                <span style={{ fontSize: 10, fontWeight: 700, marginLeft: 3, fontFamily: "monospace" }}>
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    marginLeft: 3,
+                    fontFamily: "monospace",
+                  }}
+                >
                   {qualityLabel}
                 </span>
               </ControlBtn>
 
               {showQuality && (
-                <div style={{
-                  position: "absolute",
-                  bottom: "calc(100% + 8px)",
-                  right: 0,
-                  background: "rgba(18,18,18,0.97)",
-                  backdropFilter: "blur(16px)",
-                  borderRadius: 10,
-                  padding: "6px 0",
-                  minWidth: 120,
-                  zIndex: 50,
-                  boxShadow: "0 8px 32px rgba(0,0,0,0.7)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                }}>
-                  <div style={{
-                    padding: "6px 14px 8px",
-                    fontSize: 10,
-                    color: "rgba(255,255,255,0.45)",
-                    fontWeight: 700,
-                    letterSpacing: "0.08em",
-                    textTransform: "uppercase",
-                    fontFamily: "sans-serif",
-                  }}>
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: "calc(100% + 8px)",
+                    right: 0,
+                    background: "rgba(18,18,18,0.97)",
+                    backdropFilter: "blur(16px)",
+                    borderRadius: 10,
+                    padding: "6px 0",
+                    minWidth: 120,
+                    zIndex: 50,
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.7)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: "6px 14px 8px",
+                      fontSize: 10,
+                      color: "rgba(255,255,255,0.45)",
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      fontFamily: "sans-serif",
+                    }}
+                  >
                     Quality
                   </div>
-                  {[{ label: "Auto", value: -1 }, ...levels.map((l, i) => ({ label: `${l.height}p`, value: i }))].map((opt) => (
+                  {[
+                    { label: "Auto", value: -1 },
+                    ...levels.map((l, i) => ({
+                      label: `${l.height}p`,
+                      value: i,
+                    })),
+                  ].map((opt) => (
                     <button
                       key={opt.value}
                       onClick={() => changeQuality(opt.value)}
@@ -689,27 +836,45 @@ export default function HLSPlayer({ src, poster, thumbnailVtt, className = "" }:
                         background: "none",
                         border: "none",
                         cursor: "pointer",
-                        color: currentLevel === opt.value ? "#fff" : "rgba(255,255,255,0.65)",
+                        color:
+                          currentLevel === opt.value
+                            ? "#fff"
+                            : "rgba(255,255,255,0.65)",
                         fontSize: 13,
                         fontFamily: "sans-serif",
                         fontWeight: currentLevel === opt.value ? 600 : 400,
                         gap: 8,
                         transition: "background 0.15s",
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.07)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.background =
+                          "rgba(255,255,255,0.07)")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.background = "none")
+                      }
                     >
-                      <span style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: "50%",
-                        background: currentLevel === opt.value ? "#fff" : "transparent",
-                        border: "1.5px solid rgba(255,255,255,0.4)",
-                        flexShrink: 0,
-                      }} />
+                      <span
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: "50%",
+                          background:
+                            currentLevel === opt.value ? "#fff" : "transparent",
+                          border: "1.5px solid rgba(255,255,255,0.4)",
+                          flexShrink: 0,
+                        }}
+                      />
                       {opt.label}
                       {opt.value !== -1 && levels[opt.value] && (
-                        <span style={{ marginLeft: "auto", fontSize: 10, opacity: 0.4, fontFamily: "monospace" }}>
+                        <span
+                          style={{
+                            marginLeft: "auto",
+                            fontSize: 10,
+                            opacity: 0.4,
+                            fontFamily: "monospace",
+                          }}
+                        >
                           {Math.round(levels[opt.value].bitrate / 1000)}k
                         </span>
                       )}
@@ -727,7 +892,10 @@ export default function HLSPlayer({ src, poster, thumbnailVtt, className = "" }:
             )}
 
             {/* Fullscreen */}
-            <ControlBtn onClick={toggleFullscreen} title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}>
+            <ControlBtn
+              onClick={toggleFullscreen}
+              title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+            >
               {isFullscreen ? <FullscreenExitIcon /> : <FullscreenEnterIcon />}
             </ControlBtn>
           </div>

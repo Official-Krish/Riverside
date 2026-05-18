@@ -13,7 +13,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { http } from "@/https";
 import { toast } from "sonner";
 import { getHttpErrorMessage } from "@/lib/httpError";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Popover,
   PopoverContent,
@@ -83,11 +83,8 @@ export function UpcomingMeetings({
     ? upcoming.slice(0, 3)
     : upcoming.slice((page - 1) * pageSize, page * pageSize);
 
-  const activeSchedule = useMemo(
-    () =>
-      upcoming.find((schedule) => schedule.id === rescheduleScheduleId) ?? null,
-    [upcoming, rescheduleScheduleId],
-  );
+  const activeSchedule =
+    upcoming.find((schedule) => schedule.id === rescheduleScheduleId) ?? null;
 
   const rescheduleMutation = useMutation({
     mutationFn: async ({ id, startTime }: { id: string; startTime: Date }) => {

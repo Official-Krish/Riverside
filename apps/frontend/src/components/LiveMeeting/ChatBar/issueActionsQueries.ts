@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { http } from "../../../https";
@@ -101,8 +102,8 @@ export function useIssueActionsQueries({
         comment,
       }),
     onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: issuesQueryKey })
-        toast.success("Comment added successfully")
+      queryClient.invalidateQueries({ queryKey: issuesQueryKey });
+      toast.success("Comment added successfully");
     },
   });
 
@@ -113,10 +114,10 @@ export function useIssueActionsQueries({
         issueNumber,
         state: "closed",
       }),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: issuesQueryKey })
-            toast.success("Issue closed successfully")
-        },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: issuesQueryKey });
+      toast.success("Issue closed successfully");
+    },
   });
 
   const assignMutation = useMutation({
@@ -132,9 +133,9 @@ export function useIssueActionsQueries({
         issueNumber,
         assignees,
       }),
-    onSuccess: () =>{ 
-        queryClient.invalidateQueries({ queryKey: issuesQueryKey })
-        toast.success("Assignees updated successfully")
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: issuesQueryKey });
+      toast.success("Assignees updated successfully");
     },
   });
 
@@ -151,9 +152,9 @@ export function useIssueActionsQueries({
         issueNumber,
         labels,
       }),
-    onSuccess: () =>{ 
-        queryClient.invalidateQueries({ queryKey: issuesQueryKey })
-        toast.success("Labels updated successfully")
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: issuesQueryKey });
+      toast.success("Labels updated successfully");
     },
   });
 

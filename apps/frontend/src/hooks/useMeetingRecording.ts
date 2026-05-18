@@ -324,7 +324,9 @@ export function useMeetingRecording({
 
         const canvas = document.createElement("canvas");
         canvasRef.current = canvas;
-        const settings = videoTrack?.getSettings?.() as any | undefined;
+        const settings = videoTrack?.getSettings?.() as
+          | MediaTrackSettings
+          | undefined;
         const width = settings?.width ?? 1280;
         const height = settings?.height ?? 720;
         canvas.width = width;
@@ -538,7 +540,9 @@ export function useMeetingRecording({
       await uploadWrappedCekMutation.mutateAsync(wrappedCek);
     } catch (error) {
       console.error("Failed to initialize meeting encryption:", error);
-      throw new Error("Failed to initialize encryption for recording");
+      throw new Error("Failed to initialize encryption for recording", {
+        cause: error,
+      });
     }
   }, [meetingId, serverPublicKeyQuery.data, uploadWrappedCekMutation]);
 

@@ -95,7 +95,7 @@ export function MeetingTimer({
 
   return (
     <div
-      className={`fixed left-4 ${isRecording ? "top-16" : "top-4"} z-50 flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium ${
+      className={`fixed inset-x-0 ${isRecording ? "top-16" : "top-4"} z-50 flex justify-center items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium ${
         isCritical
           ? "border border-red-500/50 bg-red-950/80 text-red-400"
           : isWarning

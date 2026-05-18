@@ -5,12 +5,12 @@ export const WS_RELAYER_URL =
   import.meta.env.VITE_WS_RELAYER_URL || "ws://localhost:9093";
 
 function normalizeJitsi(value: string | undefined) {
-  const fallbackBaseUrl = "http://localhost:8000";
+  const fallbackBaseUrl = "https://jitsi.krishlabs.tech";
 
   if (!value || !value.trim()) {
     return {
       baseUrl: fallbackBaseUrl,
-      domain: "localhost:8000",
+      domain: "jitsi.krishlabs.tech",
     };
   }
 

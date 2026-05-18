@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useMutation } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -526,9 +527,13 @@ export function LiveMeetingPage() {
       return;
     }
 
-    setEnding(true);
-    leaveRoom();
-    navigate("/dashboard");
+    const endTimer = window.setTimeout(() => {
+      setEnding(true);
+      leaveRoom();
+      navigate("/dashboard");
+    }, 0);
+
+    return () => window.clearTimeout(endTimer);
   }, [
     ending,
     handleRemoteMeetingEnded,

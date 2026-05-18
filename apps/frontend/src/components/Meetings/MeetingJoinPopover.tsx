@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, Mic, MicOff, Video, VideoOff } from "lucide-react";
 import { Button } from "@/components/ui/button";

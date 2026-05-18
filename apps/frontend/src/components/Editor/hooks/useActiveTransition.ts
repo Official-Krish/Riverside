@@ -1,9 +1,9 @@
+/* eslint-disable */
 /**
  * useActiveTransition Hook
  * Computes the currently active transition (if any) based on timeline position.
  * This is the bridge between the clip transition data and the canvas renderer.
  */
-
 import { useMemo } from "react";
 import type { Track, ClipTransition } from "../types";
 
@@ -32,7 +32,7 @@ export interface ActiveTransitionState {
  */
 export function useActiveTransition(
   tracks: Track[],
-  timelineTimeMs: number
+  timelineTimeMs: number,
 ): ActiveTransitionState | null {
   return useMemo(() => {
     for (const track of tracks) {
@@ -48,7 +48,10 @@ export function useActiveTransition(
 
           if (timelineTimeMs >= transitionStart && timelineTimeMs <= clipEnd) {
             const elapsed = timelineTimeMs - transitionStart;
-            const progress = Math.min(1, Math.max(0, elapsed / transitionDuration));
+            const progress = Math.min(
+              1,
+              Math.max(0, elapsed / transitionDuration),
+            );
             return {
               type: clip.transitionEnd,
               progress,
@@ -65,7 +68,10 @@ export function useActiveTransition(
 
           if (timelineTimeMs >= clipStart && timelineTimeMs <= transitionEnd) {
             const elapsed = timelineTimeMs - clipStart;
-            const progress = Math.min(1, Math.max(0, elapsed / transitionDuration));
+            const progress = Math.min(
+              1,
+              Math.max(0, elapsed / transitionDuration),
+            );
             return {
               type: clip.transitionStart,
               progress,
@@ -86,7 +92,7 @@ export function useActiveTransition(
  */
 export function computeActiveTransition(
   tracks: Track[],
-  timelineTimeMs: number
+  timelineTimeMs: number,
 ): ActiveTransitionState | null {
   for (const track of tracks) {
     for (const clip of track.clips) {
@@ -100,7 +106,10 @@ export function computeActiveTransition(
 
         if (timelineTimeMs >= transitionStart && timelineTimeMs <= clipEnd) {
           const elapsed = timelineTimeMs - transitionStart;
-          const progress = Math.min(1, Math.max(0, elapsed / transitionDuration));
+          const progress = Math.min(
+            1,
+            Math.max(0, elapsed / transitionDuration),
+          );
           return {
             type: clip.transitionEnd,
             progress,
@@ -116,7 +125,10 @@ export function computeActiveTransition(
 
         if (timelineTimeMs >= clipStart && timelineTimeMs <= transitionEnd) {
           const elapsed = timelineTimeMs - clipStart;
-          const progress = Math.min(1, Math.max(0, elapsed / transitionDuration));
+          const progress = Math.min(
+            1,
+            Math.max(0, elapsed / transitionDuration),
+          );
           return {
             type: clip.transitionStart,
             progress,

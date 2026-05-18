@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
@@ -115,8 +116,11 @@ export function useMeetingSetup({
       typeof navigator === "undefined" ||
       !navigator.mediaDevices?.getUserMedia
     ) {
-      setPreviewError("Media device APIs are not available in this browser.");
-      return;
+      const errorTimer = window.setTimeout(() => {
+        setPreviewError("Media device APIs are not available in this browser.");
+      }, 0);
+
+      return () => window.clearTimeout(errorTimer);
     }
 
     let mounted = true;

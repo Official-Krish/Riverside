@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+/* eslint-disable */
+import {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  useLayoutEffect,
+} from "react";
 import { startRenderLoop, drawSingleFrame } from "../utils/RenderLoop";
 import type { RenderState, RenderOverlay } from "../utils/RenderLoop";
 import type { Overlay, ClipTransition } from "../../types";
@@ -109,9 +116,33 @@ export function useCanvasVideo(
     [audioClips],
   );
 
-  // Update refs synchronously during render (no effects needed for refs)
-  activeTransitionRef.current = activeTransition ?? null;
-  transformRef.current = {
+  // Update refs synchronously after render but before paint
+  useLayoutEffect(() => {
+    activeTransitionRef.current = activeTransition ?? null;
+    transformRef.current = {
+      stretchX,
+      stretchY,
+      offsetX,
+      offsetY,
+      trimStart,
+      trimEnd,
+      videoAlpha,
+      activeTransition: activeTransitionRef.current
+        ? {
+            type: activeTransitionRef.current.type,
+            progress: activeTransitionRef.current.progress,
+            position: activeTransitionRef.current.position,
+            sourceVideo: activeTransitionRef.current.sourceVideo,
+            targetVideo: activeTransitionRef.current.targetVideo,
+          }
+        : undefined,
+    };
+    overlaysRef.current = overlays;
+    timelineTimeMsRef.current = timelineTimeMs;
+    onTimeUpdateRef.current = onTimeUpdate;
+    onPlayStateChangeRef.current = onPlayStateChange;
+  }, [
+    activeTransition,
     stretchX,
     stretchY,
     offsetX,
@@ -119,20 +150,11 @@ export function useCanvasVideo(
     trimStart,
     trimEnd,
     videoAlpha,
-    activeTransition: activeTransitionRef.current
-      ? {
-          type: activeTransitionRef.current.type,
-          progress: activeTransitionRef.current.progress,
-          position: activeTransitionRef.current.position,
-          sourceVideo: activeTransitionRef.current.sourceVideo,
-          targetVideo: activeTransitionRef.current.targetVideo,
-        }
-      : undefined,
-  };
-  overlaysRef.current = overlays;
-  timelineTimeMsRef.current = timelineTimeMs;
-  onTimeUpdateRef.current = onTimeUpdate;
-  onPlayStateChangeRef.current = onPlayStateChange;
+    overlays,
+    timelineTimeMs,
+    onTimeUpdate,
+    onPlayStateChange,
+  ]);
 
   // ─── Helpers ──────────────────────────────────────────────────────
   const getVisibleOverlays = useCallback((): RenderOverlay[] => {

@@ -2,7 +2,7 @@ export type MeetingTile = {
   id: string;
   title: string;
   subtitle?: string;
-  track: any | null;
+  track: unknown | null;
   participantId?: string;
   isMuted?: boolean;
   isVideoOff?: boolean;
@@ -17,7 +17,7 @@ export type FocusedTiles = {
 
 export type RemoteAudioTrackItem = {
   id: string;
-  track: any;
+  track: unknown;
 };
 
 export type MeetingParticipant = {

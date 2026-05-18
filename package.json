@@ -21,6 +21,9 @@
     "husky": "^9.1.7",
     "lint-staged": "^17.0.4",
     "prettier": "^3.5.3",
+    "eslint": "^10.4.0",
+    "@typescript-eslint/parser": "^8.58.0",
+    "@typescript-eslint/eslint-plugin": "^8.58.0",
     "turbo": "^2.5.3",
     "typescript": "5.8.2"
   },

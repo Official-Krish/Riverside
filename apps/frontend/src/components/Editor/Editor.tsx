@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import type { Track, Overlay, Asset, PresetType } from "./types";

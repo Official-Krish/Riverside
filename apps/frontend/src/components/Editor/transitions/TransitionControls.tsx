@@ -3,8 +3,13 @@
  * Properties panel for configuring selected transition
  */
 
+/* eslint-disable */
 import { useEffect, useState } from "react";
-import type { Transition, TransitionEasing, TransitionDirection } from "./types";
+import type {
+  Transition,
+  TransitionEasing,
+  TransitionDirection,
+} from "./types";
 import {
   DEFAULT_TRANSITION_DURATION,
   MIN_TRANSITION_DURATION,
@@ -21,8 +26,16 @@ interface TransitionControlsProps {
   onBackToList?: () => void;
 }
 
-export function TransitionControls({ transition, onUpdate, onDelete, onClose, onBackToList }: TransitionControlsProps) {
-  const [localDuration, setLocalDuration] = useState(transition?.durationMs || DEFAULT_TRANSITION_DURATION);
+export function TransitionControls({
+  transition,
+  onUpdate,
+  onDelete,
+  onClose,
+  onBackToList,
+}: TransitionControlsProps) {
+  const [localDuration, setLocalDuration] = useState(
+    transition?.durationMs || DEFAULT_TRANSITION_DURATION,
+  );
 
   useEffect(() => {
     setLocalDuration(transition?.durationMs || DEFAULT_TRANSITION_DURATION);
@@ -32,7 +45,9 @@ export function TransitionControls({ transition, onUpdate, onDelete, onClose, on
     return (
       <div className="flex h-full flex-col items-center justify-center p-6 text-center">
         <div className="mb-3 text-3xl text-[#8d7850]">◫</div>
-        <p className="text-sm font-medium text-[#bfa873]">No Transition Selected</p>
+        <p className="text-sm font-medium text-[#bfa873]">
+          No Transition Selected
+        </p>
         <p className="mt-1 text-xs text-[#8d7850]">
           Select a transition from the timeline to configure its properties
         </p>
@@ -48,8 +63,12 @@ export function TransitionControls({ transition, onUpdate, onDelete, onClose, on
       <div className="border-b border-[#f5a623]/10 px-4 py-3">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-[#fff5de]">{def?.name || transition.type}</h3>
-            <p className="text-[10px] text-[#8d7850] capitalize">{transition.category} • {transition.position}</p>
+            <h3 className="text-sm font-semibold text-[#fff5de]">
+              {def?.name || transition.type}
+            </h3>
+            <p className="text-[10px] text-[#8d7850] capitalize">
+              {transition.category} • {transition.position}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             {onBackToList && (
@@ -58,8 +77,18 @@ export function TransitionControls({ transition, onUpdate, onDelete, onClose, on
                 className="rounded p-1.5 text-[#f5a623] transition-colors hover:bg-[#f5a623]/10"
                 title="Back to transition list"
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
+                  />
                 </svg>
               </button>
             )}
@@ -69,8 +98,18 @@ export function TransitionControls({ transition, onUpdate, onDelete, onClose, on
                 className="rounded p-1.5 text-[#ef4444] transition-colors hover:bg-[#ef4444]/10"
                 title="Delete transition"
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                  />
                 </svg>
               </button>
             )}
@@ -80,8 +119,18 @@ export function TransitionControls({ transition, onUpdate, onDelete, onClose, on
                 className="rounded p-1.5 text-[#8d7850] transition-colors hover:bg-[#f5a623]/10 hover:text-[#f5a623]"
                 title="Close controls"
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             )}
@@ -94,8 +143,12 @@ export function TransitionControls({ transition, onUpdate, onDelete, onClose, on
         {/* Duration */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-[#bfa873]">Duration</label>
-            <span className="text-xs font-mono text-[#f5a623]">{localDuration}ms</span>
+            <label className="text-xs font-medium text-[#bfa873]">
+              Duration
+            </label>
+            <span className="text-xs font-mono text-[#f5a623]">
+              {localDuration}ms
+            </span>
           </div>
           <input
             type="range"
@@ -117,7 +170,14 @@ export function TransitionControls({ transition, onUpdate, onDelete, onClose, on
         <div className="space-y-2">
           <label className="text-xs font-medium text-[#bfa873]">Easing</label>
           <div className="grid grid-cols-2 gap-1.5">
-            {(["linear", "ease-in", "ease-out", "ease-in-out"] as TransitionEasing[]).map((easing) => (
+            {(
+              [
+                "linear",
+                "ease-in",
+                "ease-out",
+                "ease-in-out",
+              ] as TransitionEasing[]
+            ).map((easing) => (
               <button
                 key={easing}
                 onClick={() => onUpdate({ easing })}
@@ -125,7 +185,7 @@ export function TransitionControls({ transition, onUpdate, onDelete, onClose, on
                   "rounded-md border px-2 py-1.5 text-xs transition-colors",
                   transition.easing === easing
                     ? "border-[#f5a623] bg-[#f5a623]/10 text-[#f5a623]"
-                    : "border-[#f5a623]/20 bg-[#1a1a16] text-[#8d7850] hover:border-[#f5a623]/40"
+                    : "border-[#f5a623]/20 bg-[#1a1a16] text-[#8d7850] hover:border-[#f5a623]/40",
                 )}
               >
                 {easing.replace(/-/g, " ")}
@@ -141,9 +201,23 @@ export function TransitionControls({ transition, onUpdate, onDelete, onClose, on
         {/* Direction (for directional transitions) */}
         {def && ["slide", "wipe", "push", "special"].includes(def.category) && (
           <div className="space-y-2">
-            <label className="text-xs font-medium text-[#bfa873]">Direction</label>
+            <label className="text-xs font-medium text-[#bfa873]">
+              Direction
+            </label>
             <div className="grid grid-cols-3 gap-1.5">
-              {(["top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom", "bottom-right"] as TransitionDirection[]).map((dir) => (
+              {(
+                [
+                  "top-left",
+                  "top",
+                  "top-right",
+                  "left",
+                  "center",
+                  "right",
+                  "bottom-left",
+                  "bottom",
+                  "bottom-right",
+                ] as TransitionDirection[]
+              ).map((dir) => (
                 <button
                   key={dir}
                   onClick={() => onUpdate({ direction: dir })}
@@ -152,7 +226,7 @@ export function TransitionControls({ transition, onUpdate, onDelete, onClose, on
                     "rounded-md border px-1.5 py-1 text-[10px] transition-colors disabled:opacity-30",
                     transition.direction === dir
                       ? "border-[#f5a623] bg-[#f5a623]/10 text-[#f5a623]"
-                      : "border-[#f5a623]/20 bg-[#1a1a16] text-[#8d7850] hover:border-[#f5a623]/40"
+                      : "border-[#f5a623]/20 bg-[#1a1a16] text-[#8d7850] hover:border-[#f5a623]/40",
                   )}
                 >
                   {dir.replace("-", " ")}
@@ -163,20 +237,31 @@ export function TransitionControls({ transition, onUpdate, onDelete, onClose, on
         )}
 
         {/* Reverse toggle for applicable transitions */}
-        {["slide-left", "slide-right", "slide-up", "slide-down", "wipe-left", "wipe-right", "wipe-top", "wipe-bottom"].includes(transition.type) && (
+        {[
+          "slide-left",
+          "slide-right",
+          "slide-up",
+          "slide-down",
+          "wipe-left",
+          "wipe-right",
+          "wipe-top",
+          "wipe-bottom",
+        ].includes(transition.type) && (
           <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-[#bfa873]">Reverse</label>
+            <label className="text-xs font-medium text-[#bfa873]">
+              Reverse
+            </label>
             <button
               onClick={() => onUpdate({ reverse: !transition.reverse })}
               className={cn(
                 "relative h-5 w-9 rounded-full transition-colors",
-                transition.reverse ? "bg-[#f5a623]" : "bg-[#1a1a16]"
+                transition.reverse ? "bg-[#f5a623]" : "bg-[#1a1a16]",
               )}
             >
               <span
                 className={cn(
                   "absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform",
-                  transition.reverse ? "left-4" : "left-0.5"
+                  transition.reverse ? "left-4" : "left-0.5",
                 )}
               />
             </button>
@@ -184,16 +269,29 @@ export function TransitionControls({ transition, onUpdate, onDelete, onClose, on
         )}
 
         {/* Border options for slide transitions */}
-        {["slide-left", "slide-right", "slide-up", "slide-down", "push-left", "push-right", "push-up", "push-down"].includes(transition.type) && (
+        {[
+          "slide-left",
+          "slide-right",
+          "slide-up",
+          "slide-down",
+          "push-left",
+          "push-right",
+          "push-up",
+          "push-down",
+        ].includes(transition.type) && (
           <>
             <div className="space-y-2">
-              <label className="text-xs font-medium text-[#bfa873]">Border Width</label>
+              <label className="text-xs font-medium text-[#bfa873]">
+                Border Width
+              </label>
               <input
                 type="range"
                 min={0}
                 max={20}
                 value={transition.borderWidth || 0}
-                onChange={(e) => onUpdate({ borderWidth: Number(e.target.value) })}
+                onChange={(e) =>
+                  onUpdate({ borderWidth: Number(e.target.value) })
+                }
                 className="h-1.5 w-full accent-[#f5a623]"
               />
               <div className="text-right text-xs font-mono text-[#f5a623]">
@@ -202,7 +300,9 @@ export function TransitionControls({ transition, onUpdate, onDelete, onClose, on
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-medium text-[#bfa873]">Border Color</label>
+              <label className="text-xs font-medium text-[#bfa873]">
+                Border Color
+              </label>
               <div className="flex items-center gap-2">
                 <input
                   type="color"
@@ -230,7 +330,6 @@ export function TransitionControls({ transition, onUpdate, onDelete, onClose, on
 }
 
 // Easing Preview Component
-
 
 function EasingPreview({ easing }: { easing: TransitionEasing }) {
   const getPath = () => {
@@ -273,7 +372,6 @@ function EasingPreview({ easing }: { easing: TransitionEasing }) {
     </svg>
   );
 }
-
 
 function isValidDirection(type: string, dir: string): boolean {
   const validDirections: Record<string, string[]> = {

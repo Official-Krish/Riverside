@@ -10,7 +10,8 @@
     "@repo/amazons3": "workspace:*"
   },
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "lint": "eslint . --ext .ts"
   },
   "peerDependencies": {
     "typescript": "^5"

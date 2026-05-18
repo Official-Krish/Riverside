@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/ban-ts-comment */
 import { useMutation } from "@tanstack/react-query";
 import { persistAuth, setStoredName } from "../../lib/auth";
 import { getHttpErrorMessage } from "../../lib/httpError";
@@ -8,8 +9,16 @@ import { http } from "../../https";
 export function useLogin(setErrorMessage: (msg: string | null) => void) {
   const navigate = useNavigate();
   return useMutation({
-    mutationFn: async ({ email, password }: { email: string; password: string }) => {
-      const response = await http.post<LoginResponse & { code?: string; email?: string }>("/user/login", { email, password });
+    mutationFn: async ({
+      email,
+      password,
+    }: {
+      email: string;
+      password: string;
+    }) => {
+      const response = await http.post<
+        LoginResponse & { code?: string; email?: string }
+      >("/user/login", { email, password });
       return response.data;
     },
     onSuccess: (data) => {
@@ -19,9 +28,11 @@ export function useLogin(setErrorMessage: (msg: string | null) => void) {
     onError: (error: any) => {
       const errorCode = error.response?.data?.code;
       const email = error.response?.data?.email;
-      
+
       if (errorCode === "EMAIL_NOT_VERIFIED") {
-        setErrorMessage("Email not verified. Please check your inbox and verify your email.");
+        setErrorMessage(
+          "Email not verified. Please check your inbox and verify your email.",
+        );
         if (email) {
           setTimeout(() => {
             navigate(`/verify-pending?email=${encodeURIComponent(email)}`);
@@ -29,7 +40,10 @@ export function useLogin(setErrorMessage: (msg: string | null) => void) {
         }
       } else {
         setErrorMessage(
-          getHttpErrorMessage(error, "Could not sign you in. Check your email and password.")
+          getHttpErrorMessage(
+            error,
+            "Could not sign you in. Check your email and password.",
+          ),
         );
       }
     },
@@ -39,8 +53,20 @@ export function useLogin(setErrorMessage: (msg: string | null) => void) {
 export function useSignup(setErrorMessage: (msg: string | null) => void) {
   const navigate = useNavigate();
   return useMutation({
-    mutationFn: async ({ name, email, password }: { name: string; email: string; password: string }) => {
-      const response = await http.post<SignupResponse>("/user/signup", { name, email, password });
+    mutationFn: async ({
+      name,
+      email,
+      password,
+    }: {
+      name: string;
+      email: string;
+      password: string;
+    }) => {
+      const response = await http.post<SignupResponse>("/user/signup", {
+        name,
+        email,
+        password,
+      });
       return response.data;
     },
     //@ts-ignore
@@ -49,7 +75,12 @@ export function useSignup(setErrorMessage: (msg: string | null) => void) {
       navigate(`/verify-pending?email=${encodeURIComponent(variables.email)}`);
     },
     onError: (error) => {
-      setErrorMessage(getHttpErrorMessage(error, "Could not create your account. Try a different email."));
+      setErrorMessage(
+        getHttpErrorMessage(
+          error,
+          "Could not create your account. Try a different email.",
+        ),
+      );
     },
   });
 }
@@ -58,10 +89,13 @@ export function useVerifyEmail() {
   const navigate = useNavigate();
   return useMutation({
     mutationFn: async ({ email, code }: { email: string; code: string }) => {
-      const response = await http.post<{ message: string; token: string }>("/user/verify-email", { 
-        email,
-        code 
-      });
+      const response = await http.post<{ message: string; token: string }>(
+        "/user/verify-email",
+        {
+          email,
+          code,
+        },
+      );
       return response.data;
     },
     onSuccess: (data) => {
@@ -74,7 +108,10 @@ export function useVerifyEmail() {
 export function useResendVerificationEmail() {
   return useMutation({
     mutationFn: async (email: string) => {
-      const response = await http.post<{ message: string }>("/user/resend-verification-email", { email });
+      const response = await http.post<{ message: string }>(
+        "/user/resend-verification-email",
+        { email },
+      );
       return response.data;
     },
   });
