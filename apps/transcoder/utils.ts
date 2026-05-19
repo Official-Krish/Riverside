@@ -23,38 +23,11 @@ const TILE_COLS = 10;
 const TILE_CELL_W = THUMB_WIDTH + TILE_PADDING;
 const TILE_CELL_H = THUMB_HEIGHT + TILE_PADDING;
 
-export function getTranscodeOutputDir(recordingsRoot: string, meetingId: string) {
+export function getTranscodeOutputDir(
+  recordingsRoot: string,
+  meetingId: string,
+) {
   return path.join(recordingsRoot, meetingId, "hls");
-}
-
-export function buildRenditionArgs(inputPath: string, outDir: string, profile: HlsProfile): string[] {
-  const playlistPath = path.join(outDir, `${profile.name}.m3u8`);
-  const segmentPattern = path.join(outDir, `${profile.name}_%03d.ts`);
-
-  return [
-    "-y",
-    "-i",
-    inputPath,
-    "-vf",
-    `scale=w=${profile.width}:h=${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`,
-    "-c:v",
-    "libx264",
-    "-preset",
-    "fast",
-    "-crf",
-    String(profile.crf),
-    "-c:a",
-    "aac",
-    "-b:a",
-    "128k",
-    "-hls_time",
-    "6",
-    "-hls_playlist_type",
-    "vod",
-    "-hls_segment_filename",
-    segmentPattern,
-    playlistPath,
-  ];
 }
 
 export function buildPosterArgs(inputPath: string, outDir: string): string[] {
@@ -70,8 +43,15 @@ export function buildPosterArgs(inputPath: string, outDir: string): string[] {
   ];
 }
 
-export function buildSpriteArgs(inputPath: string, outDir: string, durationSeconds: number): string[] {
-  const thumbCount = Math.max(1, Math.ceil(durationSeconds / THUMB_INTERVAL_SECONDS));
+export function buildSpriteArgs(
+  inputPath: string,
+  outDir: string,
+  durationSeconds: number,
+): string[] {
+  const thumbCount = Math.max(
+    1,
+    Math.ceil(durationSeconds / THUMB_INTERVAL_SECONDS),
+  );
   const rows = Math.max(1, Math.ceil(thumbCount / TILE_COLS));
 
   return [
@@ -101,12 +81,18 @@ export function buildMasterPlaylistContent() {
 }
 
 export function buildThumbnailVtt(durationSeconds: number) {
-  const thumbCount = Math.max(1, Math.ceil(durationSeconds / THUMB_INTERVAL_SECONDS));
+  const thumbCount = Math.max(
+    1,
+    Math.ceil(durationSeconds / THUMB_INTERVAL_SECONDS),
+  );
   let vtt = "WEBVTT\n\n";
 
   for (let i = 0; i < thumbCount; i++) {
     const startTime = i * THUMB_INTERVAL_SECONDS;
-    const endTime = Math.min(startTime + THUMB_INTERVAL_SECONDS, durationSeconds);
+    const endTime = Math.min(
+      startTime + THUMB_INTERVAL_SECONDS,
+      durationSeconds,
+    );
     const col = i % TILE_COLS;
     const row = Math.floor(i / TILE_COLS);
 
