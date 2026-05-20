@@ -88,7 +88,7 @@ spec:
     spec:
       containers:
         - name: weave-backend
-          image: krishanand01/weave-backend:v1.2.16
+          image: krishanand01/weave-backend:v1.2.14
           imagePullPolicy: Always
 
           ports:
@@ -322,7 +322,7 @@ spec:
     spec:
       containers:
         - name: weave-ws-relayer
-          image: krishanand01/weave-ws-relayer:v1.2.16
+          image: krishanand01/weave-ws-relayer:v1.2.14
           imagePullPolicy: Always
 
           ports:
