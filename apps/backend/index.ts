@@ -13,7 +13,6 @@ import GithubRouter from "./routes/github";
 import chatRouter from "./routes/chat";
 import rateLimiter from "./utils/rateLimiter";
 import keysRouter from "./routes/keys";
-import JitsiRouter from "./routes/jitsi";
 import { ensureServerKeyPair } from "./utils/keys";
 
 const app = express();
@@ -37,7 +36,6 @@ app.use("/api/v1/editor", editorRouter);
 app.use("/api/v1/github", GithubRouter);
 app.use("/api/v1/chat", chatRouter);
 app.use("/api/v1/keys", keysRouter);
-app.use("/api/v1/jitsi", JitsiRouter);
 
 notificationWorker().catch((error) => {
   console.error("Error in sendInvitationEmail:", error);

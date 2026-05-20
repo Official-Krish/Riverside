@@ -43,11 +43,9 @@ userRouter.post("/signup", async (req, res) => {
 
     await SendVerificationEmail(email, verificationToken);
 
-    res
-      .status(200)
-      .json({
-        message: "User created successfully. Please verify your email.",
-      });
+    res.status(200).json({
+      message: "User created successfully. Please verify your email.",
+    });
   } catch (error) {
     console.error("Signup failed:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -201,6 +199,7 @@ userRouter.get("/me", authMiddleware, async (req, res) => {
     const user = await prisma.user.findFirst({
       where: { id: userId, isVerified: true },
       select: {
+        id: true,
         name: true,
         email: true,
       },
