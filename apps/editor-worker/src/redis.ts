@@ -8,7 +8,7 @@ export const publishConnection = createRedis("publish");
 export function createRedis(name: string) {
   const client = new Redis({
     host: process.env.REDIS_HOST,
-    port: Number(process.env.REDIS_PORT ?? 6379),
+    port: 6379,
     tls: process.env.REDIS_TLS === "true" ? {} : undefined,
     retryStrategy: (times) => Math.min(times * 100, 3_000),
     maxRetriesPerRequest: null, // required for BullMQ / blocking commands
@@ -16,7 +16,9 @@ export function createRedis(name: string) {
     lazyConnect: false,
   });
 
-  client.on("error", (err) => log("error", `Redis[${name}] error`, { err: err.message }));
+  client.on("error", (err) =>
+    log("error", `Redis[${name}] error`, { err: err.message }),
+  );
   client.on("reconnecting", () => log("warn", `Redis[${name}] reconnecting`));
   client.on("ready", () => log("info", `Redis[${name}] ready`));
   return client;

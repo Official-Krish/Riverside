@@ -68,6 +68,7 @@ export function QualityFormatsSection() {
         <div className="grid grid-cols-4 border-b border-white/10">
           {formats.map((f) => {
             const isActive = f.id === selected;
+            const isComingSoon = f.id === "4k";
             return (
               <button
                 key={f.id}
@@ -101,6 +102,11 @@ export function QualityFormatsSection() {
                   >
                     {f.label}
                   </span>
+                  {isComingSoon && (
+                    <span className="text-[8px] font-bold px-1.5 py-0.5 bg-[#F5A623]/15 text-[#F5A623] rounded">
+                      COMING SOON
+                    </span>
+                  )}
                 </div>
               </button>
             );
@@ -153,6 +159,11 @@ export function QualityFormatsSection() {
         <p className="mt-12 text-xs text-white/20 tracking-wide">
           All formats export from the locally captured source — no re-encoding
           from a compressed stream.
+          {active.id === "4k" && (
+            <span className="block text-[#F5A623] mt-2">
+              ✓ 4K ProRes coming Q3 2026
+            </span>
+          )}
         </p>
       </div>
     </section>
