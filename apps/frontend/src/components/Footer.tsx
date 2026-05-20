@@ -24,7 +24,6 @@ const footerLinks: {
   ],
   social: [
     { label: "GitHub", href: "https://github.com/Official-Krish/Weave" },
-    { label: "Twitter", href: "#twitter" },
     { label: "LinkedIn", href: "#linkedin" },
   ],
 };

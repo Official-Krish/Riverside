@@ -45,7 +45,7 @@ const storage = resolveStorageContext();
 
 const redisClient = new Redis({
   host: process.env.REDIS_HOST,
-  port: Number(process.env.REDIS_PORT || 6379),
+  port: 6379,
   lazyConnect: true, // don't connect until first use
   enableOfflineQueue: false, // fail fast if Redis is down — don't buffer jobs in memory
   maxRetriesPerRequest: 3,
