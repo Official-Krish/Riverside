@@ -25,11 +25,13 @@ export function MeetingTimer({
 }: MeetingTimerProps) {
   const navigate = useNavigate();
   const hasEndedRef = useRef(false);
+  const lastTickAtRef = useRef<number | null>(null);
   const [displayTime, setDisplayTime] = useState({
     elapsed: 0,
     remaining: 0,
     percentage: 0,
     isEnded: false,
+    maxDuration: 0,
   });
 
   const { data: status } = useQuery<MeetingStatus>({
@@ -52,31 +54,91 @@ export function MeetingTimer({
     },
   });
 
+  const endMeetingRef = useRef(endMeetingMutation.mutate);
+  const navigateRef = useRef(navigate);
+
+  useEffect(() => {
+    endMeetingRef.current = endMeetingMutation.mutate;
+    navigateRef.current = navigate;
+  });
+
   useEffect(() => {
     if (!status || hasEndedRef.current) return;
 
+    lastTickAtRef.current = Date.now();
     setDisplayTime({
       elapsed: status.elapsedMs,
       remaining: status.remainingMs || 0,
       percentage: status.percentage || 0,
       isEnded: status.isEnded,
+      maxDuration: status.maxDurationMs || 0,
     });
 
     if (status.isEnded) {
       hasEndedRef.current = true;
-      navigate("/dashboard");
+      navigateRef.current("/dashboard");
       return;
     }
 
     if (status.shouldAutoEnd) {
       hasEndedRef.current = true;
       if (isHost) {
-        endMeetingMutation.mutate();
+        endMeetingRef.current();
       } else {
-        navigate("/dashboard");
+        navigateRef.current("/dashboard");
       }
     }
-  }, [status, isHost, navigate, endMeetingMutation]);
+  }, [status, isHost, meetingId]);
+
+  useEffect(() => {
+    if (
+      hasEndedRef.current ||
+      displayTime.isEnded ||
+      displayTime.remaining <= 0
+    ) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      const now = Date.now();
+      const delta = lastTickAtRef.current ? now - lastTickAtRef.current : 1000;
+      lastTickAtRef.current = now;
+
+      setDisplayTime((prev) => {
+        if (prev.isEnded || prev.remaining <= 0) return prev;
+
+        const nextRemaining = Math.max(0, prev.remaining - delta);
+        const nextElapsed = prev.elapsed + delta;
+        const nextPercentage =
+          prev.maxDuration > 0
+            ? Math.min(100, (nextElapsed / prev.maxDuration) * 100)
+            : prev.percentage;
+
+        return {
+          ...prev,
+          elapsed: nextElapsed,
+          remaining: nextRemaining,
+          percentage: nextPercentage,
+          isEnded: nextRemaining <= 0,
+        };
+      });
+    }, 1000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [displayTime.isEnded, displayTime.remaining]);
+
+  useEffect(() => {
+    if (hasEndedRef.current || !displayTime.isEnded) return;
+
+    hasEndedRef.current = true;
+    if (isHost) {
+      endMeetingRef.current();
+    } else {
+      navigateRef.current("/dashboard");
+    }
+  }, [displayTime.isEnded, isHost]);
 
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
@@ -95,7 +157,7 @@ export function MeetingTimer({
 
   return (
     <div
-      className={`fixed inset-x-0 ${isRecording ? "top-16" : "top-4"} z-50 flex justify-center items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium ${
+      className={`fixed left-1/2 -translate-x-1/2 ${isRecording ? "top-16" : "top-4"} z-50 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium ${
         isCritical
           ? "border border-red-500/50 bg-red-950/80 text-red-400"
           : isWarning

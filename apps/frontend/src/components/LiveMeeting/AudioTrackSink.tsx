@@ -5,6 +5,13 @@ export function AudioTrackSink({ track }: { track: any }) {
   const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
+    if (audioRef.current) {
+      // Slightly lower remote playback to reduce speaker→mic echo bleed.
+      audioRef.current.volume = 0.85;
+    }
+  }, []);
+
+  useEffect(() => {
     if (!track || !audioRef.current) {
       return;
     }

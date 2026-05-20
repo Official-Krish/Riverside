@@ -9,24 +9,12 @@ import { http } from "../https";
 import { getHttpErrorMessage } from "../lib/httpError";
 import { toast } from "sonner";
 import { buildMeetingLivePath } from "../lib/meeting";
+import { buildMeetingAudioConstraints } from "../lib/meetingAudio";
 
 type UseMeetingSetupArgs = {
   displayNameFallback: string;
   navigate: (path: string) => void;
 };
-
-function buildPreviewAudioConstraints(
-  selectedMicId: string,
-): MediaTrackConstraints | boolean {
-  return {
-    deviceId: selectedMicId ? { exact: selectedMicId } : undefined,
-    echoCancellation: true,
-    noiseSuppression: true,
-    autoGainControl: true,
-    channelCount: { ideal: 1 },
-    sampleRate: { ideal: 48000 },
-  };
-}
 
 function buildPreviewVideoConstraints(
   selectedCameraId: string,
@@ -143,7 +131,7 @@ export function useMeetingSetup({
         stopAudioMeter();
         stream = await navigator.mediaDevices.getUserMedia({
           video: buildPreviewVideoConstraints(selectedCameraId),
-          audio: buildPreviewAudioConstraints(selectedMicId),
+          audio: buildMeetingAudioConstraints(selectedMicId, "preview"),
         });
 
         streamRef.current = stream;

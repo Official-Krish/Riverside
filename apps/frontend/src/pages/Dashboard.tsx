@@ -50,6 +50,7 @@ export function Dashboard() {
       return response.data;
     },
     enabled: isAuthenticated,
+    refetchInterval: 10000,
   });
 
   const joinScheduledMeetingMutation = useMutation({
@@ -166,8 +167,15 @@ export function Dashboard() {
                   meetingsQuery.error,
                   "Could not load meetings.",
                 )}
-                onOpenMeeting={(meetingId) =>
-                  navigate(`/meeting/live/${meetingId}`)
+                onOpenMeeting={(meeting) =>
+                  navigate(
+                    buildMeetingLivePath({
+                      roomId: meeting.roomId,
+                      name: name || "Guest",
+                      role: meeting.isHost ? "host" : "guest",
+                      recordingState: meeting.recordingState === "RECORDING",
+                    }),
+                  )
                 }
                 onOpenRecording={(recordingId) =>
                   navigate(`/recordings/${recordingId}`)

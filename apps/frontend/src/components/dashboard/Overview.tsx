@@ -43,7 +43,7 @@ export function Overview({
 
   const [meetingsPage, setMeetingsPage] = useState(1);
   const [recordingsPage, setRecordingsPage] = useState(1);
-  const pageSize = 4;
+  const pageSize = 3;
 
   const readyMeetings = meetings.filter(
     (meeting) => meeting.recordingState === "READY",

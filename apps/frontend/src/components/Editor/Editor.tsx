@@ -194,7 +194,7 @@ export function Editor() {
   );
 
   const { exportJob, showExportDialog, setShowExportDialog, handleExport } =
-    useExport(project);
+    useExport(project, tracks, overlays, durationMs);
 
   const { handleDeleteOverlay, handleUpdateOverlay, handleAddOverlay } =
     useOverlayOperations(setOverlays);
@@ -416,11 +416,7 @@ export function Editor() {
     if (!el) return;
 
     const updateContainerSize = () => {
-      const canvasRect = canvasRef.current?.getBoundingClientRect();
-      const rect =
-        canvasRect && canvasRect.width > 0 && canvasRect.height > 0
-          ? canvasRect
-          : el.getBoundingClientRect();
+      const rect = el.getBoundingClientRect();
 
       setContainerSize({
         width: rect.width,

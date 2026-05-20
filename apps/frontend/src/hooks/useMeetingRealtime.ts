@@ -259,6 +259,9 @@ export function useMeetingRealtime({
 
       if (payload.type === "joined-room" && payload.participantId) {
         selfParticipantIdRef.current = payload.participantId;
+        if (typeof payload.isRecording === "boolean" && payload.isRecording) {
+          onRemoteRecordingStateRef.current?.(true);
+        }
       }
 
       if (

@@ -1,14 +1,18 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { http } from "../https";
+import { getStoredToken } from "../lib/auth";
+import { getHttpErrorMessage } from "../lib/httpError";
 import type { RecordingStatusResponse } from "@repo/types/api";
 import {
   encryptMeetingChunk,
   generateMeetingCek,
+  getMeetingCekStorageId,
   persistMeetingCek,
   readMeetingCek,
   wrapMeetingCek,
 } from "../lib/meetingCrypto";
+import { buildMeetingAudioConstraints } from "../lib/meetingAudio";
 
 type ConnectionState =
   | "idle"
@@ -20,6 +24,7 @@ type ConnectionState =
 type UseMeetingRecordingArgs = {
   meetingId: string;
   roomName: string;
+  authUserId: string;
   localParticipantId: string | null;
   connectionState: ConnectionState;
   isRecording: boolean;
@@ -28,20 +33,8 @@ type UseMeetingRecordingArgs = {
   isVideoOff: boolean;
   selectedMicId?: string;
   selectedCameraId?: string;
+  jitsiLocalAudioTrack?: { getTrack?: () => MediaStreamTrack } | null;
 };
-
-function buildRecordingAudioConstraints(
-  selectedMicId?: string,
-): MediaTrackConstraints {
-  return {
-    deviceId: selectedMicId ? { exact: selectedMicId } : undefined,
-    echoCancellation: true,
-    noiseSuppression: true,
-    autoGainControl: true,
-    channelCount: { ideal: 1 },
-    sampleRate: { ideal: 48000 },
-  };
-}
 
 function buildRecordingVideoConstraints(
   selectedCameraId?: string,
@@ -57,6 +50,7 @@ function buildRecordingVideoConstraints(
 export function useMeetingRecording({
   meetingId,
   roomName,
+  authUserId,
   localParticipantId,
   connectionState,
   isRecording,
@@ -65,6 +59,7 @@ export function useMeetingRecording({
   isVideoOff,
   selectedMicId,
   selectedCameraId,
+  jitsiLocalAudioTrack,
 }: UseMeetingRecordingArgs) {
   const CHUNK_DURATION_MS = 10000;
 
@@ -86,6 +81,30 @@ export function useMeetingRecording({
   const uploadChainRef = useRef<Promise<void>>(Promise.resolve());
   const stoppingRef = useRef(false);
   const chunkStartedAtRef = useRef<number | null>(null);
+  const chunkStopTimeoutRef = useRef<number | null>(null);
+  const ownedMediaTracksRef = useRef<Set<MediaStreamTrack>>(new Set());
+  const jitsiLocalAudioTrackRef = useRef(jitsiLocalAudioTrack);
+
+  useEffect(() => {
+    jitsiLocalAudioTrackRef.current = jitsiLocalAudioTrack;
+  }, [jitsiLocalAudioTrack]);
+
+  const markTrackOwned = useCallback((track: MediaStreamTrack | null) => {
+    if (track) {
+      ownedMediaTracksRef.current.add(track);
+    }
+  }, []);
+
+  const stopOwnedTracks = useCallback(() => {
+    for (const track of ownedMediaTracksRef.current) {
+      try {
+        track.stop();
+      } catch {
+        // best effort
+      }
+    }
+    ownedMediaTracksRef.current.clear();
+  }, []);
 
   const resetRecorderSession = useCallback(() => {
     sequenceRef.current = 0;
@@ -113,7 +132,8 @@ export function useMeetingRecording({
       const { data } = await http.get(`/recording/status/${meetingId}`);
       return data;
     },
-    refetchInterval: 30000,
+    refetchInterval: (query) =>
+      query.state.data?.recordingState === "RECORDING" ? 2000 : 3000,
   });
 
   useEffect(() => {
@@ -151,11 +171,20 @@ export function useMeetingRecording({
 
       uploadChainRef.current = uploadChainRef.current
         .then(async () => {
-          const participantForNonce =
-            localParticipantId || "unknown-participant";
+          if (chunk.size < 256) {
+            console.warn(
+              `[recording] Skipping chunk seq=${nextSequence} (${chunk.size} bytes) — too small to be valid WebM`,
+            );
+            return;
+          }
+
+          if (!authUserId) {
+            throw new Error("User identity not loaded — cannot encrypt chunk");
+          }
+
           const encryptedPayload = await encryptMeetingChunk({
-            meetingId,
-            participantId: participantForNonce,
+            meetingId: roomName,
+            authUserId,
             sequenceNumber: nextSequence,
             chunk,
           });
@@ -183,18 +212,31 @@ export function useMeetingRecording({
             String(encryptedPayload.tagBits),
           );
 
+          const token = getStoredToken();
+          const headers: Record<string, string> = {};
+
+          if (token) {
+            headers.Authorization = token.startsWith("Bearer ")
+              ? token
+              : `Bearer ${token}`;
+          }
+
           await http.post("/upload-chunk", formData, {
-            headers: {
-              "Content-Type": "multipart/form-data",
-            },
+            headers,
           });
         })
-        .catch(() => {
-          setRecordingError("Failed to encrypt or upload one or more chunks.");
+        .catch((error) => {
+          setRecordingError(
+            getHttpErrorMessage(
+              error,
+              "Failed to encrypt or upload one or more chunks.",
+            ),
+          );
           setIsUploadingChunks(false);
+          uploadChainRef.current = Promise.resolve();
         });
     },
-    [roomName, localParticipantId, meetingId],
+    [authUserId, roomName, localParticipantId],
   );
 
   const getSupportedMimeType = useCallback(() => {
@@ -213,39 +255,20 @@ export function useMeetingRecording({
     return "video/webm";
   }, []);
 
-  const cleanupRecorder = useCallback(() => {
-    try {
-      mediaRecorderRef.current?.stop();
-    } catch {
-      // best effort
-    }
+  const releaseRecorderResources = useCallback(() => {
     mediaRecorderRef.current = null;
-
-    if (recordingStreamRef.current) {
-      recordingStreamRef.current.getTracks().forEach((track) => {
-        try {
-          track.stop();
-        } catch {
-          // best effort
-        }
-      });
-      recordingStreamRef.current = null;
-    }
+    recordingStreamRef.current = null;
+    processedStreamRef.current = null;
     audioTrackRef.current = null;
     chunkStartedAtRef.current = null;
 
-    if (processedStreamRef.current) {
-      processedStreamRef.current.getTracks().forEach((track) => {
-        try {
-          track.stop();
-        } catch {
-          // best effort
-        }
-      });
-      processedStreamRef.current = null;
+    if (chunkStopTimeoutRef.current !== null) {
+      window.clearTimeout(chunkStopTimeoutRef.current);
+      chunkStopTimeoutRef.current = null;
     }
 
-    // stop canvas animation if present
+    stopOwnedTracks();
+
     if (canvasAnimationRef.current) {
       cancelAnimationFrame(canvasAnimationRef.current);
       canvasAnimationRef.current = null;
@@ -260,6 +283,79 @@ export function useMeetingRecording({
       }
       videoElementRef.current = null;
     }
+  }, [stopOwnedTracks]);
+
+  const flushAndStopRecorder = useCallback(async () => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state === "inactive") {
+      releaseRecorderResources();
+      return;
+    }
+
+    if (chunkStopTimeoutRef.current !== null) {
+      window.clearTimeout(chunkStopTimeoutRef.current);
+      chunkStopTimeoutRef.current = null;
+    }
+
+    await new Promise<void>((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        resolve();
+      };
+
+      const handleData = (event: BlobEvent) => {
+        if (!event.data || event.data.size === 0) {
+          return;
+        }
+        const chunkEndedAt = Date.now();
+        const chunkStartedAt =
+          chunkStartedAtRef.current ?? chunkEndedAt - CHUNK_DURATION_MS;
+        const actualDurationMs = Math.max(1, chunkEndedAt - chunkStartedAt);
+        chunkStartedAtRef.current = chunkEndedAt;
+        setIsUploadingChunks(true);
+        enqueueChunkUpload(
+          event.data,
+          new Date(chunkStartedAt).toISOString(),
+          actualDurationMs,
+        );
+      };
+
+      recorder.addEventListener("dataavailable", handleData);
+      recorder.addEventListener(
+        "stop",
+        () => {
+          recorder.removeEventListener("dataavailable", handleData);
+          finish();
+        },
+        { once: true },
+      );
+
+      try {
+        recorder.stop();
+      } catch {
+        finish();
+      }
+    });
+
+    releaseRecorderResources();
+  }, [enqueueChunkUpload, releaseRecorderResources]);
+
+  const waitForSharedJitsiAudioTrack = useCallback(async () => {
+    const deadline = Date.now() + 8000;
+
+    while (Date.now() < deadline) {
+      const track = jitsiLocalAudioTrackRef.current?.getTrack?.() ?? null;
+      if (track && track.readyState === "live") {
+        return track;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+
+    return jitsiLocalAudioTrackRef.current?.getTrack?.() ?? null;
   }, []);
 
   const startLocalChunkRecorder = useCallback(
@@ -291,13 +387,17 @@ export function useMeetingRecording({
           return canvas.captureStream(60).getVideoTracks()[0] ?? null;
         };
 
+        const sharedJitsiAudioTrack = await waitForSharedJitsiAudioTrack();
+
         const mediaConstraints: MediaStreamConstraints = {
           // Keep a real video source available even when the meeting camera is
           // currently "off" so later camera-on toggles can produce frames.
           video: buildRecordingVideoConstraints(selectedCameraId),
-          // Keep a real audio source available even when the participant joins
-          // muted so later unmute actions can be captured in the same session.
-          audio: buildRecordingAudioConstraints(selectedMicId),
+          // Reuse the Jitsi mic when possible — opening a second audio input
+          // competes with WebRTC processing and causes echo / noise artifacts.
+          audio: sharedJitsiAudioTrack
+            ? false
+            : buildMeetingAudioConstraints(selectedMicId, "recording"),
         };
 
         const stream =
@@ -306,13 +406,18 @@ export function useMeetingRecording({
             : new MediaStream();
 
         recordingStreamRef.current = stream;
+        stream.getTracks().forEach((track) => markTrackOwned(track));
 
         const recorderStream = new MediaStream();
 
-        const rawAudioTrack = stream.getAudioTracks()[0] ?? null;
+        const rawAudioTrack =
+          sharedJitsiAudioTrack ?? stream.getAudioTracks()[0] ?? null;
         if (rawAudioTrack) {
           audioTrackRef.current = rawAudioTrack;
           recorderStream.addTrack(rawAudioTrack);
+          if (!sharedJitsiAudioTrack) {
+            markTrackOwned(rawAudioTrack);
+          }
         }
 
         const videoTrack = initialIsVideoOff
@@ -321,6 +426,9 @@ export function useMeetingRecording({
         const blackVideoTrack = initialIsVideoOff
           ? createBlackVideoTrack()
           : null;
+        if (blackVideoTrack) {
+          markTrackOwned(blackVideoTrack);
+        }
 
         const canvas = document.createElement("canvas");
         canvasRef.current = canvas;
@@ -395,51 +503,87 @@ export function useMeetingRecording({
         const canvasVideoTrack =
           canvasStream.getVideoTracks()[0] ?? blackVideoTrack;
         if (canvasVideoTrack) {
+          markTrackOwned(canvasVideoTrack);
           recorderStream.addTrack(canvasVideoTrack);
         }
 
         processedStreamRef.current = recorderStream;
 
-        let recorder: MediaRecorder;
-        try {
-          recorder = new MediaRecorder(recorderStream, {
-            mimeType: getSupportedMimeType(),
-            audioBitsPerSecond: 256_000,
-          });
-        } catch {
-          recorder = new MediaRecorder(recorderStream);
-        }
-
-        recorder.ondataavailable = (event) => {
-          if (!event.data || event.data.size === 0) {
+        const startNextChunk = () => {
+          if (stoppingRef.current || mediaRecorderRef.current) {
             return;
           }
-          const chunkEndedAt = Date.now();
-          const chunkStartedAt =
-            chunkStartedAtRef.current ?? chunkEndedAt - CHUNK_DURATION_MS;
-          const actualDurationMs = Math.max(1, chunkEndedAt - chunkStartedAt);
-          chunkStartedAtRef.current = chunkEndedAt;
-          setIsUploadingChunks(true);
-          enqueueChunkUpload(
-            event.data,
-            new Date(chunkStartedAt).toISOString(),
-            actualDurationMs,
-          );
+
+          let nextRecorder: MediaRecorder;
+          try {
+            nextRecorder = new MediaRecorder(recorderStream, {
+              mimeType: getSupportedMimeType(),
+              audioBitsPerSecond: 256_000,
+            });
+          } catch {
+            nextRecorder = new MediaRecorder(recorderStream);
+          }
+
+          nextRecorder.ondataavailable = (event) => {
+            if (!event.data || event.data.size === 0) {
+              return;
+            }
+
+            const chunkEndedAt = Date.now();
+            const chunkStartedAt =
+              chunkStartedAtRef.current ?? chunkEndedAt - CHUNK_DURATION_MS;
+            const actualDurationMs = Math.max(1, chunkEndedAt - chunkStartedAt);
+            chunkStartedAtRef.current = chunkEndedAt;
+            setIsUploadingChunks(true);
+            enqueueChunkUpload(
+              event.data,
+              new Date(chunkStartedAt).toISOString(),
+              actualDurationMs,
+            );
+          };
+
+          nextRecorder.onerror = () => {
+            setRecordingError("Chunk recorder failed while capturing meeting.");
+          };
+
+          nextRecorder.onstop = async () => {
+            await uploadChainRef.current;
+            setIsUploadingChunks(false);
+
+            mediaRecorderRef.current = null;
+
+            if (!stoppingRef.current) {
+              startNextChunk();
+            }
+          };
+
+          mediaRecorderRef.current = nextRecorder;
+          syncRecorderMediaState();
+          chunkStartedAtRef.current = Date.now();
+
+          try {
+            nextRecorder.start();
+          } catch (error) {
+            setRecordingError("Chunk recorder failed while capturing meeting.");
+            mediaRecorderRef.current = null;
+            throw error;
+          }
+
+          if (chunkStopTimeoutRef.current !== null) {
+            window.clearTimeout(chunkStopTimeoutRef.current);
+          }
+          chunkStopTimeoutRef.current = window.setTimeout(() => {
+            if (nextRecorder.state === "recording") {
+              try {
+                nextRecorder.stop();
+              } catch {
+                // best effort
+              }
+            }
+          }, CHUNK_DURATION_MS);
         };
 
-        recorder.onerror = () => {
-          setRecordingError("Chunk recorder failed while capturing meeting.");
-        };
-
-        recorder.onstop = async () => {
-          await uploadChainRef.current;
-          setIsUploadingChunks(false);
-        };
-
-        mediaRecorderRef.current = recorder;
-        syncRecorderMediaState();
-        chunkStartedAtRef.current = Date.now();
-        recorder.start(CHUNK_DURATION_MS);
+        startNextChunk();
       } catch (err) {
         // Ensure the transient starting flag is cleared on error so callers
         // (which may implement retry/backoff) can attempt to start again.
@@ -454,9 +598,11 @@ export function useMeetingRecording({
     [
       enqueueChunkUpload,
       getSupportedMimeType,
+      markTrackOwned,
       selectedCameraId,
       selectedMicId,
       syncRecorderMediaState,
+      waitForSharedJitsiAudioTrack,
     ],
   );
 
@@ -496,10 +642,12 @@ export function useMeetingRecording({
   );
 
   const stopLocalChunkRecorder = useCallback(async () => {
-    cleanupRecorder();
+    stoppingRef.current = true;
+    await flushAndStopRecorder();
     await uploadChainRef.current;
     setIsUploadingChunks(false);
-  }, [cleanupRecorder]);
+    stoppingRef.current = false;
+  }, [flushAndStopRecorder]);
 
   const serverPublicKeyQuery = useQuery({
     queryKey: ["server-public-key"],
@@ -515,14 +663,15 @@ export function useMeetingRecording({
 
   const uploadWrappedCekMutation = useMutation({
     mutationFn: async (wrappedCek: number[]) => {
-      await http.post(`/keys/meeting/${meetingId}/wrapped-cek`, {
+      await http.post(`/keys/meeting/${roomName}/wrapped-cek`, {
         wrappedCek,
       });
     },
   });
 
   const initializeMeetingCek = useCallback(async (): Promise<void> => {
-    const existingCek = readMeetingCek(meetingId);
+    const storageId = getMeetingCekStorageId(roomName);
+    const existingCek = readMeetingCek(storageId);
     if (existingCek) {
       return;
     }
@@ -533,7 +682,7 @@ export function useMeetingRecording({
 
     try {
       const cek = generateMeetingCek();
-      persistMeetingCek(meetingId, cek);
+      persistMeetingCek(storageId, cek);
 
       const wrappedCek = await wrapMeetingCek(serverPublicKeyQuery.data, cek);
 
@@ -544,7 +693,7 @@ export function useMeetingRecording({
         cause: error,
       });
     }
-  }, [meetingId, serverPublicKeyQuery.data, uploadWrappedCekMutation]);
+  }, [roomName, serverPublicKeyQuery.data, uploadWrappedCekMutation]);
 
   const startRecordingMutation = useMutation({
     mutationFn: async () => {
@@ -558,7 +707,7 @@ export function useMeetingRecording({
       recordingStatusQuery.refetch();
     },
     onError: () => {
-      cleanupRecorder();
+      void flushAndStopRecorder();
       setRecordingError(
         "Could not start recording. Check permissions and try again.",
       );
@@ -582,9 +731,9 @@ export function useMeetingRecording({
 
   useEffect(() => {
     return () => {
-      cleanupRecorder();
+      void flushAndStopRecorder();
     };
-  }, [cleanupRecorder]);
+  }, [flushAndStopRecorder]);
 
   useEffect(() => {
     const serverState = recordingStatusQuery.data?.recordingState;
@@ -595,7 +744,14 @@ export function useMeetingRecording({
     const shouldRecord = serverState === "RECORDING";
 
     if (shouldRecord) {
-      stoppingRef.current = false;
+      if (stoppingRef.current) {
+        return;
+      }
+
+      if (!readMeetingCek(getMeetingCekStorageId(roomName))) {
+        return;
+      }
+
       void startLocalRecording({
         resetSession: !mediaRecorderRef.current,
       }).catch(() => {
@@ -607,14 +763,16 @@ export function useMeetingRecording({
     }
 
     if (mediaRecorderRef.current && !stoppingRef.current) {
-      stoppingRef.current = true;
       void (async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10000));
+        stoppingRef.current = true;
+        // Grace period so the host's final chunk boundary aligns with guests.
+        await new Promise((resolve) => setTimeout(resolve, 3000));
         await stopLocalChunkRecorder();
       })();
     }
   }, [
     connectionState,
+    roomName,
     recordingStatusQuery.data?.recordingState,
     startLocalRecording,
     stopLocalChunkRecorder,
@@ -639,6 +797,7 @@ export function useMeetingRecording({
     recordingButtonLabel,
     stopLocalChunkRecorder,
     startLocalRecording,
+    refetchRecordingStatus: recordingStatusQuery.refetch,
     hasActiveRecorder: () => Boolean(mediaRecorderRef.current),
     isMeetingEnded: Boolean(recordingStatusQuery.data?.isEnded),
   };

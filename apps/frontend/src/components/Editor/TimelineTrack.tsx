@@ -250,13 +250,13 @@ function TimelineTrackComponent({
           return (
             <div
               key={`${clipId}-bar-${i}`}
-              className="w-1 rounded-sm bg-[#4ade80]/70"
+              className="flex-1 min-w-0 rounded-sm bg-[#4ade80]/70"
               style={{ height: `${height}%` }}
             />
           );
         });
         return (
-          <div className="absolute inset-0 flex items-end gap-0.5 px-1 py-1 opacity-80 pointer-events-none">
+          <div className="absolute inset-0 flex items-end gap-px px-1 py-1 opacity-80 pointer-events-none">
             {bars}
           </div>
         );
@@ -305,14 +305,9 @@ function TimelineTrackComponent({
           ),
         );
 
-        // Determine how many frames to show based on clip width
-        const numFrames = Math.min(4, clipThumbs.length);
-        const frames = Array.from({ length: numFrames }, (_, i) => {
-          const idx = Math.floor(
-            (i / Math.max(1, numFrames - 1)) * (clipThumbs.length - 1),
-          );
-          return clipThumbs[Math.min(clipThumbs.length - 1, Math.max(0, idx))];
-        });
+        // Use the full thumbnail slice so long clips don't collapse into a dark strip.
+        // The thumbnail extractor already caps the asset at a manageable count.
+        const frames = clipThumbs;
 
         return (
           <div
@@ -332,8 +327,8 @@ function TimelineTrackComponent({
                 }}
               />
             ))}
-            {/* Subtle dark overlay for text readability */}
-            <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-black/20" />
+            {/* Keep a light overlay so the label stays readable without hiding the frames. */}
+            <div className="absolute inset-0 bg-linear-to-t from-black/18 via-transparent to-black/10" />
 
             {/* Spinner overlay if still extracting more frames */}
             {isExtracting && (
@@ -576,92 +571,95 @@ function TimelineTrackComponent({
               />
 
               {/* Transition indicators and controls */}
+              {track.type !== "AUDIO" && (
+                <>
+                  {/* Drag Over Drop Zone Indicators */}
+                  {dragOverZone?.clipId === clipId &&
+                    dragOverZone.position === "start" && (
+                      <div className="absolute left-0 top-0 bottom-0 w-1/4 max-w-15 bg-[#06b6d4]/30 border-2 border-dashed border-[#06b6d4] z-30 pointer-events-none rounded-l-lg" />
+                    )}
+                  {dragOverZone?.clipId === clipId &&
+                    dragOverZone.position === "end" && (
+                      <div className="absolute right-0 top-0 bottom-0 w-1/4 max-w-15 bg-[#06b6d4]/30 border-2 border-dashed border-[#06b6d4] z-30 pointer-events-none rounded-r-lg" />
+                    )}
 
-              {/* Drag Over Drop Zone Indicators */}
-              {dragOverZone?.clipId === clipId &&
-                dragOverZone.position === "start" && (
-                  <div className="absolute left-0 top-0 bottom-0 w-1/4 max-w-15 bg-[#06b6d4]/30 border-2 border-dashed border-[#06b6d4] z-30 pointer-events-none rounded-l-lg" />
-                )}
-              {dragOverZone?.clipId === clipId &&
-                dragOverZone.position === "end" && (
-                  <div className="absolute right-0 top-0 bottom-0 w-1/4 max-w-15 bg-[#06b6d4]/30 border-2 border-dashed border-[#06b6d4] z-30 pointer-events-none rounded-r-lg" />
-                )}
+                  {/* Start Transition Block */}
+                  {clip.transitionStart && (
+                    <div
+                      className="absolute left-0 top-0 bottom-0 z-20 flex items-center justify-center cursor-pointer group/trans overflow-hidden
+                      bg-[#06b6d4]/40 border-r border-[#06b6d4]/60 hover:bg-[#06b6d4]/60 transition-colors backdrop-blur-[1px]"
+                      style={{
+                        width: `${Math.max(startTransWidthPercent, 2)}%`,
+                        minWidth: "16px",
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectTransition(index, clipId, "start");
+                      }}
+                      title="Edit start transition"
+                    >
+                      <Blend className="h-3 w-3 text-white opacity-80 group-hover/trans:opacity-100 group-hover/trans:scale-110 transition-all drop-shadow-md" />
+                    </div>
+                  )}
 
-              {/* Start Transition Block */}
-              {clip.transitionStart && (
-                <div
-                  className="absolute left-0 top-0 bottom-0 z-20 flex items-center justify-center cursor-pointer group/trans overflow-hidden
-                    bg-[#06b6d4]/40 border-r border-[#06b6d4]/60 hover:bg-[#06b6d4]/60 transition-colors backdrop-blur-[1px]"
-                  style={{
-                    width: `${Math.max(startTransWidthPercent, 2)}%`,
-                    minWidth: "16px",
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelectTransition(index, clipId, "start");
-                  }}
-                  title="Edit start transition"
-                >
-                  <Blend className="h-3 w-3 text-white opacity-80 group-hover/trans:opacity-100 group-hover/trans:scale-110 transition-all drop-shadow-md" />
-                </div>
-              )}
+                  {/* End Transition Block */}
+                  {clip.transitionEnd && (
+                    <div
+                      className="absolute right-0 top-0 bottom-0 z-20 flex items-center justify-center cursor-pointer group/trans overflow-hidden
+                      bg-[#06b6d4]/40 border-l border-[#06b6d4]/60 hover:bg-[#06b6d4]/60 transition-colors backdrop-blur-[1px]"
+                      style={{
+                        width: `${Math.max(endTransWidthPercent, 2)}%`,
+                        minWidth: "16px",
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectTransition(index, clipId, "end");
+                      }}
+                      title="Edit end transition"
+                    >
+                      <Blend className="h-3 w-3 text-white opacity-80 group-hover/trans:opacity-100 group-hover/trans:scale-110 transition-all drop-shadow-md" />
+                    </div>
+                  )}
 
-              {/* End Transition Block */}
-              {clip.transitionEnd && (
-                <div
-                  className="absolute right-0 top-0 bottom-0 z-20 flex items-center justify-center cursor-pointer group/trans overflow-hidden
-                    bg-[#06b6d4]/40 border-l border-[#06b6d4]/60 hover:bg-[#06b6d4]/60 transition-colors backdrop-blur-[1px]"
-                  style={{
-                    width: `${Math.max(endTransWidthPercent, 2)}%`,
-                    minWidth: "16px",
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelectTransition(index, clipId, "end");
-                  }}
-                  title="Edit end transition"
-                >
-                  <Blend className="h-3 w-3 text-white opacity-80 group-hover/trans:opacity-100 group-hover/trans:scale-110 transition-all drop-shadow-md" />
-                </div>
-              )}
+                  {/* Add Transition Hover Buttons (zero-gap split for mid-clip) */}
+                  {!clip.transitionStart && (
+                    <button
+                      className="absolute left-0.5 top-0.5 z-20 flex h-5 w-5 items-center justify-center rounded text-[7px] shadow-md transition-all hover:scale-110 bg-black/50 text-[#8d7850] opacity-0 group-hover/clip:opacity-100 hover:bg-[#06b6d4]/80 hover:text-white"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAddTransitionAtPosition(
+                          index,
+                          clipId,
+                          clip.timelineStartMs,
+                          "start",
+                          "cross-dissolve",
+                        );
+                      }}
+                      title="Add start transition"
+                    >
+                      <Blend className="h-3 w-3" />
+                    </button>
+                  )}
 
-              {/* Add Transition Hover Buttons (zero-gap split for mid-clip) */}
-              {!clip.transitionStart && (
-                <button
-                  className="absolute left-0.5 top-0.5 z-20 flex h-5 w-5 items-center justify-center rounded text-[7px] shadow-md transition-all hover:scale-110 bg-black/50 text-[#8d7850] opacity-0 group-hover/clip:opacity-100 hover:bg-[#06b6d4]/80 hover:text-white"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAddTransitionAtPosition(
-                      index,
-                      clipId,
-                      clip.timelineStartMs,
-                      "start",
-                      "cross-dissolve",
-                    );
-                  }}
-                  title="Add start transition"
-                >
-                  <Blend className="h-3 w-3" />
-                </button>
-              )}
-
-              {!clip.transitionEnd && (
-                <button
-                  className="absolute right-0.5 top-0.5 z-20 flex h-5 w-5 items-center justify-center rounded text-[7px] shadow-md transition-all hover:scale-110 bg-black/50 text-[#8d7850] opacity-0 group-hover/clip:opacity-100 hover:bg-[#06b6d4]/80 hover:text-white"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAddTransitionAtPosition(
-                      index,
-                      clipId,
-                      clip.timelineStartMs + clip.durationMs,
-                      "end",
-                      "cross-dissolve",
-                    );
-                  }}
-                  title="Add end transition"
-                >
-                  <Blend className="h-3 w-3" />
-                </button>
+                  {!clip.transitionEnd && (
+                    <button
+                      className="absolute right-0.5 top-0.5 z-20 flex h-5 w-5 items-center justify-center rounded text-[7px] shadow-md transition-all hover:scale-110 bg-black/50 text-[#8d7850] opacity-0 group-hover/clip:opacity-100 hover:bg-[#06b6d4]/80 hover:text-white"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAddTransitionAtPosition(
+                          index,
+                          clipId,
+                          clip.timelineStartMs + clip.durationMs,
+                          "end",
+                          "cross-dissolve",
+                        );
+                      }}
+                      title="Add end transition"
+                    >
+                      <Blend className="h-3 w-3" />
+                    </button>
+                  )}
+                </>
               )}
               {/* Delete button — yellow ✕ in bottom-right, matching reference */}
               <button

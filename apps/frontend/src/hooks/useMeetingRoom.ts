@@ -1,8 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
 import { JITSI_BASE_URL } from "../lib/config";
-import { http } from "@/https";
+import { buildMeetingAudioConstraints } from "../lib/meetingAudio";
 
 type ConnectionState =
   | "idle"
@@ -27,19 +26,6 @@ type ParticipantState = {
   tracks: JitsiTrack[];
 };
 
-function buildMeetingAudioConstraints(
-  selectedMicId?: string,
-): MediaTrackConstraints {
-  return {
-    deviceId: selectedMicId ? { exact: selectedMicId } : undefined,
-    echoCancellation: true,
-    noiseSuppression: true,
-    autoGainControl: true,
-    channelCount: { ideal: 1 },
-    sampleRate: { ideal: 48000 },
-  };
-}
-
 function buildMeetingVideoConstraints(
   selectedCameraId?: string,
 ): MediaTrackConstraints {
@@ -60,7 +46,6 @@ export function useMeetingRoom({
   initialMuted = false,
   initialVideoOff = false,
   enabled = true,
-  isAuthenticated = false,
 }: {
   meetingId: string;
   displayName: string;
@@ -69,7 +54,6 @@ export function useMeetingRoom({
   initialMuted?: boolean;
   initialVideoOff?: boolean;
   enabled?: boolean;
-  isAuthenticated?: boolean;
 }) {
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("idle");
@@ -95,6 +79,9 @@ export function useMeetingRoom({
   const localVideoTrackRef = useRef<JitsiTrack | null>(null);
   const localScreenTrackRef = useRef<JitsiTrack | null>(null);
 
+  const [localAudioTrack, setLocalAudioTrack] = useState<JitsiTrack | null>(
+    null,
+  );
   const [localVideoTrack, setLocalVideoTrack] = useState<JitsiTrack | null>(
     null,
   );
@@ -243,6 +230,7 @@ export function useMeetingRoom({
 
   const clearRoomState = useCallback(() => {
     setParticipantsMap({});
+    setLocalAudioTrack(null);
     setLocalVideoTrack(null);
     setLocalScreenTrack(null);
     setLocalParticipantId(null);
@@ -410,23 +398,8 @@ export function useMeetingRoom({
     }
   }, []);
 
-  const getJitsiTokenMutation = useMutation<
-    { token: string; domain: string },
-    Error,
-    { meetingId: string }
-  >({
-    mutationFn: async ({ meetingId }: { meetingId: string }) => {
-      const response = await http.post<{ token: string; domain: string }>(
-        "/jitsi/token",
-        { meetingId },
-      );
-
-      return response.data;
-    },
-  });
-
   useEffect(() => {
-    if (!meetingId || !enabled || !isAuthenticated) {
+    if (!meetingId || !enabled) {
       return;
     }
 
@@ -486,27 +459,15 @@ export function useMeetingRoom({
         const runtimeConfig = await fetchJitsiConnectionConfig();
         console.log("Jitsi config:", runtimeConfig);
 
-        let jwtToken: string | undefined = undefined;
-        try {
-          const tokenData = await getJitsiTokenMutation.mutateAsync({
-            meetingId,
-          });
-          jwtToken = tokenData.token;
-        } catch (err) {
-          console.error("Failed to get Jitsi token:", err);
-        }
-
         const connection = new JitsiMeetJS.JitsiConnection(null, null, {
           hosts: {
-            domain: runtimeConfig.domain,
-            muc: runtimeConfig.muc,
+            domain: "jitsi.krishlabs.tech",
+            muc: `conference.jitsi.krishlabs.tech`,
           },
-          // Use serviceUrl for BOSH endpoint (bosh is deprecated in newer Jitsi versions)
           serviceUrl: runtimeConfig.bosh,
           clientNode: "http://jitsi.org/jitsimeet",
           enableLipSync: false,
           externalConnectUrl: null,
-          jwt: jwtToken ?? undefined,
         });
 
         console.log("JitsiConnection created:", connection);
@@ -605,7 +566,10 @@ export function useMeetingRoom({
               cameraDeviceId: selectedCameraId || undefined,
               micDeviceId: selectedMicId || undefined,
               constraints: {
-                audio: buildMeetingAudioConstraints(selectedMicId),
+                audio: buildMeetingAudioConstraints(
+                  selectedMicId,
+                  "conference",
+                ),
                 video: buildMeetingVideoConstraints(selectedCameraId),
               },
             });
@@ -621,6 +585,7 @@ export function useMeetingRoom({
               conference.addTrack(track);
               if (track.getType?.() === "audio") {
                 localAudioTrackRef.current = track;
+                setLocalAudioTrack(track);
               }
               if (track.getType?.() === "video") {
                 localVideoTrackRef.current = track;
@@ -685,7 +650,6 @@ export function useMeetingRoom({
     initialMuted,
     initialVideoOff,
     selectedMicId,
-    isAuthenticated,
     updateParticipantName,
   ]);
 
@@ -697,6 +661,7 @@ export function useMeetingRoom({
   return {
     connectionState,
     error,
+    localAudioTrack,
     localVideoTrack,
     localScreenTrack,
     participants,

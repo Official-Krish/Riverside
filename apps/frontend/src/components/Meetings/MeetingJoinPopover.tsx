@@ -19,19 +19,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { http } from "@/https";
 import { toast } from "sonner";
 import { getHttpErrorMessage } from "@/lib/httpError";
-
-function buildJoinPreviewAudioConstraints(
-  selectedMicId: string,
-): MediaTrackConstraints | boolean {
-  return {
-    deviceId: selectedMicId ? { exact: selectedMicId } : undefined,
-    echoCancellation: true,
-    noiseSuppression: true,
-    autoGainControl: true,
-    channelCount: { ideal: 1 },
-    sampleRate: { ideal: 48000 },
-  };
-}
+import { buildMeetingAudioConstraints } from "@/lib/meetingAudio";
 
 function buildJoinPreviewVideoConstraints(
   selectedCameraId: string,
@@ -111,7 +99,7 @@ export function MeetingJoinPopover({
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: buildJoinPreviewVideoConstraints(selectedCameraId),
-          audio: buildJoinPreviewAudioConstraints(selectedMicId),
+          audio: buildMeetingAudioConstraints(selectedMicId, "preview"),
         });
 
         if (!active) {

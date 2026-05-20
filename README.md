@@ -9,11 +9,12 @@
 
 ## 🚀 Overview
 
-Weave is a next-generation video conferencing platform that revolutionizes meeting recording by implementing **local recording technology** with **end-to-end encryption**. Unlike traditional platforms like Zoom that depend on internet quality for recording, Weave captures high-quality video and audio directly on each participant's device in encrypted 60-second chunks, then intelligently merges and processes recordings in the cloud.
+Weave is a next-generation video conferencing platform that revolutionizes meeting recording by implementing **local recording technology** with **end-to-end encryption**. Unlike traditional platforms like Zoom that depend on internet quality for recording, Weave captures high-quality video and audio directly on each participant's device in encrypted 10-second chunks, then intelligently merges and processes recordings in the cloud.
 
 ### 🎯 Key Innovation
 
 **Local Recording with Encryption**: Recordings happen locally on each user's device in 60-second chunks with AES-256-GCM encryption, ensuring:
+
 - **No quality loss** due to internet connectivity issues
 - **Consistent recording quality** regardless of network conditions
 - **End-to-end encryption** - chunks encrypted before upload, decrypted only during merge
@@ -23,6 +24,7 @@ Weave is a next-generation video conferencing platform that revolutionizes meeti
 ## ✨ Features
 
 ### 🎥 Core Functionality
+
 - **Real-time video conferencing** with Jitsi Meet integration
 - **Local recording** with automatic chunk upload and encryption
 - **Screen sharing** capabilities
@@ -31,6 +33,7 @@ Weave is a next-generation video conferencing platform that revolutionizes meeti
 - **Passcode protection** for meetings
 
 ### 🔐 Security Features
+
 - **AES-256-GCM chunk encryption** - Each recording chunk is encrypted locally
 - **Per-meeting CEK (Content Encryption Key)** - Unique key per meeting
 - **RSA-OAEP-256 key wrapping** - CEK wrapped with server's RSA public key
@@ -39,6 +42,7 @@ Weave is a next-generation video conferencing platform that revolutionizes meeti
 - **Rate limiting** on API endpoints
 
 ### 🔧 Technical Features
+
 - **Chunk-based recording** (60-second intervals)
 - **Automatic video merging** using FFmpeg
 - **Grid layout generation** for multi-participant recordings
@@ -88,18 +92,19 @@ Weave is a next-generation video conferencing platform that revolutionizes meeti
 
 ### Services
 
-| Service | Port | Purpose |
-|---------|------|---------|
-| **frontend** | 5173 | React Vite dev server |
-| **backend** | 3000 | REST API server |
-| **ws-relayer** | 9093 | WebSocket relay for real-time |
-| **merger-worker** | - | Merges chunks into grid video |
-| **editor-worker** | - | Video editor processing |
-| **transcoder** | - | HLS transcoding |
+| Service           | Port | Purpose                       |
+| ----------------- | ---- | ----------------------------- |
+| **frontend**      | 5173 | React Vite dev server         |
+| **backend**       | 3000 | REST API server               |
+| **ws-relayer**    | 9093 | WebSocket relay for real-time |
+| **merger-worker** | -    | Merges chunks into grid video |
+| **editor-worker** | -    | Video editor processing       |
+| **transcoder**    | -    | HLS transcoding               |
 
 ## 🛠️ Technology Stack
 
 ### Frontend
+
 - **React 19** with TypeScript
 - **Vite** for fast development and building
 - **Tailwind CSS 4** for styling
@@ -109,6 +114,7 @@ Weave is a next-generation video conferencing platform that revolutionizes meeti
 - **Konva + React-Konva** for canvas-based editor
 
 ### Backend
+
 - **Bun / Node.js** runtime
 - **Express.js** for API
 - **TypeScript** for type safety
@@ -117,6 +123,7 @@ Weave is a next-generation video conferencing platform that revolutionizes meeti
 - **JWT** for authentication
 
 ### Workers
+
 - **FFmpeg** for video processing
 - **Bun** runtime for worker services
 - **Google Cloud Storage** for file storage
@@ -146,6 +153,7 @@ video_voice_confrence/
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Bun 1.2+ or Node.js 18+
 - PostgreSQL 14+
 - Redis 6+
@@ -154,27 +162,31 @@ video_voice_confrence/
 ### Development Setup
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/Official-Krish/weave
    cd weave
    ```
 
 2. **Install dependencies**
+
    ```bash
    bun install
    ```
 
 3. **Environment Configuration**
+
    ```bash
    # Copy environment templates
    cp apps/backend/.env.example apps/backend/.env
    cp apps/frontend/.env.example apps/frontend/.env
-   
+
    # Configure your environment variables
    # See Environment Variables section below
    ```
 
 4. **Database Setup**
+
    ```bash
    cd packages/db
    bunx prisma generate
@@ -182,10 +194,11 @@ video_voice_confrence/
    ```
 
 5. **Start Development Servers**
+
    ```bash
    # Start all services
    npm run dev
-   
+
    # Or start individually
    npm run backend      # Port 3000
    npm run dev          # Frontend on 5173
@@ -197,6 +210,7 @@ video_voice_confrence/
 ## 🔧 Environment Variables
 
 ### Backend
+
 ```env
 DATABASE_URL="postgresql://user:password@localhost:5432/weave"
 JWT_SECRET="your-jwt-secret"
@@ -206,6 +220,7 @@ CDN_BASE_URL="https://cdn.yourdomain.com"
 ```
 
 ### Frontend
+
 ```env
 VITE_API_URL="http://localhost:3000"
 VITE_WS_URL="ws://localhost:9093"
@@ -213,6 +228,7 @@ VITE_JITSI_DOMAIN="meet.jit.si"
 ```
 
 ### Worker Services
+
 ```env
 REDIS_HOST=localhost
 REDIS_PORT=6379
@@ -237,11 +253,13 @@ REDIS_PORT=6379
 ## 🔄 Recording Process (with Encryption)
 
 ### 1. Meeting Start
+
 - Generate a random 256-bit Content Encryption Key (CEK) for the meeting
 - Retrieve server's RSA public key
 - Wrap CEK with RSA-OAEP-256 and store in Redis
 
 ### 2. Local Recording (every 60 seconds)
+
 - Capture video/audio chunk from local MediaStream
 - Generate random 96-bit IV
 - Encrypt chunk: AES-256-GCM(plaintext, CEK, IV)
@@ -249,10 +267,12 @@ REDIS_PORT=6379
 - Upload: encrypted chunk + wrapped CEK + IV + algorithm metadata
 
 ### 3. Chunk Upload
+
 - Backend stores chunk with encryption metadata in database
 - S3 stores the encrypted binary data
 
 ### 4. Meeting End → Merge
+
 - Merger-worker downloads all chunks
 - Reads encryption metadata from database
 - Unwraps CEK using server's RSA private key
@@ -261,6 +281,7 @@ REDIS_PORT=6379
 - Creates grid layout video with FFmpeg
 
 ### 5. Transcoding
+
 - Transcoder converts final MP4 to HLS
 - Generates multiple quality profiles (360p, 480p, 720p, 1080p)
 - Creates thumbnail sprites and poster
