@@ -1,24 +1,21 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { Mail, ArrowRight, Loader } from "lucide-react";
 import { toast } from "sonner";
-import { useResendVerificationEmail, useVerifyEmail } from "../components/Authentication/useAuthMutations";
+import {
+  useResendVerificationEmail,
+  useVerifyEmail,
+} from "../components/Authentication/useAuthMutations";
 
 export function VerificationPendingPage() {
   const [searchParams] = useSearchParams();
-  const [email, setEmail] = useState("");
+  const [email] = useState(() => searchParams.get("email") ?? "");
   const [code, setCode] = useState(["", "", "", "", "", ""]);
   const [resendTimeout, setResendTimeout] = useState(0);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const resendMutation = useResendVerificationEmail();
   const verifyMutation = useVerifyEmail();
-
-  useEffect(() => {
-    const emailParam = searchParams.get("email");
-    if (emailParam) {
-      setEmail(emailParam);
-    }
-  }, [searchParams]);
 
   // Handle resend timeout countdown
   useEffect(() => {
@@ -42,7 +39,10 @@ export function VerificationPendingPage() {
     }
   };
 
-  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (
+    index: number,
+    e: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
     if (e.key === "Backspace" && !code[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
@@ -50,7 +50,7 @@ export function VerificationPendingPage() {
 
   const handleVerify = async () => {
     const fullCode = code.join("");
-    
+
     if (fullCode.length !== 6) {
       toast.error("Please enter all 6 digits");
       return;
@@ -65,7 +65,8 @@ export function VerificationPendingPage() {
       await verifyMutation.mutateAsync({ email, code: fullCode });
       toast.success("Email verified successfully!");
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || "Invalid verification code";
+      const errorMsg =
+        error.response?.data?.message || "Invalid verification code";
       toast.error(errorMsg);
     }
   };
@@ -88,11 +89,11 @@ export function VerificationPendingPage() {
   };
 
   const canResend = resendTimeout === 0 && !resendMutation.isPending;
-  const codeComplete = code.every(digit => digit !== "");
+  const codeComplete = code.every((digit) => digit !== "");
 
   return (
     <section className="relative min-h-[calc(100vh-76px)] overflow-hidden px-6 py-10 sm:px-8 flex items-center justify-center">
-      <div className="w-full max-w-md rounded-3xl border border-white/8 bg-white/[0.03] p-8 shadow-[0_20px_60px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+      <div className="w-full max-w-md rounded-3xl border border-white/8 bg-white/3 p-8 shadow-[0_20px_60px_rgba(0,0,0,0.35)] backdrop-blur-xl">
         {/* Logo */}
         <div className="mb-6 flex items-center gap-2.5">
           <img src="/logo-navbar.svg" alt="Weave" className="h-6 w-auto" />
@@ -133,7 +134,7 @@ export function VerificationPendingPage() {
                   value={digit}
                   onChange={(e) => handleCodeChange(index, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(index, e)}
-                  className="w-12 h-12 text-center text-lg font-bold rounded-xl border border-white/8 bg-white/4 text-[#fff5de] outline-none placeholder:text-[#c8b880]/35 transition focus:border-[#f5a623]/40 focus:bg-[#f5a623]/[0.03]"
+                  className="w-12 h-12 text-center text-lg font-bold rounded-xl border border-white/8 bg-white/4 text-[#fff5de] outline-none placeholder:text-[#c8b880]/35 transition focus:border-[#f5a623]/40 focus:bg-[#f5a623]/3"
                   placeholder="0"
                 />
               ))}
@@ -145,7 +146,7 @@ export function VerificationPendingPage() {
               className={`inline-flex w-full items-center justify-center gap-2 rounded-full py-3 text-sm font-extrabold shadow-[0_4px_20px_rgba(245,166,35,0.25)] transition ${
                 codeComplete && !verifyMutation.isPending
                   ? "bg-linear-to-r from-[#ffcf6b] via-[#f5a623] to-[#d98a10] text-[#1b1100] hover:opacity-92 active:scale-[0.98] cursor-pointer"
-                  : "bg-gradient-to-r from-[#ffcf6b]/50 via-[#f5a623]/50 to-[#d98a10]/50 text-[#1b1100]/50 cursor-not-allowed"
+                  : "bg-linear-to-r from-[#ffcf6b]/50 via-[#f5a623]/50 to-[#d98a10]/50 text-[#1b1100]/50 cursor-not-allowed"
               }`}
             >
               {verifyMutation.isPending ? (
@@ -184,7 +185,10 @@ export function VerificationPendingPage() {
 
           <p className="mt-6 text-xs text-[#c8b880]/50">
             Already have an account?{" "}
-            <Link to="/signin" className="font-bold text-[#f5a623] hover:underline">
+            <Link
+              to="/signin"
+              className="font-bold text-[#f5a623] hover:underline"
+            >
               Sign in
             </Link>
           </p>

@@ -1,4 +1,5 @@
-import { useMutation } from "@tanstack/react-query";
+/* eslint-disable react-hooks/exhaustive-deps */
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -23,9 +24,10 @@ import { useMeetingRecording } from "../hooks/useMeetingRecording";
 import { useMeetingRoom } from "../hooks/useMeetingRoom";
 import { useRecordingLimit } from "../hooks/useRecordingLimit";
 import { http } from "../https";
-import { useAuth } from "../hooks/useAuth";
 import {
   generateMeetingCek,
+  getMeetingCekStorageId,
+  readMeetingCek,
   persistMeetingCek,
   wrapMeetingCek,
 } from "../lib/meetingCrypto";
@@ -42,6 +44,7 @@ import type {
   JoinMeetingResponse,
   RegisterWrappedCekResponse,
   ServerPublicKeyResponse,
+  UserProfileResponse,
 } from "@repo/types/api";
 
 export function LiveMeetingPage() {
@@ -50,6 +53,7 @@ export function LiveMeetingPage() {
   const navigate = useNavigate();
   const [ending, setEnding] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [canonicalRoomId, setCanonicalRoomId] = useState<string | null>(null);
   const endingRef = useRef(false);
   const initialRecordingStartedRef = useRef(false);
 
@@ -57,8 +61,21 @@ export function LiveMeetingPage() {
   const isHost = searchParams.get("role") === "host";
   const passcode = searchParams.get("passcode") || "";
   const roomName = useMemo(() => meetingId.trim(), [meetingId]);
-  const { isAuthenticated } = useAuth();
   const initialRecordingState = searchParams.get("recordingState") === "true";
+
+  // Use the canonical roomId from join response for all meeting operations.
+  // For scheduled meetings, this differs from the URL param meetingId.
+  const effectiveRoomId = canonicalRoomId || roomName;
+
+  const authUserQuery = useQuery({
+    queryKey: ["user-me"],
+    queryFn: async () => {
+      const { data } = await http.get<UserProfileResponse>("/user/me");
+      return data.user;
+    },
+    staleTime: Infinity,
+  });
+  const authUserId = authUserQuery.data?.id ?? "";
   const selectedMicId = searchParams.get("micId") || "";
   const selectedCameraId = searchParams.get("cameraId") || "";
   const initialMicOff = searchParams.get("micOff") === "true";
@@ -72,21 +89,43 @@ export function LiveMeetingPage() {
     mutationFn: async () => {
       const publicKeyResponse =
         await http.get<ServerPublicKeyResponse>("/keys/public");
-      const cek = generateMeetingCek();
-      persistMeetingCek(roomName, cek);
+
+      const storageId = getMeetingCekStorageId(effectiveRoomId);
+
+      const existingCek = readMeetingCek(storageId);
+
+      const cek = existingCek ?? generateMeetingCek();
+
+      if (!existingCek) {
+        persistMeetingCek(storageId, cek);
+      }
 
       const wrappedCek = await wrapMeetingCek(
         publicKeyResponse.data.publicKey,
         cek,
       );
-      const response = await http.post<RegisterWrappedCekResponse>(
-        `/keys/meeting/${meetingId}/wrapped-cek`,
-        {
-          wrappedCek,
-        },
-      );
 
-      return response.data;
+      try {
+        const response = await http.post<RegisterWrappedCekResponse>(
+          `/keys/meeting/${effectiveRoomId}/wrapped-cek`,
+          {
+            wrappedCek,
+          },
+        );
+        return response.data;
+      } catch (error) {
+        if (error) {
+          console.error(
+            "[CEK] Auth error: JWT token may be invalid or expired",
+          );
+        }
+        if (error) {
+          console.error(
+            "[CEK] Auth error: User not authorized for this meeting",
+          );
+        }
+        throw error;
+      }
     },
   });
 
@@ -104,7 +143,10 @@ export function LiveMeetingPage() {
       );
       return res.data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Store the canonical roomId returned from backend.
+      // For scheduled meetings, this differs from the URL param meetingId.
+      setCanonicalRoomId(data.roomId);
       wrappedCekMutation.mutate();
     },
   });
@@ -117,6 +159,7 @@ export function LiveMeetingPage() {
   const {
     connectionState,
     error,
+    localAudioTrack,
     localVideoTrack,
     localScreenTrack,
     participants,
@@ -137,7 +180,7 @@ export function LiveMeetingPage() {
     toggleScreenShare,
     leaveRoom,
   } = useMeetingRoom({
-    meetingId: roomName,
+    meetingId: effectiveRoomId,
     displayName,
     selectedCameraId,
     selectedMicId,
@@ -146,7 +189,6 @@ export function LiveMeetingPage() {
     enabled:
       joinMutation.status === "success" &&
       wrappedCekMutation.status === "success",
-    isAuthenticated,
   });
 
   const {
@@ -158,11 +200,13 @@ export function LiveMeetingPage() {
     recordingButtonLabel,
     stopLocalChunkRecorder,
     startLocalRecording,
+    refetchRecordingStatus,
     hasActiveRecorder,
     isMeetingEnded,
   } = useMeetingRecording({
     meetingId,
-    roomName,
+    roomName: effectiveRoomId,
+    authUserId,
     localParticipantId,
     connectionState,
     isRecording,
@@ -171,6 +215,7 @@ export function LiveMeetingPage() {
     isVideoOff,
     selectedMicId,
     selectedCameraId,
+    jitsiLocalAudioTrack: localAudioTrack,
   });
 
   const {
@@ -193,7 +238,7 @@ export function LiveMeetingPage() {
     participantNamesById,
     sendReaction,
   } = useMeetingRealtime({
-    roomId: roomName,
+    roomId: effectiveRoomId,
     displayName,
     participantId: localParticipantId,
     isHost,
@@ -204,18 +249,16 @@ export function LiveMeetingPage() {
     },
     onRemoteRecordingState: (remoteIsRecording) => {
       setIsRecording(remoteIsRecording);
+      void refetchRecordingStatus();
 
-      // If server signalled recording start/stop, start/stop local recorder immediately for non-hosts.
-      if (!isHost) {
-        if (remoteIsRecording) {
-          void startLocalRecording?.().catch(() => {
-            // best-effort: notify user
-
-            console.warn("Failed to start local recording on signal");
-          });
-        } else {
-          void stopLocalChunkRecorder();
-        }
+      // Fast-path start for guests; never stop on websocket alone (it can fire
+      // before the DB reflects IDLE and would truncate chunk uploads).
+      if (!isHost && remoteIsRecording) {
+        void startLocalRecording?.({
+          resetSession: !hasActiveRecorder(),
+        }).catch(() => {
+          console.warn("Failed to start local recording on signal");
+        });
       }
     },
     onParticipantJoined: (participant) => {
@@ -278,23 +321,21 @@ export function LiveMeetingPage() {
     sendRecordingState,
     startRecordingMutation,
     startLocalRecording,
+    hasActiveRecorder,
     isHost,
+    refetchRecordingStatus,
   ]);
 
   const allTiles = useMemo<MeetingTile[]>(() => {
     const remoteTiles = participants.flatMap((participant) => {
-      const cameraTrack =
-        participant.tracks.find(
-          (track) =>
-            track.getType?.() === "video" &&
-            track.getVideoType?.() !== "desktop",
-        ) || null;
-      const screenTrack =
-        participant.tracks.find(
-          (track) =>
-            track.getType?.() === "video" &&
-            track.getVideoType?.() === "desktop",
-        ) || null;
+      const cameraTrack = (participant.tracks.find(
+        (track) =>
+          track.getType?.() === "video" && track.getVideoType?.() !== "desktop",
+      ) || null) as MeetingTile["track"];
+      const screenTrack = (participant.tracks.find(
+        (track) =>
+          track.getType?.() === "video" && track.getVideoType?.() === "desktop",
+      ) || null) as MeetingTile["track"];
 
       const participantName = participant.displayName || participant.id;
       const mediaState = getParticipantMediaState(
@@ -400,18 +441,14 @@ export function LiveMeetingPage() {
 
   const participantList = useMemo<MeetingParticipantState[]>(() => {
     const remoteParticipants = participants.map((participant) => {
-      const cameraTrack =
-        participant.tracks.find(
-          (track) =>
-            track.getType?.() === "video" &&
-            track.getVideoType?.() !== "desktop",
-        ) || null;
-      const screenTrack =
-        participant.tracks.find(
-          (track) =>
-            track.getType?.() === "video" &&
-            track.getVideoType?.() === "desktop",
-        ) || null;
+      const cameraTrack = (participant.tracks.find(
+        (track) =>
+          track.getType?.() === "video" && track.getVideoType?.() !== "desktop",
+      ) || null) as MeetingTile["track"];
+      const screenTrack = (participant.tracks.find(
+        (track) =>
+          track.getType?.() === "video" && track.getVideoType?.() === "desktop",
+      ) || null) as MeetingTile["track"];
       const mediaState = getParticipantMediaState(
         participantMediaStates,
         participant.id,
@@ -497,6 +534,14 @@ export function LiveMeetingPage() {
 
     leaveRoom();
 
+    if (isHost) {
+      try {
+        await http.post(`/meeting/end/${meetingId}`);
+      } catch {
+        // best effort — WS relayer will also finalize on disconnect
+      }
+    }
+
     navigate("/dashboard");
   };
 
@@ -526,9 +571,13 @@ export function LiveMeetingPage() {
       return;
     }
 
-    setEnding(true);
-    leaveRoom();
-    navigate("/dashboard");
+    const endTimer = window.setTimeout(() => {
+      setEnding(true);
+      leaveRoom();
+      navigate("/dashboard");
+    }, 0);
+
+    return () => window.clearTimeout(endTimer);
   }, [
     ending,
     handleRemoteMeetingEnded,

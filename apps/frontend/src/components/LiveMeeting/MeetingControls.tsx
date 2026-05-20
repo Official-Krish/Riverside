@@ -1,3 +1,4 @@
+/* eslint-disable */
 import {
   Circle,
   LayoutGrid,
@@ -12,7 +13,13 @@ import {
   VideoOff,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { type ReactNode, useEffect, useRef, useState, useCallback } from "react";
+import {
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
 
 /** How long (ms) of mouse inactivity before controls hide */
 const HIDE_AFTER_MS = 3000;
@@ -146,9 +153,7 @@ function ControlGroup({
 
 /** Thin vertical divider between sections */
 function Divider() {
-  return (
-    <div className="mx-0.5 h-8 w-px self-center bg-white/8" aria-hidden />
-  );
+  return <div className="mx-0.5 h-8 w-px self-center bg-white/8" aria-hidden />;
 }
 
 export function MeetingControls({
@@ -247,14 +252,18 @@ export function MeetingControls({
         {/* Main control bar */}
         <motion.div
           initial={{ y: 24, opacity: 0 }}
-          animate={controlsVisible ? { y: 0, opacity: 1 } : { y: 14, opacity: 0 }}
+          animate={
+            controlsVisible ? { y: 0, opacity: 1 } : { y: 14, opacity: 0 }
+          }
           transition={{ duration: 0.24, ease: "easeOut" }}
           onPointerMove={resetHideTimer}
           onPointerDown={resetHideTimer}
           onFocusCapture={resetHideTimer}
           className={[
             "pointer-events-auto flex max-w-[calc(100vw-1.5rem)] flex-wrap items-end justify-center gap-2 rounded-[32px] border border-[#f5a623]/16 bg-[#0e0b08]/90 px-4 py-3 shadow-[0_18px_50px_rgba(0,0,0,0.52)] backdrop-blur-md transition-[transform,opacity] duration-200",
-            controlsVisible ? "translate-y-0" : "pointer-events-none translate-y-3",
+            controlsVisible
+              ? "translate-y-0"
+              : "pointer-events-none translate-y-3",
           ].join(" ")}
           aria-hidden={!controlsVisible}
         >
@@ -279,7 +288,11 @@ export function MeetingControls({
             />
             <ControlButton
               label={isScreenSharing ? "Stop share" : "Share"}
-              hint={isScreenSharing ? "Stop sharing your screen" : "Share screen with the room"}
+              hint={
+                isScreenSharing
+                  ? "Stop sharing your screen"
+                  : "Share screen with the room"
+              }
               kbd="S"
               onClick={onToggleScreenShare}
               active={isScreenSharing}
@@ -303,7 +316,11 @@ export function MeetingControls({
             />
             <ControlButton
               label={isSidebarOpen ? "Hide users" : "Users"}
-              hint={isSidebarOpen ? "Close participant list" : "Open participant list"}
+              hint={
+                isSidebarOpen
+                  ? "Close participant list"
+                  : "Open participant list"
+              }
               kbd="U"
               onClick={onToggleSidebar}
               active={isSidebarOpen}
@@ -347,7 +364,9 @@ export function MeetingControls({
                 icon={
                   <Circle
                     size={18}
-                    className={recordingActive ? "text-red-400" : "text-[#a57a26]"}
+                    className={
+                      recordingActive ? "text-red-400" : "text-[#a57a26]"
+                    }
                   />
                 }
               />

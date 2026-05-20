@@ -115,8 +115,6 @@ export function useNotifications(
   const acceptInvite = useMutation({
     mutationFn: ({
       targetId,
-      notifId: _notifId,
-      devices: _devices,
     }: {
       targetId: string;
       notifId: string;

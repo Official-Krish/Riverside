@@ -22,6 +22,25 @@ import { downloadSourceToLocal } from "./storage";
 import { generateTemplateOverlays } from "./presets";
 import { materializeClipEffectsAssets } from "./effects/materialize";
 
+async function validatePartFile(partPath: string): Promise<void> {
+  try {
+    const stats = await fs.stat(partPath);
+    if (stats.size < 1000) {
+      throw new Error(
+        `Part file too small (${stats.size} bytes) - likely incomplete`,
+      );
+    }
+    const hasAudio = await (
+      await import("./ffmpegUtils")
+    ).hasAudioStream(partPath);
+    if (!hasAudio) {
+      log("warn", "Part file has no audio stream", { partPath });
+    }
+  } catch (err: any) {
+    throw new Error(`Invalid part file ${partPath}: ${err.message}`);
+  }
+}
+
 function buildOverlayBurnInArgs(
   inputPath: string,
   overlays: any[],
@@ -190,10 +209,14 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
       }),
     );
 
+    let videoOnlyHasAudio = false;
+
     if (resolvedVideoClips.length === 1) {
       const c = resolvedVideoClips[0]!;
       const args = buildClipRenderArgs(c, videoOnlyPath, width, height, fps);
       await runBinaryWithRetries(CONFIG.FFMPEG_BIN, args);
+
+      videoOnlyHasAudio = c.hasAudio ?? false;
 
       const videoOnlyStats = await fs.stat(videoOnlyPath);
       log("info", "Video encoding complete", {
@@ -205,6 +228,8 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
 
       await updateProgress(jobId, 75);
     } else {
+      videoOnlyHasAudio = resolvedVideoClips.some((c) => c.hasAudio) ?? false;
+
       const clipParts: Array<{
         path: string;
         durationMs: number;
@@ -245,6 +270,8 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
         );
       }
 
+      await Promise.all(clipParts.map((part) => validatePartFile(part.path)));
+
       const crossfadeResult = buildCrossfadeConcatArgs(
         clipParts,
         videoOnlyPath,
@@ -258,6 +285,7 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
           throw err;
         }
       } else {
+        await Promise.all(clipParts.map((part) => validatePartFile(part.path)));
         const { args, listPath } = await buildConcatArgs(
           clipParts.map((p) => p.path),
           videoOnlyPath,
@@ -320,6 +348,7 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
         overlayedPath,
         resolvedAudioClips,
         outputPath,
+        videoOnlyHasAudio,
       );
       await runBinaryWithRetries(CONFIG.FFMPEG_BIN, mixArgs);
       await updateProgress(jobId, 98);

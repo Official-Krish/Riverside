@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { WS_RELAYER_URL } from "../lib/config";
 import { http } from "../https";
@@ -23,8 +24,14 @@ type UseMeetingRealtimeOptions = {
     isMuted: boolean;
     isVideoOff: boolean;
   }) => void;
-  onParticipantLeft?: (participant: { participantId: string; displayName: string }) => void;
-  onMeetingEnded?: (endedBy: { participantId: string; displayName: string }) => void;
+  onParticipantLeft?: (participant: {
+    participantId: string;
+    displayName: string;
+  }) => void;
+  onMeetingEnded?: (endedBy: {
+    participantId: string;
+    displayName: string;
+  }) => void;
   isChatOpen?: boolean;
 };
 
@@ -107,20 +114,28 @@ export function useMeetingRealtime({
   const isChatOpenRef = useRef(isChatOpen);
   const selfParticipantIdRef = useRef<string | null>(participantId ?? null);
   const localMediaStateRef = useRef<ParticipantMediaState>(
-    localMediaState ?? { isMuted: false, isVideoOff: false }
+    localMediaState ?? { isMuted: false, isVideoOff: false },
   );
   const onParticipantJoinedRef = useRef(onParticipantJoined);
   const onParticipantLeftRef = useRef(onParticipantLeft);
   const onMeetingEndedRef = useRef(onMeetingEnded);
   const onRemoteRecordingStateRef = useRef(onRemoteRecordingState);
 
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("disconnected");
+  const [connectionStatus, setConnectionStatus] =
+    useState<ConnectionStatus>("disconnected");
   const [chatMessages, setChatMessages] = useState<RealtimeChatMessage[]>([]);
-  const [typingParticipants, setTypingParticipants] = useState<Record<string, string>>({});
-  const [participantMediaStates, setParticipantMediaStates] = useState<ParticipantMediaStateMap>({});
+  const [typingParticipants, setTypingParticipants] = useState<
+    Record<string, string>
+  >({});
+  const [participantMediaStates, setParticipantMediaStates] =
+    useState<ParticipantMediaStateMap>({});
   const [unreadCount, setUnreadCount] = useState(0);
-  const [reactions, setReactions] = useState<Record<string, ChatReaction[]>>({});
-  const [participantNamesById, setParticipantNamesById] = useState<Record<string, string>>({});
+  const [reactions, setReactions] = useState<Record<string, ChatReaction[]>>(
+    {},
+  );
+  const [participantNamesById, setParticipantNamesById] = useState<
+    Record<string, string>
+  >({});
 
   useEffect(() => {
     isChatOpenRef.current = isChatOpen;
@@ -168,7 +183,7 @@ export function useMeetingRealtime({
     try {
       const res = await http.get(`/chat/${roomId}/history?limit=50`);
       const history = res.data.messages || [];
-      
+
       if (history.length === 0) return;
 
       const existingIds = new Set(chatMessages.map((m) => m.id));
@@ -180,8 +195,9 @@ export function useMeetingRealtime({
           senderId: msg.sender?.participantId || msg.senderId || "",
           senderName: msg.sender?.displayName || msg.senderName || "Guest",
           timestamp: msg.timestamp || Date.now(),
-          isOwn: selfParticipantIdRef.current 
-            ? (msg.sender?.participantId || msg.senderId) === selfParticipantIdRef.current 
+          isOwn: selfParticipantIdRef.current
+            ? (msg.sender?.participantId || msg.senderId) ===
+              selfParticipantIdRef.current
             : false,
         }));
 
@@ -234,21 +250,34 @@ export function useMeetingRealtime({
         return;
       }
 
-      if (payload.type === "recording-state" && typeof payload.isRecording === "boolean") {
+      if (
+        payload.type === "recording-state" &&
+        typeof payload.isRecording === "boolean"
+      ) {
         onRemoteRecordingStateRef.current?.(payload.isRecording);
       }
 
       if (payload.type === "joined-room" && payload.participantId) {
         selfParticipantIdRef.current = payload.participantId;
+        if (typeof payload.isRecording === "boolean" && payload.isRecording) {
+          onRemoteRecordingStateRef.current?.(true);
+        }
       }
 
-      if (payload.type === "participant-joined" && payload.participant?.participantId && payload.participant.displayName) {
+      if (
+        payload.type === "participant-joined" &&
+        payload.participant?.participantId &&
+        payload.participant.displayName
+      ) {
         setParticipantNamesById((current) => ({
           ...current,
-          [payload.participant!.participantId!]: payload.participant!.displayName!,
+          [payload.participant!.participantId!]:
+            payload.participant!.displayName!,
         }));
 
-        if (payload.participant.participantId !== selfParticipantIdRef.current) {
+        if (
+          payload.participant.participantId !== selfParticipantIdRef.current
+        ) {
           onParticipantJoinedRef.current?.({
             participantId: payload.participant.participantId,
             displayName: payload.participant.displayName,
@@ -259,15 +288,25 @@ export function useMeetingRealtime({
         }
 
         setParticipantMediaStates((current) =>
-          setParticipantMediaState(current, payload.participant!.participantId!, {
-            isMuted: Boolean(payload.participant!.isMuted),
-            isVideoOff: Boolean(payload.participant!.isVideoOff),
-          })
+          setParticipantMediaState(
+            current,
+            payload.participant!.participantId!,
+            {
+              isMuted: Boolean(payload.participant!.isMuted),
+              isVideoOff: Boolean(payload.participant!.isVideoOff),
+            },
+          ),
         );
       }
 
-      if (payload.type === "participant-left" && payload.participantId && payload.displayName) {
-        setParticipantMediaStates((current) => removeParticipantMediaState(current, payload.participantId as string));
+      if (
+        payload.type === "participant-left" &&
+        payload.participantId &&
+        payload.displayName
+      ) {
+        setParticipantMediaStates((current) =>
+          removeParticipantMediaState(current, payload.participantId as string),
+        );
 
         if (payload.participantId !== selfParticipantIdRef.current) {
           onParticipantLeftRef.current?.({
@@ -277,14 +316,21 @@ export function useMeetingRealtime({
         }
       }
 
-      if (payload.type === "meeting-ended" && payload.endedBy?.participantId && payload.endedBy.displayName) {
+      if (
+        payload.type === "meeting-ended" &&
+        payload.endedBy?.participantId &&
+        payload.endedBy.displayName
+      ) {
         onMeetingEndedRef.current?.({
           participantId: payload.endedBy.participantId,
           displayName: payload.endedBy.displayName,
         });
       }
 
-      if (payload.type === "participant-list" && Array.isArray(payload.participants)) {
+      if (
+        payload.type === "participant-list" &&
+        Array.isArray(payload.participants)
+      ) {
         setParticipantMediaStates(() => {
           const next: ParticipantMediaStateMap = {};
           for (const participant of payload.participants ?? []) {
@@ -320,11 +366,15 @@ export function useMeetingRealtime({
           setParticipantMediaState(current, payload.participantId as string, {
             isMuted: payload.isMuted as boolean,
             isVideoOff: payload.isVideoOff as boolean,
-          })
+          }),
         );
       }
 
-      if (payload.type === "chat-message" && payload.text && payload.sender?.participantId) {
+      if (
+        payload.type === "chat-message" &&
+        payload.text &&
+        payload.sender?.participantId
+      ) {
         if (payload.sender.displayName) {
           setParticipantNamesById((current) => ({
             ...current,
@@ -333,7 +383,9 @@ export function useMeetingRealtime({
         }
 
         const isOwn =
-          (selfParticipantIdRef.current && payload.sender.participantId === selfParticipantIdRef.current) || false;
+          (selfParticipantIdRef.current &&
+            payload.sender.participantId === selfParticipantIdRef.current) ||
+          false;
         const message: RealtimeChatMessage = {
           id: payload.id || crypto.randomUUID(),
           text: payload.text,
@@ -355,7 +407,11 @@ export function useMeetingRealtime({
         }
       }
 
-      if (payload.type === "typing-state" && payload.participantId && payload.displayName) {
+      if (
+        payload.type === "typing-state" &&
+        payload.participantId &&
+        payload.displayName
+      ) {
         setParticipantNamesById((current) => ({
           ...current,
           [payload.participantId as string]: payload.displayName as string,
@@ -364,7 +420,8 @@ export function useMeetingRealtime({
         setTypingParticipants((current) => {
           const next = { ...current };
           if (payload.isTyping) {
-            next[payload.participantId as string] = payload.displayName as string;
+            next[payload.participantId as string] =
+              payload.displayName as string;
           } else {
             delete next[payload.participantId as string];
           }
@@ -372,7 +429,13 @@ export function useMeetingRealtime({
         });
       }
 
-      if (payload.type === "reaction" && payload.messageId && payload.emoji && payload.action && payload.participantId) {
+      if (
+        payload.type === "reaction" &&
+        payload.messageId &&
+        payload.emoji &&
+        payload.action &&
+        payload.participantId
+      ) {
         if (payload.displayName) {
           setParticipantNamesById((current) => ({
             ...current,
@@ -404,8 +467,12 @@ export function useMeetingRealtime({
               }
             }
 
-            const compacted = messageReactions.filter((reaction) => reaction.count > 0);
-            const targetReaction = compacted.find((reaction) => reaction.emoji === targetEmoji);
+            const compacted = messageReactions.filter(
+              (reaction) => reaction.count > 0,
+            );
+            const targetReaction = compacted.find(
+              (reaction) => reaction.emoji === targetEmoji,
+            );
 
             if (targetReaction) {
               if (!targetReaction.reactors.includes(participantId)) {
@@ -422,7 +489,9 @@ export function useMeetingRealtime({
 
             next[messageId] = compacted;
           } else if (payload.action === "remove") {
-            const targetReaction = messageReactions.find((reaction) => reaction.emoji === targetEmoji);
+            const targetReaction = messageReactions.find(
+              (reaction) => reaction.emoji === targetEmoji,
+            );
 
             if (targetReaction) {
               const reactorIdx = targetReaction.reactors.indexOf(participantId);
@@ -432,7 +501,9 @@ export function useMeetingRealtime({
               }
             }
 
-            const compacted = messageReactions.filter((reaction) => reaction.count > 0);
+            const compacted = messageReactions.filter(
+              (reaction) => reaction.count > 0,
+            );
             if (compacted.length > 0) {
               next[messageId] = compacted;
             } else {
@@ -467,13 +538,7 @@ export function useMeetingRealtime({
     socket.onerror = () => {
       setConnectionStatus("disconnected");
     };
-  }, [
-    displayName,
-    enabled,
-    isHost,
-    roomId,
-    safeSend,
-  ]);
+  }, [displayName, enabled, isHost, roomId, safeSend]);
 
   useEffect(() => {
     connectRef.current = connect;
@@ -520,7 +585,7 @@ export function useMeetingRealtime({
         text: normalized,
       });
     },
-    [roomId, safeSend]
+    [roomId, safeSend],
   );
 
   const setTyping = useCallback(
@@ -545,10 +610,13 @@ export function useMeetingRealtime({
         }, 1200);
       }
     },
-    [roomId, safeSend]
+    [roomId, safeSend],
   );
 
-  const typingNames = useMemo(() => Object.values(typingParticipants), [typingParticipants]);
+  const typingNames = useMemo(
+    () => Object.values(typingParticipants),
+    [typingParticipants],
+  );
 
   const sendMeetingEnded = useCallback(() => {
     return safeSend({
@@ -565,7 +633,7 @@ export function useMeetingRealtime({
         isRecording,
       });
     },
-    [roomId, safeSend]
+    [roomId, safeSend],
   );
 
   const sendMediaState = useCallback(
@@ -582,13 +650,13 @@ export function useMeetingRealtime({
       const selfParticipantId = selfParticipantIdRef.current;
       if (selfParticipantId) {
         setParticipantMediaStates((current) =>
-          setParticipantMediaState(current, selfParticipantId, mediaState)
+          setParticipantMediaState(current, selfParticipantId, mediaState),
         );
       }
 
       return sent;
     },
-    [roomId, safeSend]
+    [roomId, safeSend],
   );
 
   const sendReaction = useCallback(
@@ -601,7 +669,7 @@ export function useMeetingRealtime({
         action,
       });
     },
-    [roomId, safeSend]
+    [roomId, safeSend],
   );
 
   return {

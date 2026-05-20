@@ -52,7 +52,6 @@ export function QualityFormatsSection() {
   return (
     <section className="px-6 py-28 sm:px-8 border-b border-neutral-800">
       <div className="mx-auto max-w-6xl">
-
         {/* Section label */}
         <p className="text-xs font-semibold tracking-[0.25em] text-[#F5A623]/70 uppercase mb-4">
           Export Formats
@@ -60,14 +59,15 @@ export function QualityFormatsSection() {
 
         {/* Headline */}
         <h2 className="text-4xl sm:text-5xl font-bold text-white tracking-tight mb-16 max-w-xl leading-tight">
-          Export exactly<br />what you need.
+          Export exactly
+          <br />
+          what you need.
         </h2>
 
         {/* Format tab row */}
         <div className="grid grid-cols-4 border-b border-white/10">
           {formats.map((f) => {
             const isActive = f.id === selected;
-            const isComingSoon = f.id === "4k";
             return (
               <button
                 key={f.id}
@@ -84,7 +84,9 @@ export function QualityFormatsSection() {
                 )}
                 <span
                   className={`block text-[10px] font-bold tracking-[0.2em] uppercase mb-1.5 transition-colors ${
-                    isActive ? "text-[#F5A623]" : "text-white/25 group-hover:text-white/40"
+                    isActive
+                      ? "text-[#F5A623]"
+                      : "text-white/25 group-hover:text-white/40"
                   }`}
                 >
                   {f.tag}
@@ -92,16 +94,13 @@ export function QualityFormatsSection() {
                 <div className="flex items-center gap-2">
                   <span
                     className={`block text-base font-semibold transition-colors ${
-                      isActive ? "text-white" : "text-white/40 group-hover:text-white/60"
+                      isActive
+                        ? "text-white"
+                        : "text-white/40 group-hover:text-white/60"
                     }`}
                   >
                     {f.label}
                   </span>
-                  {isComingSoon && (
-                    <span className="text-[8px] font-bold px-1.5 py-0.5 bg-[#F5A623]/15 text-[#F5A623] rounded">
-                      COMING SOON
-                    </span>
-                  )}
                 </div>
               </button>
             );
@@ -152,12 +151,9 @@ export function QualityFormatsSection() {
 
         {/* Bottom note */}
         <p className="mt-12 text-xs text-white/20 tracking-wide">
-          All formats export from the locally captured source — no re-encoding from a compressed stream.
-          {active.id === "4k" && (
-            <span className="block text-[#F5A623] mt-2">✓ 4K ProRes coming Q3 2026</span>
-          )}
+          All formats export from the locally captured source — no re-encoding
+          from a compressed stream.
         </p>
-
       </div>
     </section>
   );

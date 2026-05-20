@@ -23,7 +23,10 @@ export function TimelineRuler({
     const el = rulerRef.current;
     if (!el || durationMs === 0) return 0;
     const rect = el.getBoundingClientRect();
-    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const ratio = Math.max(
+      0,
+      Math.min(1, (e.clientX - rect.left) / rect.width),
+    );
     return ratio * durationMs;
   };
 
@@ -45,24 +48,16 @@ export function TimelineRuler({
 
   // Adaptive tick spacing based on zoom & duration
   const totalSeconds = durationMs / 1000;
-  let majorInterval = 10; // seconds
-  let minorInterval = 1;
-  if (totalSeconds / zoom <= 10) {
-    majorInterval = 1;
-    minorInterval = 0.1;
-  } else if (totalSeconds / zoom <= 30) {
-    majorInterval = 5;
-    minorInterval = 0.5;
-  } else if (totalSeconds / zoom <= 120) {
-    majorInterval = 10;
-    minorInterval = 1;
-  } else if (totalSeconds / zoom <= 600) {
-    majorInterval = 30;
-    minorInterval = 5;
-  } else {
-    majorInterval = 60;
-    minorInterval = 10;
-  }
+  const [majorInterval, minorInterval] =
+    totalSeconds / zoom <= 10
+      ? [1, 0.1]
+      : totalSeconds / zoom <= 30
+        ? [5, 0.5]
+        : totalSeconds / zoom <= 120
+          ? [10, 1]
+          : totalSeconds / zoom <= 600
+            ? [30, 5]
+            : [60, 10];
 
   const majorTicks: number[] = [];
   const minorTicks: number[] = [];
@@ -96,7 +91,7 @@ export function TimelineRuler({
       onMouseDown={handleMouseDown}
     >
       {/* Subtle gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#f5a623]/5 to-transparent pointer-events-none" />
+      <div className="absolute inset-0 bg-linear-to-b from-[#f5a623]/5 to-transparent pointer-events-none" />
 
       {/* Minor ticks */}
       {minorTicks.map((s) => (
@@ -132,7 +127,7 @@ export function TimelineRuler({
                 left: pct(clip.timelineStartMs / 1000),
               }}
             />
-          ))
+          )),
         )}
       </div>
 
@@ -142,7 +137,7 @@ export function TimelineRuler({
         style={{ left: `${playheadPct}%` }}
       >
         {/* Playhead cap */}
-        <div className="absolute -top-0 left-1/2 -translate-x-1/2">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2">
           <div
             className="h-0 w-0"
             style={{

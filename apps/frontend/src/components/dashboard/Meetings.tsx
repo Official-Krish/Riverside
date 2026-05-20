@@ -8,8 +8,21 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
-import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationPrevious, PaginationNext } from "@/components/ui/pagination";
-import { getMeetingDate, getMeetingParticipantCount, getStatusLabel, getStatusTone, type MeetingsProps } from "./types";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationPrevious,
+  PaginationNext,
+} from "@/components/ui/pagination";
+import {
+  getMeetingDate,
+  getMeetingParticipantCount,
+  getStatusLabel,
+  getStatusTone,
+  type MeetingsProps,
+} from "./types";
 
 export function Meetings({
   meetings,
@@ -26,7 +39,10 @@ export function Meetings({
   const pageSize = 4;
   const allMeetings = [...liveMeetings, ...endedMeetings];
   const totalPages = Math.ceil(allMeetings.length / pageSize);
-  const paginatedMeetings = allMeetings.slice((page - 1) * pageSize, page * pageSize);
+  const paginatedMeetings = allMeetings.slice(
+    (page - 1) * pageSize,
+    page * pageSize,
+  );
   const paginatedLive = paginatedMeetings.filter((meeting) => !meeting.isEnded);
   const paginatedEnded = paginatedMeetings.filter((meeting) => meeting.isEnded);
 
@@ -46,12 +62,20 @@ export function Meetings({
           {[
             { label: "Total", value: meetings.length },
             { label: "Live", value: liveMeetings.length },
-            { label: "Ready", value: meetings.filter((m) => m.recordingState === "READY").length },
+            {
+              label: "Ready",
+              value: meetings.filter((m) => m.recordingState === "READY")
+                .length,
+            },
             { label: "Ended", value: endedMeetings.length },
           ].map((item) => (
             <div key={item.label} className="px-5 py-3 border-l border-white/7">
-              <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-white/28">{item.label}</p>
-              <p className="mt-1 text-[28px] font-normal text-white font-serif">{item.value}</p>
+              <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-white/28">
+                {item.label}
+              </p>
+              <p className="mt-1 text-[28px] font-normal text-white font-serif">
+                {item.value}
+              </p>
             </div>
           ))}
         </div>
@@ -80,9 +104,13 @@ export function Meetings({
             .map((group) => (
               <div key={group.title}>
                 <div className="flex items-center gap-4 mb-5">
-                  <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-white/22">{group.title}</span>
+                  <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-white/22">
+                    {group.title}
+                  </span>
                   <div className="flex-1 h-px bg-white/6" />
-                  <span className="text-[11px] text-white/45">{group.items.length} items</span>
+                  <span className="text-[11px] text-white/45">
+                    {group.items.length} items
+                  </span>
                 </div>
 
                 <div className="space-y-0">
@@ -100,7 +128,8 @@ export function Meetings({
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-[15px] font-medium text-white/85">
-                              {meeting.roomName?.trim() || `Meeting ${meeting.roomId.slice(0, 8)}`}
+                              {meeting.roomName?.trim() ||
+                                `Meeting ${meeting.roomId.slice(0, 8)}`}
                             </p>
                             <span
                               className={[
@@ -129,16 +158,22 @@ export function Meetings({
                             </span>
                             <span className="flex items-center gap-1">
                               <CalendarDays className="size-3" />
-                              {new Date(getMeetingDate(meeting)).toLocaleDateString()}
+                              {new Date(
+                                getMeetingDate(meeting),
+                              ).toLocaleDateString()}
                             </span>
                             <span className="flex items-center gap-1">
                               <Clock3 className="size-3" />
                               {meeting.startedAt
-                                ? new Date(meeting.startedAt).toLocaleTimeString([], {
+                                ? new Date(
+                                    meeting.startedAt,
+                                  ).toLocaleTimeString([], {
                                     hour: "2-digit",
                                     minute: "2-digit",
                                   })
-                                : (meeting.isEnded ? "Ended" : "Not started")}
+                                : meeting.isEnded
+                                  ? "Ended"
+                                  : "Not started"}
                             </span>
                           </div>
                         </div>
@@ -147,7 +182,7 @@ export function Meetings({
                           {!meeting.isEnded ? (
                             <button
                               type="button"
-                              onClick={() => onOpenMeeting(meeting.roomId)}
+                              onClick={() => onOpenMeeting(meeting)}
                               className="inline-flex items-center gap-2 px-4 py-2 text-[12px] font-medium text-[#f5a623] hover:bg-[#f5a623]/10 rounded-full transition-colors cursor-pointer"
                             >
                               Open room
@@ -171,7 +206,7 @@ export function Meetings({
                 </div>
               </div>
             ))}
-          
+
           {totalPages > 1 && (
             <div className="pt-4 flex justify-center">
               <Pagination>
@@ -196,7 +231,9 @@ export function Meetings({
                   ))}
                   <PaginationItem>
                     <PaginationNext
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      onClick={() =>
+                        setPage((p) => Math.min(totalPages, p + 1))
+                      }
                       aria-disabled={page === totalPages}
                       tabIndex={page === totalPages ? -1 : 0}
                       className="cursor-pointer"

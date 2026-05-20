@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useRef } from "react";
 import type { Track, Overlay, Clip } from "./types";
 import { TimelineTrack } from "./TimelineTrack";
@@ -16,7 +17,11 @@ interface TimelineProps {
   onZoomChange: (zoom: number) => void;
   onAddClip: (trackIndex: number) => void;
   onAddAudio: () => void;
-  onUpdateClip: (trackIndex: number, clipId: string, updates: Partial<Clip>) => void;
+  onUpdateClip: (
+    trackIndex: number,
+    clipId: string,
+    updates: Partial<Clip>,
+  ) => void;
   onDeleteClip: (trackIndex: number, clipId: string) => void;
   onUpdateTrack: (trackIndex: number, updates: Partial<Track>) => void;
   onAddOverlay: (overlay: Overlay) => void;
@@ -24,8 +29,18 @@ interface TimelineProps {
   onDeleteOverlay: (overlayId: string) => void;
   onSeek: (timeMs: number) => void;
   onSplitClip: (trackIndex: number, clipId: string, timelineMs: number) => void;
-  onAddTransitionAtPosition: (trackIndex: number, clipId: string, timelineMs: number, position: "start" | "end" | "middle", transitionType?: string) => void;
-  onPlaceTransitionAtTime: (trackIndex: number, timelineMs: number, transitionType?: string) => void;
+  onAddTransitionAtPosition: (
+    trackIndex: number,
+    clipId: string,
+    timelineMs: number,
+    position: "start" | "end" | "middle",
+    transitionType?: string,
+  ) => void;
+  onPlaceTransitionAtTime: (
+    trackIndex: number,
+    timelineMs: number,
+    transitionType?: string,
+  ) => void;
   transitionMode: boolean;
   onToggleTransitionMode: () => void;
   splitMode: boolean;
@@ -39,7 +54,11 @@ interface TimelineProps {
   onZoomReset: () => void;
   // Transition props
   selectedTransitionId: string | null;
-  onSelectTransition: (trackIndex: number, clipId: string, position: "start" | "end") => void;
+  onSelectTransition: (
+    trackIndex: number,
+    clipId: string,
+    position: "start" | "end",
+  ) => void;
   onToggleTransitionPanel: () => void;
   showTransitionPanel: boolean;
 }
@@ -76,7 +95,7 @@ export function Timeline({
   onZoomReset,
   onToggleTransitionPanel,
   showTransitionPanel,
-  onSelectTransition
+  onSelectTransition,
 }: TimelineProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentWidthPct = useMemo(() => Math.max(100, zoom * 100), [zoom]);
@@ -99,8 +118,13 @@ export function Timeline({
 
     if (transitionMode) {
       e.stopPropagation();
-      const trackIndex = Number((e.currentTarget as HTMLElement).getAttribute("data-track-index") ?? "0");
-      const selectEl = document.getElementById("transition-type-select") as HTMLSelectElement | null;
+      const trackIndex = Number(
+        (e.currentTarget as HTMLElement).getAttribute("data-track-index") ??
+          "0",
+      );
+      const selectEl = document.getElementById(
+        "transition-type-select",
+      ) as HTMLSelectElement | null;
       const transitionType = selectEl?.value ?? "cross-dissolve";
       onPlaceTransitionAtTime(trackIndex, currentTime, transitionType);
       onToggleTransitionMode();
@@ -114,23 +138,25 @@ export function Timeline({
     const totalWidth = lane.scrollWidth || rect.width;
     const clickX = e.clientX - rect.left + scrollLeft;
     const clickTimeMs = (clickX / totalWidth) * durationMs;
-    
+
     // Snapping logic (snap to clip/overlay boundaries within 15px)
     const snapThresholdMs = (15 / totalWidth) * durationMs;
     let closestTimeMs = clickTimeMs;
     let minDiff = snapThresholdMs;
 
     const snapPoints = [0, durationMs];
-    tracks.forEach(t => t.clips.forEach(c => {
-      snapPoints.push(c.timelineStartMs);
-      snapPoints.push(c.timelineStartMs + c.durationMs);
-    }));
-    overlays.forEach(o => {
+    tracks.forEach((t) =>
+      t.clips.forEach((c) => {
+        snapPoints.push(c.timelineStartMs);
+        snapPoints.push(c.timelineStartMs + c.durationMs);
+      }),
+    );
+    overlays.forEach((o) => {
       snapPoints.push(o.timelineStartMs);
       snapPoints.push(o.timelineStartMs + o.durationMs);
     });
 
-    snapPoints.forEach(time => {
+    snapPoints.forEach((time) => {
       const diff = Math.abs(time - clickTimeMs);
       if (diff < minDiff) {
         minDiff = diff;
@@ -159,7 +185,13 @@ export function Timeline({
             }`}
             title="Drag to place transitions anywhere on the timeline"
           >
-            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              className="h-3 w-3"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M12 2v20M2 12h20" />
             </svg>
             {transitionMode ? "Placing..." : "Place Transition"}
@@ -174,7 +206,13 @@ export function Timeline({
             }`}
             title="Open transition panel"
           >
-            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              className="h-3 w-3"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <rect x="3" y="3" width="18" height="18" rx="2" />
               <path d="M9 3v18M15 3v18M3 9h18M3 15h18" />
             </svg>
@@ -183,9 +221,14 @@ export function Timeline({
         </div>
         <div className="flex items-center gap-2">
           <label className="text-xs text-[#8d7850]">
-            Duration: <span className="font-mono font-medium text-[#bfa873]">{(durationMs / 1000).toFixed(1)}s</span>
+            Duration:{" "}
+            <span className="font-mono font-medium text-[#bfa873]">
+              {(durationMs / 1000).toFixed(1)}s
+            </span>
           </label>
-          <span className="ml-2 text-[11px] text-[#8d7850]">Zoom: {zoom.toFixed(2)}x (Ctrl/Cmd + wheel)</span>
+          <span className="ml-2 text-[11px] text-[#8d7850]">
+            Zoom: {zoom.toFixed(2)}x (Ctrl/Cmd + wheel)
+          </span>
         </div>
         {/* Zoom controls */}
         <div className="flex items-center gap-2">
@@ -199,17 +242,19 @@ export function Timeline({
           >
             <ZoomOut className="h-3.5 w-3.5" />
           </Button>
-          <input 
-            type="range" 
-            min="0.5" 
-            max="8" 
-            step="0.25" 
-            value={timelineZoom} 
-            onChange={(e) => onZoomChange(Number(e.target.value))} 
+          <input
+            type="range"
+            min="0.5"
+            max="8"
+            step="0.25"
+            value={timelineZoom}
+            onChange={(e) => onZoomChange(Number(e.target.value))}
             className="w-24 h-1.5 accent-[#f5a623] cursor-pointer"
             title="Drag to zoom or use Ctrl+Wheel"
           />
-          <span className="w-10 text-right text-xs font-mono text-[#bfa873]">{timelineZoom.toFixed(1)}x</span>
+          <span className="w-10 text-right text-xs font-mono text-[#bfa873]">
+            {timelineZoom.toFixed(1)}x
+          </span>
           <Button
             variant="outline"
             size="icon"
@@ -231,16 +276,18 @@ export function Timeline({
           </Button>
         </div>
         <button
-          onClick={() => onAddOverlay({
-            id: crypto.randomUUID(),
-            type: "TEXT",
-            timelineStartMs: currentTime,       // starts at playhead
-            durationMs: 3000,                   // default 3 seconds
-            zIndex: overlays.length,
-            content: { text: "New Text" },
-            transform: { x: 100, y: 100 },
-            style: { fontSize: 24, textDirection: "ltr", textAlign: "left" },
-          })}
+          onClick={() =>
+            onAddOverlay({
+              id: crypto.randomUUID(),
+              type: "TEXT",
+              timelineStartMs: currentTime, // starts at playhead
+              durationMs: 3000, // default 3 seconds
+              zIndex: overlays.length,
+              content: { text: "New Text" },
+              transform: { x: 100, y: 100 },
+              style: { fontSize: 24, textDirection: "ltr", textAlign: "left" },
+            })
+          }
           className="rounded bg-[#a855f7]/10 px-2 py-1 text-xs text-[#c084fc] hover:bg-[#a855f7]/20"
         >
           + Text Overlay
@@ -253,7 +300,10 @@ export function Timeline({
           className="overflow-x-auto overflow-y-hidden rounded-lg border border-[#f5a623]/10 bg-[#060605]/40"
           onWheel={handleWheel}
         >
-          <div style={{ width: `${contentWidthPct}%`, minWidth: "100%" }} className="space-y-4 p-3">
+          <div
+            style={{ width: `${contentWidthPct}%`, minWidth: "100%" }}
+            className="space-y-4 p-3"
+          >
             {/* Timeline Ruler */}
             <TimelineRuler
               durationMs={durationMs}
@@ -265,9 +315,7 @@ export function Timeline({
 
             {/* Transition Placement Indicator */}
             {transitionMode && (
-              <div
-                className="relative flex items-center gap-3 px-3 py-2.5 rounded-lg border border-[#a855f7]/30 bg-[#a855f7]/8"
-              >
+              <div className="relative flex items-center gap-3 px-3 py-2.5 rounded-lg border border-[#a855f7]/30 bg-[#a855f7]/8">
                 <div className="flex items-center gap-2">
                   <div className="h-3 w-3 rounded-full bg-[#a855f7] animate-pulse" />
                   <span className="text-[11px] text-[#c084fc] font-medium">
@@ -286,7 +334,7 @@ export function Timeline({
                   ))}
                 </select>
                 <div className="text-[11px] font-mono text-[#c084fc]/60">
-                  {((currentTime) / 1000).toFixed(1)}s
+                  {(currentTime / 1000).toFixed(1)}s
                 </div>
                 <button
                   onClick={onToggleTransitionMode}
@@ -341,8 +389,12 @@ export function Timeline({
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f5a623]/10">
                       <Plus className="h-5 w-5 text-[#f5a623]" />
                     </div>
-                    <p className="text-sm font-medium text-[#bfa873]">Click to add your first track</p>
-                    <p className="text-xs text-[#8d7850]">Or use the "Add Track" button above</p>
+                    <p className="text-sm font-medium text-[#bfa873]">
+                      Click to add your first track
+                    </p>
+                    <p className="text-xs text-[#8d7850]">
+                      Or use the "Add Track" button above
+                    </p>
                   </div>
                 </div>
               )}

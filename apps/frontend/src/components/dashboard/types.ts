@@ -5,7 +5,7 @@ export type MeetingsProps = {
   isLoading?: boolean;
   isError?: boolean;
   errorMessage?: string;
-  onOpenMeeting: (meetingId: string) => void;
+  onOpenMeeting: (meeting: MeetingDetails) => void;
   onOpenRecording: (recordingId: string) => void;
 };
 
@@ -61,7 +61,10 @@ export type RecordingsPageProps = {
   onOpenRecording: (recordingId: string) => void;
 };
 
-export function getDuration(start?: Date | string | null, end?: Date | string | null) {
+export function getDuration(
+  start?: Date | string | null,
+  end?: Date | string | null,
+) {
   if (!start || !end) return "00:00:00";
 
   const startDate = new Date(start);

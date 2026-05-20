@@ -10,7 +10,12 @@ function EncryptionPipelineDiagram() {
   ];
 
   return (
-    <svg viewBox="0 0 960 320" className="w-full" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg
+      viewBox="0 0 960 320"
+      className="w-full"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
       <defs>
         <style>{`
           @keyframes flowDash {
@@ -32,8 +37,15 @@ function EncryptionPipelineDiagram() {
       </defs>
 
       {/* YOUR DEVICE ONLY label */}
-      <text x="480" y="28" textAnchor="middle" fontSize="11"
-        fontWeight="700" fill="rgba(245,166,35,0.85)" letterSpacing="3">
+      <text
+        x="480"
+        y="28"
+        textAnchor="middle"
+        fontSize="11"
+        fontWeight="700"
+        fill="rgba(245,166,35,0.85)"
+        letterSpacing="3"
+      >
         YOUR DEVICE ONLY
       </text>
 
@@ -41,15 +53,28 @@ function EncryptionPipelineDiagram() {
       {nodes.map((node, i) => (
         <g key={i}>
           <rect
-            x={node.x} y="55" width="150" height="52" rx="26"
-            fill={node.highlight ? "rgba(245,166,35,0.1)" : "rgba(255,255,255,0.05)"}
-            stroke={node.highlight ? "rgba(245,166,35,0.5)" : "rgba(255,255,255,0.12)"}
+            x={node.x}
+            y="55"
+            width="150"
+            height="52"
+            rx="26"
+            fill={
+              node.highlight ? "rgba(245,166,35,0.1)" : "rgba(255,255,255,0.05)"
+            }
+            stroke={
+              node.highlight ? "rgba(245,166,35,0.5)" : "rgba(255,255,255,0.12)"
+            }
             strokeWidth="1.5"
           />
           <text
-            x={node.x + 75} y="87"
-            textAnchor="middle" fontSize="13" fontWeight="600"
-            fill={node.highlight ? "rgba(245,166,35,0.9)" : "rgba(255,255,255,0.8)"}
+            x={node.x + 75}
+            y="87"
+            textAnchor="middle"
+            fontSize="13"
+            fontWeight="600"
+            fill={
+              node.highlight ? "rgba(245,166,35,0.9)" : "rgba(255,255,255,0.8)"
+            }
             fontFamily="system-ui"
           >
             {node.label}
@@ -58,20 +83,29 @@ function EncryptionPipelineDiagram() {
       ))}
 
       {/* Connecting flow lines between nodes */}
-      {[0,1,2,3].map(i => (
+      {[0, 1, 2, 3].map((i) => (
         <line
           key={i}
-          x1={nodes[i].x + 150} y1="81"
-          x2={nodes[i+1].x} y2="81"
-          stroke="#F5A623" strokeWidth="2"
-          className={`flow-line flow-line-${i+1}`}
+          x1={nodes[i].x + 150}
+          y1="81"
+          x2={nodes[i + 1].x}
+          y2="81"
+          stroke="#F5A623"
+          strokeWidth="2"
+          className={`flow-line flow-line-${i + 1}`}
         />
       ))}
 
       {/* Vertical drop line from Local Storage down to cloud */}
-      <line x1="815" y1="107" x2="815" y2="185"
-        stroke="rgba(245,166,35,0.4)" strokeWidth="1.5"
-        strokeDasharray="4,5" />
+      <line
+        x1="815"
+        y1="107"
+        x2="815"
+        y2="185"
+        stroke="rgba(245,166,35,0.4)"
+        strokeWidth="1.5"
+        strokeDasharray="4,5"
+      />
       {/* Arrowhead */}
       <polygon points="815,192 809,180 821,180" fill="rgba(245,166,35,0.5)" />
 
@@ -90,12 +124,24 @@ function EncryptionPipelineDiagram() {
           strokeWidth="1.5"
         />
         {/* Bold strikethrough */}
-        <line x1="748" y1="230" x2="888" y2="260"
-          stroke="rgba(255,80,80,0.5)" strokeWidth="2" />
-        <text x="818" y="290"
-          textAnchor="middle" fontSize="11" fontWeight="500"
-          fill="rgba(255,255,255,0.35)" fontFamily="system-ui"
-          letterSpacing="1">
+        <line
+          x1="748"
+          y1="230"
+          x2="888"
+          y2="260"
+          stroke="rgba(255,80,80,0.5)"
+          strokeWidth="2"
+        />
+        <text
+          x="818"
+          y="290"
+          textAnchor="middle"
+          fontSize="11"
+          fontWeight="500"
+          fill="rgba(255,255,255,0.35)"
+          fontFamily="system-ui"
+          letterSpacing="1"
+        >
           NEVER REACHES HERE
         </text>
       </g>
@@ -126,15 +172,17 @@ export function HLSPrivacySection() {
             transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
           >
             {/* Label */}
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] mb-2"
-                style={{ color: "rgba(245,166,35,0.75)" }}
+            <p
+              className="text-[11px] font-semibold uppercase tracking-[0.28em] mb-2"
+              style={{ color: "rgba(245,166,35,0.75)" }}
             >
               Privacy by Design
             </p>
 
             {/* Headline */}
             <h2 className="font-syne text-3xl font-bold leading-tight text-foreground sm:text-4xl mb-8">
-              Your content.<br />
+              Your content.
+              <br />
               Secure by default.
             </h2>
 
@@ -142,29 +190,38 @@ export function HLSPrivacySection() {
             <div className="mb-8 grid grid-cols-3 gap-1 border-l border-r border-border/20">
               {/* Stat 1 */}
               <div className="border-r border-border/20 px-4 py-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <p className="text-sm font-bold text-[#F5A623]">End-to-End</p>
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 bg-[#F5A623]/15 text-[#F5A623] rounded">Coming Soon</span>
-                </div>
-                <p className="text-xs leading-relaxed text-muted-foreground/70">Client-side AES-128 encryption</p>
+                <p className="text-sm font-bold text-[#F5A623]">End-to-End</p>
+                <p className="text-xs leading-relaxed text-muted-foreground/70">
+                  Client-side AES-128 encryption
+                </p>
               </div>
 
               {/* Stat 2 */}
               <div className="border-r border-border/20 px-4 py-4">
-                <p className="text-sm font-bold text-[#F5A623] mb-1">HTTPS Secure</p>
-                <p className="text-xs leading-relaxed text-muted-foreground/70">Military-grade TLS 1.3</p>
+                <p className="text-sm font-bold text-[#F5A623] mb-1">
+                  HTTPS Secure
+                </p>
+                <p className="text-xs leading-relaxed text-muted-foreground/70">
+                  Military-grade TLS 1.3
+                </p>
               </div>
 
               {/* Stat 3 */}
               <div className="px-4 py-4">
-                <p className="text-sm font-bold text-[#F5A623] mb-1">Zero-Knowledge</p>
-                <p className="text-xs leading-relaxed text-muted-foreground/70">Weave cannot access raw footage</p>
+                <p className="text-sm font-bold text-[#F5A623] mb-1">
+                  Zero-Knowledge
+                </p>
+                <p className="text-xs leading-relaxed text-muted-foreground/70">
+                  Weave cannot access raw footage
+                </p>
               </div>
             </div>
 
             {/* Bottom line */}
             <p className="text-xs leading-relaxed text-muted-foreground/50">
-              Currently: HTTPS transport with zero-knowledge architecture. Roadmap: Client-side AES-128 before CDN upload for encrypted-at-rest protection.
+              Currently: HTTPS transport with zero-knowledge architecture.
+              Roadmap: Client-side AES-128 before CDN upload for
+              encrypted-at-rest protection.
             </p>
           </motion.div>
         </div>

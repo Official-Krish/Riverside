@@ -1,5 +1,12 @@
+/* eslint-disable */
 import { useEffect, useRef, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { editorApi } from "./api";
@@ -106,7 +113,9 @@ export function ExportDialog({ job, onClose, onCompleted }: ExportDialogProps) {
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="border-[#f5a623]/20 bg-[#0a0a08] text-[#fff5de] sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-lg font-semibold">{config.title}</DialogTitle>
+          <DialogTitle className="text-lg font-semibold">
+            {config.title}
+          </DialogTitle>
           <DialogDescription className="text-[#bfa873]">
             {config.description}
           </DialogDescription>

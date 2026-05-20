@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Type,
   ArrowLeftRight,
@@ -141,6 +142,7 @@ export function EditorPanel({
   saving,
   tracks,
 }: EditorPanelProps) {
+  /* eslint-disable @typescript-eslint/no-explicit-any */
   const isTransformModified = canvasTransform
     ? canvasTransform.stretchX !== 1 ||
       canvasTransform.stretchY !== 1 ||

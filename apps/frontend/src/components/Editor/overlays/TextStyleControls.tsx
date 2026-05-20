@@ -7,6 +7,7 @@ import {
   type AnimationEasing,
   AVAILABLE_FONTS,
 } from "./types";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 interface TextStyleControlsProps {
   style: Partial<TextOverlayStyle>;
@@ -63,16 +64,46 @@ const TEXT_PRESETS = [
 ];
 
 const ENTRY_ANIMATIONS = [
-  { type: "slide-right", icon: "→", name: "Slide", disabled: true, tooltip: "Coming Soon" },
+  {
+    type: "slide-right",
+    icon: "→",
+    name: "Slide",
+    disabled: true,
+    tooltip: "Coming Soon",
+  },
   { type: "fade-in", icon: "◉", name: "Fade", disabled: false },
-  { type: "typewriter", icon: "▮", name: "Typewriter", disabled: true, tooltip: "Coming Soon" },
-  { type: "bounce", icon: "⦿", name: "Bounce", disabled: true, tooltip: "Coming Soon" },
-  { type: "scale-in", icon: "⊕", name: "Scale", disabled: true, tooltip: "Coming Soon" },
+  {
+    type: "typewriter",
+    icon: "▮",
+    name: "Typewriter",
+    disabled: true,
+    tooltip: "Coming Soon",
+  },
+  {
+    type: "bounce",
+    icon: "⦿",
+    name: "Bounce",
+    disabled: true,
+    tooltip: "Coming Soon",
+  },
+  {
+    type: "scale-in",
+    icon: "⊕",
+    name: "Scale",
+    disabled: true,
+    tooltip: "Coming Soon",
+  },
   { type: "none", icon: "—", name: "None", disabled: false },
 ];
 
 const EXIT_ANIMATIONS = [
-  { type: "slide-left", icon: "←", name: "Slide", disabled: true, tooltip: "Coming Soon" },
+  {
+    type: "slide-left",
+    icon: "←",
+    name: "Slide",
+    disabled: true,
+    tooltip: "Coming Soon",
+  },
   { type: "fade-out", icon: "◎", name: "Fade", disabled: false },
   { type: "none", icon: "—", name: "None", disabled: false },
 ];
@@ -80,7 +111,9 @@ const EXIT_ANIMATIONS = [
 const Divider = () => <div className="h-px bg-[#252525]" />;
 
 const MiniLabel = ({ children }: { children: React.ReactNode }) => (
-  <span className="text-[10px] text-[#555] uppercase tracking-wider font-semibold">{children}</span>
+  <span className="text-[10px] text-[#555] uppercase tracking-wider font-semibold">
+    {children}
+  </span>
 );
 
 const SliderRow = ({
@@ -111,11 +144,19 @@ const SliderRow = ({
       onChange={(e) => onChange(Number(e.target.value))}
       className="flex-1 h-1.5 accent-[#f5a623] cursor-pointer"
     />
-    <span className="text-[11px] text-[#888] min-w-[32px] text-right">{format(value)}</span>
+    <span className="text-[11px] text-[#888] min-w-[32px] text-right">
+      {format(value)}
+    </span>
   </div>
 );
 
-const Toggle = ({ active, onClick }: { active: boolean; onClick: () => void }) => (
+const Toggle = ({
+  active,
+  onClick,
+}: {
+  active: boolean;
+  onClick: () => void;
+}) => (
   <button
     onClick={onClick}
     className={`w-[30px] h-[17px] rounded-full cursor-pointer relative transition-colors ${
@@ -150,7 +191,15 @@ const ColorDot = ({
   />
 );
 
-const PresetChip = ({ name, active, onClick }: { name: string; active: boolean; onClick: () => void }) => (
+const PresetChip = ({
+  name,
+  active,
+  onClick,
+}: {
+  name: string;
+  active: boolean;
+  onClick: () => void;
+}) => (
   <button
     onClick={onClick}
     className={`px-3 py-1 rounded-full text-[10px] font-semibold cursor-pointer border transition-colors whitespace-nowrap ${
@@ -163,7 +212,15 @@ const PresetChip = ({ name, active, onClick }: { name: string; active: boolean; 
   </button>
 );
 
-const BgOption = ({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) => (
+const BgOption = ({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) => (
   <button
     onClick={onClick}
     className={`flex-1 px-2 py-1 rounded-md text-[10px] font-medium text-center transition-colors ${
@@ -174,7 +231,21 @@ const BgOption = ({ label, active, onClick }: { label: string; active: boolean; 
   </button>
 );
 
-const AnimButton = ({ icon, name, active, onClick, disabled, tooltip }: { icon: string; name: string; active: boolean; onClick: () => void; disabled?: boolean; tooltip?: string }) => (
+const AnimButton = ({
+  icon,
+  name,
+  active,
+  onClick,
+  disabled,
+  tooltip,
+}: {
+  icon: string;
+  name: string;
+  active: boolean;
+  onClick: () => void;
+  disabled?: boolean;
+  tooltip?: string;
+}) => (
   <div className="relative group">
     <button
       onClick={onClick}
@@ -198,8 +269,6 @@ const AnimButton = ({ icon, name, active, onClick, disabled, tooltip }: { icon: 
   </div>
 );
 
-
-
 export function TextStyleControls({
   style,
   onStyleChange,
@@ -212,7 +281,7 @@ export function TextStyleControls({
     (updates: Partial<TextOverlayStyle>) => {
       onStyleChange({ ...style, ...updates });
     },
-    [onStyleChange, style]
+    [onStyleChange, style],
   );
 
   const handleAnimationTypeChange = useCallback(
@@ -221,7 +290,7 @@ export function TextStyleControls({
         onAnimationChange({ ...animation, type });
       }
     },
-    [onAnimationChange, animation]
+    [onAnimationChange, animation],
   );
 
   const handleExitAnimationTypeChange = useCallback(
@@ -230,7 +299,7 @@ export function TextStyleControls({
         onAnimationChange({ ...animation, exitType: type });
       }
     },
-    [onAnimationChange, animation]
+    [onAnimationChange, animation],
   );
 
   const handleAnimationDurationChange = useCallback(
@@ -239,11 +308,13 @@ export function TextStyleControls({
         onAnimationChange({ ...animation, durationMs });
       }
     },
-    [onAnimationChange, animation]
+    [onAnimationChange, animation],
   );
 
   const toggleTextTransform = (transform: TextTransform) => {
-    applyStyleUpdate({ textTransform: style.textTransform === transform ? "none" : transform });
+    applyStyleUpdate({
+      textTransform: style.textTransform === transform ? "none" : transform,
+    });
   };
 
   const toggleTextAlign = (align: TextAlignment) => {
@@ -252,10 +323,22 @@ export function TextStyleControls({
 
   const toggleGradient = () => {
     if (style.gradient?.enabled) {
-      applyStyleUpdate({ gradient: { enabled: false, color1: "#ffffff", color2: "#f5a623", direction: 90 } });
+      applyStyleUpdate({
+        gradient: {
+          enabled: false,
+          color1: "#ffffff",
+          color2: "#f5a623",
+          direction: 90,
+        },
+      });
     } else {
       applyStyleUpdate({
-        gradient: { enabled: true, color1: "#ffffff", color2: "#f5a623", direction: 90 },
+        gradient: {
+          enabled: true,
+          color1: "#ffffff",
+          color2: "#f5a623",
+          direction: 90,
+        },
       });
     }
   };
@@ -266,13 +349,45 @@ export function TextStyleControls({
 
   const toggleBackground = (type: "none" | "solid" | "blur" | "pill") => {
     if (type === "none") {
-      applyStyleUpdate({ background: { color: "#000000", opacity: 0, radius: 0, paddingX: 0, paddingY: 0 } });
+      applyStyleUpdate({
+        background: {
+          color: "#000000",
+          opacity: 0,
+          radius: 0,
+          paddingX: 0,
+          paddingY: 0,
+        },
+      });
     } else if (type === "solid") {
-      applyStyleUpdate({ background: { color: style.background?.color || "#000000", opacity: style.background?.opacity ?? 0.8, radius: 6, paddingX: 8, paddingY: 4 } });
+      applyStyleUpdate({
+        background: {
+          color: style.background?.color || "#000000",
+          opacity: style.background?.opacity ?? 0.8,
+          radius: 6,
+          paddingX: 8,
+          paddingY: 4,
+        },
+      });
     } else if (type === "blur") {
-      applyStyleUpdate({ background: { color: "#000000", opacity: 0.8, radius: 0, paddingX: 12, paddingY: 8 } });
+      applyStyleUpdate({
+        background: {
+          color: "#000000",
+          opacity: 0.8,
+          radius: 0,
+          paddingX: 12,
+          paddingY: 8,
+        },
+      });
     } else if (type === "pill") {
-      applyStyleUpdate({ background: { color: "#000000", opacity: 0.8, radius: 20, paddingX: 12, paddingY: 6 } });
+      applyStyleUpdate({
+        background: {
+          color: "#000000",
+          opacity: 0.8,
+          radius: 20,
+          paddingX: 12,
+          paddingY: 6,
+        },
+      });
     }
   };
 
@@ -314,8 +429,14 @@ export function TextStyleControls({
                 <PresetChip
                   key={preset.name}
                   name={preset.name}
-                  active={preset.name === "Custom" ? false : preset.name === "Title" && style.fontSize === 48}
-                  onClick={() => preset.name !== "Custom" && applyStyleUpdate(preset.style)}
+                  active={
+                    preset.name === "Custom"
+                      ? false
+                      : preset.name === "Title" && style.fontSize === 48
+                  }
+                  onClick={() =>
+                    preset.name !== "Custom" && applyStyleUpdate(preset.style)
+                  }
                 />
               ))}
             </div>
@@ -326,11 +447,17 @@ export function TextStyleControls({
             <div className="flex gap-2">
               <select
                 value={style.fontFamily || "Inter, system-ui, sans-serif"}
-                onChange={(e) => applyStyleUpdate({ fontFamily: e.target.value })}
+                onChange={(e) =>
+                  applyStyleUpdate({ fontFamily: e.target.value })
+                }
                 className="flex-1 bg-[#111] border border-[#333] rounded-md px-2 py-1.5 text-[12px] text-[#ddd] cursor-pointer h-[30px]"
               >
                 {AVAILABLE_FONTS.map((font) => (
-                  <option key={font.value} value={font.value} style={{ fontFamily: font.value }}>
+                  <option
+                    key={font.value}
+                    value={font.value}
+                    style={{ fontFamily: font.value }}
+                  >
                     {font.name}
                   </option>
                 ))}
@@ -341,7 +468,9 @@ export function TextStyleControls({
                   min={6}
                   max={200}
                   value={style.fontSize || 24}
-                  onChange={(e) => applyStyleUpdate({ fontSize: Number(e.target.value) })}
+                  onChange={(e) =>
+                    applyStyleUpdate({ fontSize: Number(e.target.value) })
+                  }
                   className="w-[28px] bg-transparent border-none text-[12px] text-[#ddd] outline-none"
                 />
                 <span className="text-[10px] text-[#555]">px</span>
@@ -352,7 +481,12 @@ export function TextStyleControls({
             <div className="flex items-center justify-between gap-2">
               <div className="flex gap-1">
                 <button
-                  onClick={() => applyStyleUpdate({ fontWeight: style.fontWeight === "bold" ? "normal" : "bold" })}
+                  onClick={() =>
+                    applyStyleUpdate({
+                      fontWeight:
+                        style.fontWeight === "bold" ? "normal" : "bold",
+                    })
+                  }
                   className={`w-[28px] h-[28px] rounded-md border text-[12px] font-bold cursor-pointer flex items-center justify-center transition-colors ${
                     style.fontWeight === "bold"
                       ? "bg-[#f5a623] border-[#f5a623] text-[#1a1a1a]"
@@ -362,7 +496,12 @@ export function TextStyleControls({
                   B
                 </button>
                 <button
-                  onClick={() => applyStyleUpdate({ fontStyle: style.fontStyle === "italic" ? "normal" : "italic" })}
+                  onClick={() =>
+                    applyStyleUpdate({
+                      fontStyle:
+                        style.fontStyle === "italic" ? "normal" : "italic",
+                    })
+                  }
                   className={`w-[28px] h-[28px] rounded-md border text-[12px] cursor-pointer flex items-center justify-center transition-colors ${
                     style.fontStyle === "italic"
                       ? "bg-[#f5a623] border-[#f5a623] text-[#1a1a1a]"
@@ -436,7 +575,9 @@ export function TextStyleControls({
                 <button
                   onClick={() => toggleTextTransform("uppercase")}
                   className={`px-2 py-1 rounded-md text-[10px] font-bold cursor-pointer transition-colors ${
-                    style.textTransform === "uppercase" ? "bg-[#f5a623] text-[#1a1a1a]" : "text-[#555]"
+                    style.textTransform === "uppercase"
+                      ? "bg-[#f5a623] text-[#1a1a1a]"
+                      : "text-[#555]"
                   }`}
                 >
                   AA
@@ -444,7 +585,9 @@ export function TextStyleControls({
                 <button
                   onClick={() => toggleTextTransform("capitalize")}
                   className={`px-2 py-1 rounded-md text-[10px] cursor-pointer transition-colors ${
-                    style.textTransform === "capitalize" ? "bg-[#f5a623] text-[#1a1a1a]" : "text-[#555]"
+                    style.textTransform === "capitalize"
+                      ? "bg-[#f5a623] text-[#1a1a1a]"
+                      : "text-[#555]"
                   }`}
                 >
                   Aa
@@ -452,7 +595,9 @@ export function TextStyleControls({
                 <button
                   onClick={() => toggleTextTransform("lowercase")}
                   className={`px-2 py-1 rounded-md text-[10px] cursor-pointer transition-colors ${
-                    style.textTransform === "lowercase" ? "bg-[#f5a623] text-[#1a1a1a]" : "text-[#555]"
+                    style.textTransform === "lowercase"
+                      ? "bg-[#f5a623] text-[#1a1a1a]"
+                      : "text-[#555]"
                   }`}
                 >
                   aa
@@ -505,7 +650,9 @@ export function TextStyleControls({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <MiniLabel>Gradient</MiniLabel>
-                <span className="text-[8px] text-[#f5a623] bg-[#f5a623]/10 px-1.5 py-0.5 rounded">Coming Soon</span>
+                <span className="text-[8px] text-[#f5a623] bg-[#f5a623]/10 px-1.5 py-0.5 rounded">
+                  Coming Soon
+                </span>
               </div>
               <div className="relative group">
                 <button
@@ -533,7 +680,9 @@ export function TextStyleControls({
                 />
                 <div
                   className="flex-1 h-[18px] rounded-md border border-[#333]"
-                  style={{ background: `linear-gradient(to right, ${style.gradient.color1}, ${style.gradient.color2})` }}
+                  style={{
+                    background: `linear-gradient(to right, ${style.gradient.color1}, ${style.gradient.color2})`,
+                  }}
                 />
                 <div
                   className="w-[22px] h-[22px] rounded-md border border-[#333]"
@@ -568,7 +717,10 @@ export function TextStyleControls({
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <MiniLabel>Shadow</MiniLabel>
-                <Toggle active={!!style.textShadow} onClick={toggleTextShadow} />
+                <Toggle
+                  active={!!style.textShadow}
+                  onClick={toggleTextShadow}
+                />
               </div>
               {style.textShadow && typeof style.textShadow === "object" && (
                 <div className="grid grid-cols-2 gap-2">
@@ -576,7 +728,14 @@ export function TextStyleControls({
                     <span className="text-[9px] text-[#555]">Offset X</span>
                     <SliderRow
                       value={(style.textShadow as any)?.x ?? 2}
-                      onChange={(v) => applyStyleUpdate({ textShadow: { ...(style.textShadow as object), x: v } as any })}
+                      onChange={(v) =>
+                        applyStyleUpdate({
+                          textShadow: {
+                            ...(style.textShadow as object),
+                            x: v,
+                          } as any,
+                        })
+                      }
                       min={-20}
                       max={20}
                       format={(v) => `${v}px`}
@@ -586,7 +745,14 @@ export function TextStyleControls({
                     <span className="text-[9px] text-[#555]">Offset Y</span>
                     <SliderRow
                       value={(style.textShadow as any)?.y ?? 2}
-                      onChange={(v) => applyStyleUpdate({ textShadow: { ...(style.textShadow as object), y: v } as any })}
+                      onChange={(v) =>
+                        applyStyleUpdate({
+                          textShadow: {
+                            ...(style.textShadow as object),
+                            y: v,
+                          } as any,
+                        })
+                      }
                       min={-20}
                       max={20}
                       format={(v) => `${v}px`}
@@ -596,7 +762,14 @@ export function TextStyleControls({
                     <span className="text-[9px] text-[#555]">Blur</span>
                     <SliderRow
                       value={(style.textShadow as any)?.blur ?? 4}
-                      onChange={(v) => applyStyleUpdate({ textShadow: { ...(style.textShadow as object), blur: v } as any })}
+                      onChange={(v) =>
+                        applyStyleUpdate({
+                          textShadow: {
+                            ...(style.textShadow as object),
+                            blur: v,
+                          } as any,
+                        })
+                      }
                       min={0}
                       max={30}
                       format={(v) => `${v}px`}
@@ -607,7 +780,14 @@ export function TextStyleControls({
                     <input
                       type="color"
                       value={(style.textShadow as any)?.color ?? "#000000"}
-                      onChange={(v) => applyStyleUpdate({ textShadow: { ...(style.textShadow as object), color: v.target.value } as any })}
+                      onChange={(v) =>
+                        applyStyleUpdate({
+                          textShadow: {
+                            ...(style.textShadow as object),
+                            color: v.target.value,
+                          } as any,
+                        })
+                      }
                       className="w-[22px] h-[22px] rounded-md border border-[#444] cursor-pointer"
                     />
                   </div>
@@ -624,10 +804,26 @@ export function TextStyleControls({
             <div className="flex flex-col gap-1">
               <MiniLabel>Type</MiniLabel>
               <div className="flex gap-1 bg-[#111] border border-[#2a2a2a] rounded-lg p-1">
-                <BgOption label="None" active={getBgType() === "none"} onClick={() => toggleBackground("none")} />
-                <BgOption label="Solid" active={getBgType() === "solid"} onClick={() => toggleBackground("solid")} />
-                <BgOption label="Blur" active={getBgType() === "blur"} onClick={() => toggleBackground("blur")} />
-                <BgOption label="Pill" active={getBgType() === "pill"} onClick={() => toggleBackground("pill")} />
+                <BgOption
+                  label="None"
+                  active={getBgType() === "none"}
+                  onClick={() => toggleBackground("none")}
+                />
+                <BgOption
+                  label="Solid"
+                  active={getBgType() === "solid"}
+                  onClick={() => toggleBackground("solid")}
+                />
+                <BgOption
+                  label="Blur"
+                  active={getBgType() === "blur"}
+                  onClick={() => toggleBackground("blur")}
+                />
+                <BgOption
+                  label="Pill"
+                  active={getBgType() === "pill"}
+                  onClick={() => toggleBackground("pill")}
+                />
               </div>
             </div>
 
@@ -644,7 +840,14 @@ export function TextStyleControls({
                         key={c.value}
                         color={c.value}
                         selected={style.background?.color === c.value}
-                        onClick={() => applyStyleUpdate({ background: { ...style.background, color: c.value } as any })}
+                        onClick={() =>
+                          applyStyleUpdate({
+                            background: {
+                              ...style.background,
+                              color: c.value,
+                            } as any,
+                          })
+                        }
                         border={c.value === "#1a1a1a"}
                       />
                     ))}
@@ -653,7 +856,10 @@ export function TextStyleControls({
                       value={style.background?.color || "#000000"}
                       onChange={(e) =>
                         applyStyleUpdate({
-                          background: { ...style.background, color: e.target.value } as any,
+                          background: {
+                            ...style.background,
+                            color: e.target.value,
+                          } as any,
                         })
                       }
                       className="w-[22px] h-[22px] rounded-full border-2 border-dashed border-[#444] cursor-pointer"
@@ -666,7 +872,12 @@ export function TextStyleControls({
                   label="Opacity"
                   value={Math.round((style.background?.opacity ?? 0) * 100)}
                   onChange={(v) =>
-                    applyStyleUpdate({ background: { ...style.background, opacity: v / 100 } as any })
+                    applyStyleUpdate({
+                      background: {
+                        ...style.background,
+                        opacity: v / 100,
+                      } as any,
+                    })
                   }
                   min={0}
                   max={100}
@@ -679,7 +890,11 @@ export function TextStyleControls({
                   value={style.background?.paddingX || 8}
                   onChange={(v) =>
                     applyStyleUpdate({
-                      background: { ...style.background, paddingX: v, paddingY: v } as any,
+                      background: {
+                        ...style.background,
+                        paddingX: v,
+                        paddingY: v,
+                      } as any,
                     })
                   }
                   min={0}
@@ -692,7 +907,9 @@ export function TextStyleControls({
                   label="Corner radius"
                   value={style.background?.radius || 6}
                   onChange={(v) =>
-                    applyStyleUpdate({ background: { ...style.background, radius: v } as any })
+                    applyStyleUpdate({
+                      background: { ...style.background, radius: v } as any,
+                    })
                   }
                   min={0}
                   max={30}
@@ -709,7 +926,9 @@ export function TextStyleControls({
             {/* Coming Soon Note */}
             <div className="flex items-center gap-2 px-2 py-1.5 bg-[#f5a623]/10 border border-[#f5a623]/20 rounded">
               <span className="text-[10px] text-[#f5a623]">⚠️</span>
-              <span className="text-[10px] text-[#bfa873]">Most animations export in next update. Fade only for now.</span>
+              <span className="text-[10px] text-[#bfa873]">
+                Most animations export in next update. Fade only for now.
+              </span>
             </div>
 
             {/* Entry */}
@@ -724,7 +943,10 @@ export function TextStyleControls({
                     active={animation.type === anim.type}
                     disabled={anim.disabled}
                     tooltip={anim.tooltip}
-                    onClick={() => !anim.disabled && handleAnimationTypeChange(anim.type as AnimationType)}
+                    onClick={() =>
+                      !anim.disabled &&
+                      handleAnimationTypeChange(anim.type as AnimationType)
+                    }
                   />
                 ))}
               </div>
@@ -757,7 +979,10 @@ export function TextStyleControls({
                     active={animation.exitType === anim.type}
                     disabled={anim.disabled}
                     tooltip={anim.tooltip}
-                    onClick={() => !anim.disabled && handleExitAnimationTypeChange(anim.type as AnimationType)}
+                    onClick={() =>
+                      !anim.disabled &&
+                      handleExitAnimationTypeChange(anim.type as AnimationType)
+                    }
                   />
                 ))}
               </div>

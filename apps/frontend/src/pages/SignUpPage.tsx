@@ -1,9 +1,16 @@
-import { useSignup, useGoogleAuth } from "../components/Authentication/useAuthMutations";
+import {
+  useSignup,
+  useGoogleAuth,
+} from "../components/Authentication/useAuthMutations";
 import { LoaderCircle, ArrowRight, Lock, Mail, User } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { FeatureIcon, Field } from "@/components/Authentication/icons";
+import {
+  FeatureIcon,
+  Field,
+  PasswordInput,
+} from "@/components/Authentication/icons";
 import { FaGoogle } from "react-icons/fa";
 
 export function SignUpPage() {
@@ -11,7 +18,10 @@ export function SignUpPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const canSubmit = name.trim().length > 0 && email.trim().length > 0 && password.trim().length > 0;
+  const canSubmit =
+    name.trim().length > 0 &&
+    email.trim().length > 0 &&
+    password.trim().length > 0;
 
   const signupMutation = useSignup(setErrorMessage);
   const { startGoogleLogin } = useGoogleAuth(setErrorMessage);
@@ -55,31 +65,36 @@ export function SignUpPage() {
             </Field>
 
             <Field label="Password" icon={<Lock className="size-3.5" />}>
-              <input
-                type="password"
-                placeholder="Min. 8 characters (Should Contain A-Z, a-z, 0-9, and special characters)"
+              <PasswordInput
+                placeholder="Min. 8 characters (Should contain A-Z, a-z, 0-9, and special characters)"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-xl border border-white/8 bg-white/4 py-2.5 pl-9 pr-4 text-sm text-[#fff5de] outline-none placeholder:text-[#c8b880]/35 transition focus:border-[#f5a623]/40 focus:bg-[#f5a623]/[0.03]"
               />
             </Field>
 
             <button
               type="button"
-              onClick={() => { setErrorMessage(null); signupMutation.mutate({ name, email, password }); }}
+              onClick={() => {
+                setErrorMessage(null);
+                signupMutation.mutate({ name, email, password });
+              }}
               disabled={signupMutation.isPending || !canSubmit}
               className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-linear-to-r from-[#ffcf6b] via-[#f5a623] to-[#d98a10] py-3 text-sm font-extrabold text-[#1b1100] shadow-[0_4px_20px_rgba(245,166,35,0.25)] transition hover:opacity-92 hover:-translate-y-px active:scale-[0.98] disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none cursor-pointer"
             >
-              {signupMutation.isPending
-                ? <LoaderCircle className="size-4 animate-spin" />
-                : <ArrowRight className="size-4" />}
+              {signupMutation.isPending ? (
+                <LoaderCircle className="size-4 animate-spin" />
+              ) : (
+                <ArrowRight className="size-4" />
+              )}
               Create account
             </button>
 
             {/* Divider */}
             <div className="flex items-center gap-3">
               <div className="h-px flex-1 bg-white/8" />
-              <span className="text-[11px] text-white/30">or continue with</span>
+              <span className="text-[11px] text-white/30">
+                or continue with
+              </span>
               <div className="h-px flex-1 bg-white/8" />
             </div>
 
@@ -89,7 +104,9 @@ export function SignUpPage() {
                 startGoogleLogin();
               }}
               className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/8 bg-white/4 py-3 text-sm font-semibold text-[#fff5de] shadow-sm transition hover:bg-white/6 active:bg-white/10 cursor-pointer"
-              onError={() => toast.error("Google authentication failed. Please try again.")}
+              onError={() =>
+                toast.error("Google authentication failed. Please try again.")
+              }
             >
               <FaGoogle />
               Continue with Google
@@ -103,7 +120,10 @@ export function SignUpPage() {
 
             <p className="text-center text-xs text-[#c8b880]/50">
               Already have an account?{" "}
-              <Link to="/signin" className="font-bold text-[#f5a623] hover:underline">
+              <Link
+                to="/signin"
+                className="font-bold text-[#f5a623] hover:underline"
+              >
                 Sign in
               </Link>
             </p>
@@ -116,10 +136,13 @@ export function SignUpPage() {
             Start free · No card required
           </p>
           <h2 className="mt-3 font-syne text-[28px] font-black leading-tight tracking-tight text-[#fff5de] sm:text-[34px]">
-            Record beautifully,<br />from day one.
+            Record beautifully,
+            <br />
+            from day one.
           </h2>
           <p className="mt-4 text-[13px] leading-relaxed text-[#c8b080]/70">
-            Join teams who rely on Weave for interviews, podcasts, and remote sessions where quality cannot fail.
+            Join teams who rely on Weave for interviews, podcasts, and remote
+            sessions where quality cannot fail.
           </p>
 
           <div className="mt-7 space-y-2.5">
@@ -148,7 +171,9 @@ export function SignUpPage() {
                   <FeatureIcon name={icon} />
                 </span>
                 <div>
-                  <p className="text-[13px] font-semibold text-[#fff5de]/85">{title}</p>
+                  <p className="text-[13px] font-semibold text-[#fff5de]/85">
+                    {title}
+                  </p>
                   <p className="text-[11px] text-[#c8a870]/50">{sub}</p>
                 </div>
               </div>
@@ -169,7 +194,8 @@ export function SignUpPage() {
               ))}
             </div>
             <p className="text-[11px] text-[#c8a870]/60">
-              <span className="font-bold text-[#f5a623]/80">2,400+</span> teams recording with Weave
+              <span className="font-bold text-[#f5a623]/80">2,400+</span> teams
+              recording with Weave
             </p>
           </div>
         </div>

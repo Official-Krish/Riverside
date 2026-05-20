@@ -63,6 +63,9 @@ jobs:
       - name: Install Dependencies
         run: bun install
 
+      - name: Generate Prisma Client
+        run: bunx prisma generate --schema=packages/db/prisma/schema.prisma
+
       - name: Run Lint
         run: bun run lint
 
@@ -203,6 +206,9 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           push: true
+
+          build-args: |
+            ${{ matrix.service == 'frontend' && format('VITE_BACKEND_URL={0}', secrets.BACKEND_URL) || '' }}
 
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}:latest

@@ -1,42 +1,43 @@
 export interface EncryptionMetadata {
-    isEncrypted: boolean;
-    sourceMimeType: string | null;
-    encryptionAlgorithm: string | null;
-    encryptionIv: string | null;
-    encryptionTagBits: number | null;
+  isEncrypted: boolean;
+  sourceMimeType: string | null;
+  encryptionAlgorithm: string | null;
+  encryptionIv: string | null;
+  encryptionTagBits: number | null;
 }
 
 export interface UserChunk {
-    userId: string;
-    localPath: string;
-    timestamp: number;
-    durationSeconds: number;
-    hasValidTimestamp?: boolean;
-    metadata?: EncryptionMetadata | null;
+  userId: string;
+  localPath: string;
+  timestamp: number;
+  durationSeconds: number;
+  sequenceNumber: number | null;
+  hasValidTimestamp?: boolean;
+  metadata?: EncryptionMetadata | null;
 }
 
 export interface ProcessedUser {
-    userId: string;
-    videoPath: string;
-    duration: number;
-    hasAudio: boolean;
-    joinTimestamp: number;
-    leadingPaddingSeconds: number;
+  userId: string;
+  videoPath: string;
+  duration: number;
+  hasAudio: boolean;
+  joinTimestamp: number;
+  leadingPaddingSeconds: number;
 }
 
 export interface FailedUser {
-    userId: string;
-    estimatedDuration: number;
-    joinTimestamp: number;
+  userId: string;
+  estimatedDuration: number;
+  joinTimestamp: number;
 }
 
 export interface MergerConfig {
-    frameRate: number;
-    audioBitrate: string;
-    maxConcurrentUserJobs: number;
+  frameRate: number;
+  audioBitrate: string;
+  maxConcurrentUserJobs: number;
 }
 
 export interface GridDimensions {
-    rows: number;
-    cols: number;
+  rows: number;
+  cols: number;
 }

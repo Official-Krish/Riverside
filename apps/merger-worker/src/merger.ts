@@ -3,6 +3,7 @@ import * as path from "node:path";
 import { putObjectToS3 } from "@repo/amazons3";
 import { resolveStorageContext } from "@repo/amazons3";
 import { HeadObjectCommand } from "@aws-sdk/client-s3";
+import { prisma } from "@repo/db/client";
 import { collectUserChunks } from "./chunks";
 import { createUserVideo, createBlackPlaceholderVideo } from "./video-creator";
 import { createGridVideo } from "./grid-builder";
@@ -12,31 +13,20 @@ import {
   cleanupLegacyLocalChunks,
   cleanupLegacyRecordingsTmp,
 } from "./cleanup";
-import { hasAudioStream, ffprobeBin } from "./ffmpeg";
+import { getVideoDuration, hasAudioStream, ffprobeBin } from "./ffmpeg";
 import { getPositiveIntegerEnv } from "./config";
+import {
+  computeMeetingEndMs,
+  computeMeetingEpochMs,
+  timelineDurationSeconds,
+} from "./timeline";
 import {
   type MergerConfig,
   type ProcessedUser,
   type FailedUser,
-  type UserChunk,
 } from "./types";
 
 const environment = process.env.NODE_ENV || "development";
-
-function computeTrueTimelineDuration(chunks: UserChunk[]): number {
-  if (chunks.length === 0) return 0;
-  if (chunks.length === 1) return chunks[0]!.durationSeconds;
-
-  let totalDuration = 0;
-  for (let i = 0; i < chunks.length - 1; i++) {
-    const gap = (chunks[i + 1]!.timestamp - chunks[i]!.timestamp) / 1000;
-    totalDuration +=
-      chunks[i]!.durationSeconds +
-      Math.max(0, gap - chunks[i]!.durationSeconds);
-  }
-  totalDuration += chunks[chunks.length - 1]!.durationSeconds;
-  return totalDuration;
-}
 
 export class LocalVideoMerger {
   private readonly meetingId: string;
@@ -48,7 +38,7 @@ export class LocalVideoMerger {
   >["s3Client"];
 
   private config: MergerConfig = {
-    frameRate: 60,
+    frameRate: getPositiveIntegerEnv("MERGER_FRAME_RATE", 30),
     audioBitrate: "320k",
     maxConcurrentUserJobs: getPositiveIntegerEnv("MERGER_USER_CONCURRENCY", 2),
   };
@@ -99,8 +89,31 @@ export class LocalVideoMerger {
     );
   }
 
-  private async persistFinal(gridVideoPath: string): Promise<string> {
-    const finalKey = `weave-recordings/${this.meetingId}/final/meeting_grid_recording.mp4`;
+  private async resolveCanonicalMeetingId(): Promise<string> {
+    const requestedId = this.meetingId.trim().replace(/\/+$/u, "");
+
+    const meetingByRoomId = await prisma.meeting.findUnique({
+      where: { roomId: requestedId },
+      select: { roomId: true },
+    });
+
+    if (meetingByRoomId?.roomId) {
+      return meetingByRoomId.roomId;
+    }
+
+    const meetingByInternalId = await prisma.meeting.findUnique({
+      where: { id: requestedId },
+      select: { roomId: true },
+    });
+
+    return meetingByInternalId?.roomId || requestedId;
+  }
+
+  private async persistFinal(
+    gridVideoPath: string,
+    meetingId: string,
+  ): Promise<string> {
+    const finalKey = `weave-recordings/${meetingId}/final/meeting_grid_recording.mp4`;
     const fileStats = await fs.stat(gridVideoPath);
     const uploadStart = Date.now();
 
@@ -151,27 +164,37 @@ export class LocalVideoMerger {
     try {
       await this.createDirectories();
 
-      const userChunks = await collectUserChunks(
-        this.meetingId,
+      const canonicalMeetingId = await this.resolveCanonicalMeetingId();
+
+      const { userChunks, recordingStartedAtMs } = await collectUserChunks(
+        canonicalMeetingId,
         this.tempDir,
         this.s3Client,
         this.bucketName,
       );
-      for (const [userId, chunks] of userChunks.entries()) {
-        const firstTimestamp = chunks[0]?.timestamp ?? null;
-        const lastTimestamp = chunks[chunks.length - 1]?.timestamp ?? null;
+
+      if (recordingStartedAtMs) {
         this.log(
-          `[phase:collectUserChunks] user=${userId} chunks=${chunks.length} first=${firstTimestamp ? new Date(firstTimestamp).toISOString() : "n/a"} last=${lastTimestamp ? new Date(lastTimestamp).toISOString() : "n/a"} durations=${chunks.map((chunk) => chunk.durationSeconds.toFixed(2)).join(",")}`,
+          `[phase:timeline] recordingStartedAt=${new Date(recordingStartedAtMs).toISOString()} (reference only)`,
         );
       }
 
-      let recordingStartTime = Number.MAX_VALUE;
-      const userJoinTimes = new Map<string, number>();
+      const meetingEpochMs = computeMeetingEpochMs(userChunks);
+      const meetingEndMs = computeMeetingEndMs(userChunks);
+      const meetingDurationSeconds = timelineDurationSeconds(
+        meetingEpochMs,
+        meetingEndMs,
+      );
+
+      this.log(
+        `[phase:timeline] epoch=${new Date(meetingEpochMs).toISOString()} end=${new Date(meetingEndMs).toISOString()} duration=${meetingDurationSeconds.toFixed(2)}s`,
+      );
 
       for (const [userId, chunks] of userChunks.entries()) {
-        const joinTime = chunks[0]!.timestamp;
-        userJoinTimes.set(userId, joinTime);
-        recordingStartTime = Math.min(recordingStartTime, joinTime);
+        const sorted = chunks;
+        this.log(
+          `[phase:collectUserChunks] user=${userId} chunks=${chunks.length} timeline=${sorted.map((c) => `${new Date(c.timestamp).toISOString()}(+${c.durationSeconds.toFixed(1)}s)`).join(" | ")}`,
+        );
       }
 
       const processedUsers: ProcessedUser[] = [];
@@ -188,14 +211,11 @@ export class LocalVideoMerger {
             chunks,
             this.tempDir,
             this.config,
+            meetingEpochMs,
+            meetingEndMs,
             this.log.bind(this),
           );
           const userDuration = Date.now() - userStart;
-          const joinTime = userJoinTimes.get(userId) || Date.now();
-          const leadingPaddingSeconds = Math.max(
-            0,
-            (joinTime - recordingStartTime) / 1000,
-          );
 
           if (!userVideo) {
             this.log(
@@ -203,10 +223,8 @@ export class LocalVideoMerger {
             );
             failedUsers.push({
               userId,
-              estimatedDuration:
-                leadingPaddingSeconds +
-                Math.max(1, computeTrueTimelineDuration(chunks)),
-              joinTimestamp: joinTime,
+              estimatedDuration: meetingDurationSeconds,
+              joinTimestamp: chunks[0]?.timestamp ?? meetingEpochMs,
             });
             return;
           }
@@ -216,13 +234,28 @@ export class LocalVideoMerger {
             ffprobeBin,
             this.log.bind(this),
           );
-          const trueTimelineDuration = computeTrueTimelineDuration(chunks);
-          const finalDuration = trueTimelineDuration + leadingPaddingSeconds;
+
+          let encodedDuration = meetingDurationSeconds;
+          try {
+            encodedDuration = await getVideoDuration(
+              userVideo,
+              ffprobeBin,
+              this.log.bind(this),
+            );
+          } catch {
+            // use meeting timeline duration
+          }
+
+          const joinTime = chunks[0]?.timestamp ?? meetingEpochMs;
+          const leadingPaddingSeconds = Math.max(
+            0,
+            (joinTime - meetingEpochMs) / 1000,
+          );
 
           processedUsers.push({
             userId,
             videoPath: userVideo,
-            duration: finalDuration,
+            duration: Math.max(encodedDuration, meetingDurationSeconds),
             hasAudio,
             joinTimestamp: joinTime,
             leadingPaddingSeconds,
@@ -231,34 +264,28 @@ export class LocalVideoMerger {
       );
 
       if (failedUsers.length > 0) {
-        const maxTotalDuration =
-          processedUsers.length > 0
-            ? Math.max(...processedUsers.map((user) => user.duration))
-            : Math.max(...failedUsers.map((user) => user.estimatedDuration));
-
         for (const failedUser of failedUsers) {
-          const leadingPaddingSeconds = Math.max(
-            0,
-            (failedUser.joinTimestamp - recordingStartTime) / 1000,
-          );
-          const placeholderDuration = Math.max(
-            1,
-            maxTotalDuration - leadingPaddingSeconds,
+          this.log(
+            `[phase:createUserVideos] User ${failedUser.userId} had no decodable video — using black placeholder`,
           );
 
           const placeholderPath = await createBlackPlaceholderVideo(
             failedUser.userId,
-            placeholderDuration,
+            meetingDurationSeconds,
             this.tempDir,
             this.config,
             this.log.bind(this),
           );
 
-          const finalDuration = placeholderDuration + leadingPaddingSeconds;
+          const leadingPaddingSeconds = Math.max(
+            0,
+            (failedUser.joinTimestamp - meetingEpochMs) / 1000,
+          );
+
           processedUsers.push({
             userId: failedUser.userId,
             videoPath: placeholderPath,
-            duration: finalDuration,
+            duration: meetingDurationSeconds,
             hasAudio: false,
             joinTimestamp: failedUser.joinTimestamp,
             leadingPaddingSeconds,
@@ -279,18 +306,21 @@ export class LocalVideoMerger {
         this.log.bind(this),
       );
 
-      const finalPath = await this.persistFinal(gridVideo);
+      const finalPath = await this.persistFinal(gridVideo, canonicalMeetingId);
 
-      // Cleanup is independent — run in parallel for speed
       this.log("[phase:cleanup] Starting post-merge cleanup");
       await Promise.allSettled([
         cleanupSourceChunksFromS3(
-          this.meetingId,
+          canonicalMeetingId,
           this.s3Client,
           this.bucketName,
         ),
-        cleanupLegacyLocalChunks(this.recordingsRoot, this.meetingId),
-        cleanupLegacyRecordingsTmp(this.recordingsRoot, this.log.bind(this)),
+        cleanupLegacyLocalChunks(this.recordingsRoot, canonicalMeetingId),
+        cleanupLegacyRecordingsTmp(
+          this.recordingsRoot,
+          this.tempDir,
+          this.log.bind(this),
+        ),
       ]);
       this.log("[phase:cleanup] Post-merge cleanup finished");
 

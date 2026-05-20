@@ -1,8 +1,13 @@
+export type VideoTrackLike = {
+  attach?: (element: HTMLVideoElement) => void;
+  detach?: (element: HTMLVideoElement) => void;
+};
+
 export type MeetingTile = {
   id: string;
   title: string;
   subtitle?: string;
-  track: any | null;
+  track: VideoTrackLike | null;
   participantId?: string;
   isMuted?: boolean;
   isVideoOff?: boolean;
@@ -17,7 +22,7 @@ export type FocusedTiles = {
 
 export type RemoteAudioTrackItem = {
   id: string;
-  track: any;
+  track: unknown;
 };
 
 export type MeetingParticipant = {

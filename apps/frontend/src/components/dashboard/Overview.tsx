@@ -39,10 +39,11 @@ export function Overview({
   onScheduleMeeting: () => void;
 }) {
   const navigate = useNavigate();
+  const [now] = useState(() => Date.now());
 
   const [meetingsPage, setMeetingsPage] = useState(1);
   const [recordingsPage, setRecordingsPage] = useState(1);
-  const pageSize = 4;
+  const pageSize = 3;
 
   const readyMeetings = meetings.filter(
     (meeting) => meeting.recordingState === "READY",
@@ -55,9 +56,8 @@ export function Overview({
         (a, b) =>
           new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
       )
-      .find(
-        (schedule) => new Date(schedule.startTime).getTime() >= Date.now(),
-      ) ?? null;
+      .find((schedule) => new Date(schedule.startTime).getTime() >= now) ??
+    null;
   const endedMeetings = meetings.filter(
     (meeting) => meeting.startedAt && meeting.endedAt,
   );

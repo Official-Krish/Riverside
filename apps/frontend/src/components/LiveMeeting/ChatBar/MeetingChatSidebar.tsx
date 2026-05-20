@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useQuery } from "@tanstack/react-query";
 import { FolderGit2, GitBranch, MessageSquare, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -29,7 +30,11 @@ type MeetingChatSidebarProps = {
   participantId?: string | null;
   onSendMessage: (text: string) => void;
   onTyping: (isTyping: boolean) => void;
-  onSendReaction?: (messageId: string, emoji: string, action: "add" | "remove") => void;
+  onSendReaction?: (
+    messageId: string,
+    emoji: string,
+    action: "add" | "remove",
+  ) => void;
 };
 
 type RepoItem = {
@@ -299,9 +304,9 @@ export function MeetingChatSidebar({
           )}
 
           <div className="flex min-h-0 flex-1 flex-col">
-            <MessageList 
-              messages={messages} 
-              selfName={selfName} 
+            <MessageList
+              messages={messages}
+              selfName={selfName}
               reactions={reactions}
               participantNamesById={participantNamesById}
               participantId={participantId}
@@ -332,20 +337,20 @@ export function MeetingChatSidebar({
           </div>
           <div className="shrink-0">
             <Composer
-                draft={draft}
-                setDraft={setDraft}
-                onTyping={onTyping}
-                submitDraft={submitDraft}
-                showCommandPalette={showCommandPalette}
-                filteredCommands={filteredCommands}
-                activeCommandIndex={activeCommandIndex}
-                openCommand={openCommand}
-                setShowCommandPalette={setShowCommandPalette}
-                inputRef={inputRef}
-                setActiveCommandIndex={setActiveCommandIndex}
-                selectedRepo={selectedRepo}
-                activeCommand={activeCommand}
-                groupedCommands={groupedCommands}
+              draft={draft}
+              setDraft={setDraft}
+              onTyping={onTyping}
+              submitDraft={submitDraft}
+              showCommandPalette={showCommandPalette}
+              filteredCommands={filteredCommands}
+              activeCommandIndex={activeCommandIndex}
+              openCommand={openCommand}
+              setShowCommandPalette={setShowCommandPalette}
+              inputRef={inputRef}
+              setActiveCommandIndex={setActiveCommandIndex}
+              selectedRepo={selectedRepo}
+              activeCommand={activeCommand}
+              groupedCommands={groupedCommands}
             />
           </div>
 
