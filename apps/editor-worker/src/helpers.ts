@@ -80,9 +80,7 @@ export async function ensureDir(dirPath: string) {
 }
 
 export function runBinary(binary: string, args: string[]) {
-  const MAX_STDERR_BYTES = 32 * 1024; // Keep last 32 KB of stderr (most useful for debugging)
-  // During unit tests, avoid invoking the real binary — synthesize outputs.
-  // Allow forcing real ffmpeg runs for integration tests by setting `REAL_FFMPEG=1`.
+  const MAX_STDERR_BYTES = 32 * 1024;
   if (process.env.NODE_ENV === "test" && process.env.REAL_FFMPEG !== "1") {
     if (process.env.FORCE_FFMPEG_FAIL === "deterministic") {
       return Promise.reject(
@@ -106,16 +104,33 @@ export function runBinary(binary: string, args: string[]) {
 
     processRef.stderr.on("data", (chunk) => {
       stderr += chunk.toString();
-      // Trim to tail when stderr exceeds the cap
       if (stderr.length > MAX_STDERR_BYTES * 1.5) {
         stderr = stderr.slice(-MAX_STDERR_BYTES);
       }
     });
 
-    processRef.on("close", (code) => {
+    processRef.on("close", async (code) => {
       if (code === 0) {
         resolve();
         return;
+      }
+
+      const isSoftFailure =
+        code === 255 && stderr.toLowerCase().includes("exiting normally");
+
+      if (isSoftFailure) {
+        const outputPath = args[args.length - 1];
+        if (outputPath && typeof outputPath === "string") {
+          try {
+            const stats = await fs.stat(outputPath);
+            if (stats.size > 0) {
+              resolve();
+              return;
+            }
+          } catch {
+            // file doesn't exist, fall through to reject
+          }
+        }
       }
 
       reject(

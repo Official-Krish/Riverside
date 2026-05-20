@@ -173,6 +173,10 @@ export function buildClipRenderArgs(
       filterChain += `,${presetFilter}`;
     }
 
+    const audioArgs = clip.hasAudio
+      ? ["-c:a", "aac", "-b:a", "320k", "-ar", "48000"]
+      : ["-an"];
+
     const finalArgs = [
       "-t",
       (clip.durationMs / 1000).toFixed(3),
@@ -186,12 +190,9 @@ export function buildClipRenderArgs(
       "fast",
       "-crf",
       "22",
-      "-c:a",
-      "aac",
-      "-b:a",
-      "320k",
-      "-ar",
-      "48000",
+      "-movflags",
+      "+faststart",
+      ...audioArgs,
       outputPath,
     ];
 
@@ -296,6 +297,8 @@ export function buildClipRenderArgs(
     "fast",
     "-crf",
     "22",
+    "-movflags",
+    "+faststart",
     outputPath,
   ];
 
@@ -311,7 +314,7 @@ export function buildClipRenderArgs(
       "-ar",
       "48000",
     );
-  } else {
+  } else if (clip.hasAudio) {
     finalArgs.splice(2, 0, "-map", "0:a?");
     finalArgs.splice(
       finalArgs.length - 1,
@@ -323,6 +326,8 @@ export function buildClipRenderArgs(
       "-ar",
       "48000",
     );
+  } else {
+    finalArgs.splice(2, 0, "-an");
   }
 
   return [...args, ...finalArgs];
