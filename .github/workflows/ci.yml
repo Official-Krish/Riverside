@@ -207,6 +207,9 @@ jobs:
           file: ${{ matrix.dockerfile }}
           push: true
 
+          build-args: |
+            ${{ matrix.service == 'frontend' && format('VITE_BACKEND_URL={0}', secrets.BACKEND_URL) || '' }}
+
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}:v1.2.${{ github.run_number }}
