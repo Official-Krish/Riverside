@@ -3,15 +3,17 @@ import { createWriteStream } from "node:fs";
 import * as path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
-import {
-  getObjectBytesFromS3,
-  listObjectKeysByPrefix,
-  resolveStorageContext,
-} from "@repo/amazons3";
+import { listObjectKeysByPrefix, resolveStorageContext } from "@repo/amazons3";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { type UserChunk } from "./types";
 import { decryptUserChunks } from "./decryption";
+import { sortChunksByTimeline } from "./timeline";
 import { prisma } from "@repo/db/client";
+
+export type CollectedChunksResult = {
+  userChunks: Map<string, UserChunk[]>;
+  recordingStartedAtMs: number | null;
+};
 
 const DOWNLOAD_CONCURRENCY = 4;
 
@@ -46,6 +48,15 @@ async function streamS3ToLocal(
   return true;
 }
 
+export function parseChunkSequenceNumber(filename: string): number | null {
+  const match = filename.match(/chunk-(\d+)-/);
+  if (!match?.[1]) {
+    return null;
+  }
+  const sequence = Number.parseInt(match[1], 10);
+  return Number.isNaN(sequence) ? null : sequence;
+}
+
 export function parseChunkTimestamp(filename: string): number | null {
   const match = filename.match(
     /chunk-(?:\d+-)?(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z)\./,
@@ -72,7 +83,7 @@ export async function collectUserChunks(
   tempDir: string,
   s3Client: ReturnType<typeof resolveStorageContext>["s3Client"],
   bucketName: string,
-): Promise<Map<string, UserChunk[]>> {
+): Promise<CollectedChunksResult> {
   const prefix = `weave-recordings/${meetingId}/raw/users/`;
   const chunkCacheRoot = path.join(tempDir, "chunks");
   const userChunks = new Map<string, UserChunk[]>();
@@ -98,6 +109,7 @@ export async function collectUserChunks(
       encryptionIv: string | null;
       encryptionTagBits: number | null;
       durationMs: number | null;
+      startedAt: Date | null;
     }
   > = new Map();
 
@@ -112,6 +124,7 @@ export async function collectUserChunks(
         encryptionIv: true,
         encryptionTagBits: true,
         durationMs: true,
+        startedAt: true,
       },
     });
 
@@ -125,9 +138,21 @@ export async function collectUserChunks(
           encryptionIv: record.encryptionIv,
           encryptionTagBits: record.encryptionTagBits,
           durationMs: record.durationMs,
+          startedAt: record.startedAt,
         },
       ]),
     );
+  }
+
+  let recordingStartedAtMs: number | null = null;
+  if (meetingRecord) {
+    const meeting = await prisma.meeting.findUnique({
+      where: { id: meetingRecord.id },
+      select: { recordingStartedAt: true },
+    });
+    if (meeting?.recordingStartedAt) {
+      recordingStartedAtMs = meeting.recordingStartedAt.getTime();
+    }
   }
 
   // Prepare download tasks
@@ -179,18 +204,26 @@ export async function collectUserChunks(
         );
         if (!ok) continue;
 
-        const parsedTimestamp =
-          parseChunkTimestamp(path.basename(task.localPath)) ?? 0;
+        const fileName = path.basename(task.localPath);
+        const parsedTimestamp = parseChunkTimestamp(fileName);
+        const parsedSequence = parseChunkSequenceNumber(fileName);
+        const dbStartedAtMs = task.metadata?.startedAt
+          ? task.metadata.startedAt.getTime()
+          : null;
+        const resolvedTimestamp = dbStartedAtMs ?? parsedTimestamp;
 
         const item: UserChunk = {
           userId: task.userId,
           localPath: task.localPath,
-          timestamp: parsedTimestamp,
+          timestamp: resolvedTimestamp ?? 0,
           durationSeconds: Math.max(
             0.1,
             (task.metadata?.durationMs ?? 10000) / 1000,
           ),
-          hasValidTimestamp: parsedTimestamp !== null,
+          sequenceNumber: parsedSequence,
+          hasValidTimestamp:
+            dbStartedAtMs !== null ||
+            (parsedTimestamp !== null && !Number.isNaN(parsedTimestamp)),
           metadata: task.metadata
             ? {
                 isEncrypted: task.metadata.isEncrypted,
@@ -231,11 +264,29 @@ export async function collectUserChunks(
       }
     }
 
-    chunks.sort((a, b) => a.timestamp - b.timestamp);
+    const decryptedChunks = await decryptUserChunks(
+      sortChunksByTimeline(chunks),
+      meetingId,
+      tempDir,
+    );
+    const sorted = sortChunksByTimeline(decryptedChunks);
+    const chunksWithRealDuration = sorted.map((chunk, i) => {
+      const nextChunk = sorted[i + 1];
+      if (nextChunk && nextChunk.hasValidTimestamp && chunk.hasValidTimestamp) {
+        const deltaMs = nextChunk.timestamp - chunk.timestamp;
+        if (deltaMs > 500 && deltaMs < 120_000) {
+          return { ...chunk, durationSeconds: deltaMs / 1000 };
+        }
+      }
 
-    const decryptedChunks = await decryptUserChunks(chunks, meetingId, tempDir);
-    userChunks.set(userId, decryptedChunks);
+      const rawDurationMs = chunk.durationSeconds * 1000;
+      return {
+        ...chunk,
+        durationSeconds: rawDurationMs > 500 ? rawDurationMs / 1000 : 10.0,
+      };
+    });
+    userChunks.set(userId, sortChunksByTimeline(chunksWithRealDuration));
   }
 
-  return userChunks;
+  return { userChunks, recordingStartedAtMs };
 }

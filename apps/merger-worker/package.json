@@ -4,18 +4,19 @@
   "type": "module",
   "private": true,
   "devDependencies": {
-    "@types/bun": "latest",
-    "@repo/amazons3": "workspace:*"
+    "@types/bun": "latest"
   },
   "scripts": {
     "build": "tsc",
-    "lint": "eslint . --ext .ts"
+    "lint": "eslint . --ext .ts",
+    "test:meeting-chunks": "bun ./src/scripts/test-meeting-chunks.ts"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.16.0",
+    "@repo/amazons3": "workspace:*",
     "@repo/db": "workspace:*",
     "axios": "^1.16.1",
     "ffmpeg-static": "^5.2.0",

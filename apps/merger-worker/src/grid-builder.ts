@@ -26,15 +26,11 @@ async function createSingleUserVideo(
 ): Promise<void> {
   const label = `createGridVideo[single-user]`;
   const targetDuration = Math.max(1, user.duration);
-  const tpadFilter =
-    user.leadingPaddingSeconds > 0.1
-      ? `,tpad=start_mode=add:start_duration=${user.leadingPaddingSeconds}:color=black`
-      : "";
   const audioDelayMs = Math.max(
     0,
     Math.round(user.leadingPaddingSeconds * 1000),
   );
-  const filter = `[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2${tpadFilter}[video_out]${user.hasAudio && audioDelayMs > 0 ? `;[0:a]adelay=${audioDelayMs}:all=1[audio_out]` : ""}`;
+  const filter = `[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2[video_out]${user.hasAudio && audioDelayMs > 0 ? `;[0:a]adelay=${audioDelayMs}:all=1[audio_out]` : ""}`;
 
   const args = [
     "-y",
@@ -74,6 +70,10 @@ async function createSingleUserVideo(
     targetDuration.toString(),
     "-r",
     config.frameRate.toString(),
+    "-fps_mode",
+    "cfr",
+    "-avoid_negative_ts",
+    "make_zero",
     outputPath,
   );
 
@@ -100,18 +100,9 @@ async function createMultiUserVideo(
 
   for (let i = 0; i < users.length; i++) {
     const user = users[i]!;
-    const trailingPaddingSeconds = Math.max(0, targetDuration - user.duration);
-    const tpadOptions = [
-      user.leadingPaddingSeconds > 0.1
-        ? `start_mode=add:start_duration=${user.leadingPaddingSeconds}:color=black`
-        : "",
-      trailingPaddingSeconds > 0.1
-        ? `stop_mode=add:stop_duration=${trailingPaddingSeconds}:color=black`
-        : "",
-    ].filter(Boolean);
 
     inputs.push("-i", user.videoPath);
-    filter += `[${i}:v]scale=${tileWidth}:${tileHeight}:force_original_aspect_ratio=decrease,pad=${tileWidth}:${tileHeight}:(ow-iw)/2:(oh-ih)/2${tpadOptions.length > 0 ? `,tpad=${tpadOptions.join(":")}` : ""},drawbox=x=0:y=0:w=iw:h=ih:color=#1f2937@0.6:t=2[v${i}];`;
+    filter += `[${i}:v]scale=${tileWidth}:${tileHeight}:force_original_aspect_ratio=decrease,pad=${tileWidth}:${tileHeight}:(ow-iw)/2:(oh-ih)/2,drawbox=x=0:y=0:w=iw:h=ih:color=#1f2937@0.6:t=2[v${i}];`;
   }
 
   const layout: string[] = [];
@@ -137,15 +128,8 @@ async function createMultiUserVideo(
         0,
         Math.round(user.leadingPaddingSeconds * 1000),
       );
-      const trailingPaddingSeconds = Math.max(
-        0,
-        targetDuration - user.duration,
-      );
       const audioFilters = [
         delayMs > 0 ? `adelay=${delayMs}:all=1` : "",
-        trailingPaddingSeconds > 0.1
-          ? `apad=pad_dur=${trailingPaddingSeconds}`
-          : "",
       ].filter(Boolean);
 
       if (audioFilters.length > 0) {
@@ -191,10 +175,12 @@ async function createMultiUserVideo(
       config.audioBitrate,
       "-ar",
       "48000",
-      "-t",
-      targetDuration.toString(),
       "-r",
       config.frameRate.toString(),
+      "-fps_mode",
+      "cfr",
+      "-avoid_negative_ts",
+      "make_zero",
       outputPath,
     ],
     900000,
