@@ -85,7 +85,9 @@ GithubRouter.get("/callback", async (req, res) => {
         },
       });
       if (!response) {
-        return res.status(404).json({ error: "User not found or not verified" });
+        return res
+          .status(404)
+          .json({ error: "User not found or not verified" });
       }
       res.redirect(`${process.env.FRONTEND_URL}/profile`);
     } else {
@@ -120,7 +122,6 @@ GithubRouter.post("/webhook", async (req, res) => {
 
       case "issue_comment": {
         const comment = req.body.comment;
-        const issue = req.body.issue;
 
         console.log("New comment:", comment.body);
 
