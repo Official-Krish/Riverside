@@ -25,32 +25,53 @@ jobs:
         with:
           ref: main
 
+      - name: Download Changed Services
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: ci.yml
+          run_id: ${{ github.event.workflow_run.id }}
+          name: changed-services
+          path: changed
+
       - name: Configure Git
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
 
       - name: Update Image Tags
+        shell: bash
         run: |
           VERSION=v1.2.${{ github.event.workflow_run.run_number }}
 
-          sed -i "s|image: krishanand01/weave-frontend:.*|image: krishanand01/weave-frontend:$VERSION|g" ops/deployment.yml
+          if [ "$(cat changed/backend)" = "true" ]; then
+            sed -i "s|image: krishanand01/weave-backend:.*|image: krishanand01/weave-backend:$VERSION|g" ops/deployment.yml
+          fi
 
-          sed -i "s|image: krishanand01/weave-backend:.*|image: krishanand01/weave-backend:$VERSION|g" ops/deployment.yml
+          if [ "$(cat changed/frontend)" = "true" ]; then
+            sed -i "s|image: krishanand01/weave-frontend:.*|image: krishanand01/weave-frontend:$VERSION|g" ops/deployment.yml
+          fi
 
-          sed -i "s|image: krishanand01/weave-ws-relayer:.*|image: krishanand01/weave-ws-relayer:$VERSION|g" ops/deployment.yml
+          if [ "$(cat changed/ws_relayer)" = "true" ]; then
+            sed -i "s|image: krishanand01/weave-ws-relayer:.*|image: krishanand01/weave-ws-relayer:$VERSION|g" ops/deployment.yml
+          fi
 
-          sed -i "s|image: krishanand01/weave-merger-worker:.*|image: krishanand01/weave-merger-worker:$VERSION|g" ops/deployment.yml
+          if [ "$(cat changed/merger_worker)" = "true" ]; then
+            sed -i "s|image: krishanand01/weave-merger-worker:.*|image: krishanand01/weave-merger-worker:$VERSION|g" ops/deployment.yml
+          fi
 
-          sed -i "s|image: krishanand01/weave-editor-worker:.*|image: krishanand01/weave-editor-worker:$VERSION|g" ops/deployment.yml
+          if [ "$(cat changed/editor_worker)" = "true" ]; then
+            sed -i "s|image: krishanand01/weave-editor-worker:.*|image: krishanand01/weave-editor-worker:$VERSION|g" ops/deployment.yml
+          fi
 
-          sed -i "s|image: krishanand01/weave-transcoder:.*|image: krishanand01/weave-transcoder:$VERSION|g" ops/deployment.yml
+          if [ "$(cat changed/transcoder)" = "true" ]; then
+            sed -i "s|image: krishanand01/weave-transcoder:.*|image: krishanand01/weave-transcoder:$VERSION|g" ops/deployment.yml
+          fi
 
       - name: Commit Changes
         run: |
           git add ops/deployment.yml
 
-          git commit -m "chore: update image tags to v1.${{ github.event.workflow_run.run_number }} [skip ci]" || echo "No changes"
+          git commit -m "chore: update image tags to v1.2.${{ github.event.workflow_run.run_number }}" || echo "No changes"
 
       - name: Push Changes
         run: |

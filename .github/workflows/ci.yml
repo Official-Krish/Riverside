@@ -93,8 +93,15 @@ jobs:
 
       - name: Detect Changed Files
         id: filter
+        shell: bash
         run: |
-          CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          else
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
+          fi
+
+          echo "$CHANGED_FILES"
 
           echo "backend=false" >> $GITHUB_OUTPUT
           echo "frontend=false" >> $GITHUB_OUTPUT
@@ -135,6 +142,23 @@ jobs:
             echo "editor_worker=true" >> $GITHUB_OUTPUT
             echo "transcoder=true" >> $GITHUB_OUTPUT
           fi
+
+      - name: Save Changed Services
+        run: |
+          mkdir -p changed
+
+          echo '${{ steps.filter.outputs.backend }}' > changed/backend
+          echo '${{ steps.filter.outputs.frontend }}' > changed/frontend
+          echo '${{ steps.filter.outputs.ws_relayer }}' > changed/ws_relayer
+          echo '${{ steps.filter.outputs.merger_worker }}' > changed/merger_worker
+          echo '${{ steps.filter.outputs.editor_worker }}' > changed/editor_worker
+          echo '${{ steps.filter.outputs.transcoder }}' > changed/transcoder
+
+      - name: Upload Changed Services
+        uses: actions/upload-artifact@v4
+        with:
+          name: changed-services
+          path: changed/
 
   docker-build:
     name: Docker Build & Push
