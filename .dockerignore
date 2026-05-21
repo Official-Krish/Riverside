@@ -16,3 +16,5 @@ gcp-key.json
 .gitignore
 
 recordings
+.github
+ops

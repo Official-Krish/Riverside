@@ -25,226 +25,402 @@ const QUEUES = [
   "Notifications",
 ] as const;
 
+const DEAD_LETTER_QUEUE = "NotificationWorkerDLQ";
+const MAX_IN_FLIGHT_JOBS = Number(
+  process.env.NOTIFICATION_WORKER_MAX_IN_FLIGHT ?? 20,
+);
+const DB_WRITE_CONCURRENCY = Number(
+  process.env.NOTIFICATION_DB_WRITE_CONCURRENCY ?? 25,
+);
+const PROVIDER_CONCURRENCY = Number(
+  process.env.NOTIFICATION_PROVIDER_CONCURRENCY ?? 5,
+);
+const RETRY_ATTEMPTS = Number(process.env.NOTIFICATION_RETRY_ATTEMPTS ?? 3);
+const RETRY_BASE_DELAY_MS = Number(
+  process.env.NOTIFICATION_RETRY_BASE_DELAY_MS ?? 500,
+);
+
+type QueueName = (typeof QUEUES)[number];
+
 function resolveParticipantUserId(participant: string | { userId?: string }) {
   return typeof participant === "string" ? participant : participant.userId;
 }
 
-export async function notificationWorker() {
-  while (true) {
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function normalizeError(err: unknown) {
+  return err instanceof Error ? err : new Error(String(err));
+}
+
+async function pushToDeadLetterQueue(
+  queueName: string,
+  payload: unknown,
+  error: unknown,
+  stage: string,
+) {
+  try {
+    await redisPublisher.lpush(
+      DEAD_LETTER_QUEUE,
+      JSON.stringify({
+        queueName,
+        stage,
+        payload,
+        error: normalizeError(error).message,
+        failedAt: new Date().toISOString(),
+      }),
+    );
+  } catch (dlqError) {
+    console.error("Failed to write message to dead-letter queue", dlqError);
+  }
+}
+
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  context: string,
+  queueName: string,
+  payloadForDlq: unknown,
+): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt += 1) {
     try {
-      const result = await redisSubscriber.brpop(...QUEUES, 5);
-      if (!result) continue;
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (attempt >= RETRY_ATTEMPTS) {
+        await pushToDeadLetterQueue(queueName, payloadForDlq, error, context);
+        throw error;
+      }
 
-      const [queueName, data] = result;
-      const parsed = JSON.parse(data);
+      const delayMs = RETRY_BASE_DELAY_MS * 2 ** (attempt - 1);
+      console.warn(
+        `[${context}] attempt ${attempt}/${RETRY_ATTEMPTS} failed, retrying in ${delayMs}ms`,
+        error,
+      );
+      await sleep(delayMs);
+    }
+  }
 
-      switch (queueName) {
-        case "MeetingInvitations": {
-          const { roomId, message, participants } = parsed;
-          if (!participants) break;
+  throw normalizeError(lastError);
+}
 
-          await Promise.all(
-            participants.map((participant: string | { userId?: string }) => {
-              const userId = resolveParticipantUserId(participant);
-              if (!userId) return;
-              return prisma.notification.create({
+async function processWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  handler: (item: T) => Promise<void>,
+  context: string,
+) {
+  const safeConcurrency = Math.max(1, Math.min(concurrency, items.length));
+  let index = 0;
+  let failed = 0;
+
+  await Promise.all(
+    Array.from({ length: safeConcurrency }, async () => {
+      while (true) {
+        const current = index;
+        index += 1;
+
+        if (current >= items.length) break;
+
+        try {
+          await handler(items[current]);
+        } catch (error) {
+          failed += 1;
+          console.error(`[${context}] item processing failed`, error);
+        }
+      }
+    }),
+  );
+
+  if (failed > 0) {
+    console.warn(`[${context}] completed with ${failed} failed item(s)`);
+  }
+}
+
+async function processQueueMessage(queueName: QueueName, parsed: any) {
+  switch (queueName) {
+    case "MeetingInvitations": {
+      const { roomId, message, participants } = parsed;
+      if (!Array.isArray(participants) || participants.length === 0) return;
+
+      await processWithConcurrency(
+        participants,
+        DB_WRITE_CONCURRENCY,
+        async (participant: string | { userId?: string }) => {
+          const userId = resolveParticipantUserId(participant);
+          if (!userId) return;
+
+          await withRetry(
+            () =>
+              prisma.notification.create({
                 data: {
                   userId,
                   type: "MEETING_INVITE",
                   message,
                   metadata: { roomId },
                 },
-              });
-            }),
+              }),
+            "MeetingInvitations.createNotification",
+            queueName,
+            { participant, roomId, message },
           );
-          break;
-        }
+        },
+        queueName,
+      );
+      break;
+    }
 
-        case "MeetingReminders": {
-          const { scheduleId, message, participants, scheduledAt } = parsed;
-          if (!participants) break;
+    case "MeetingReminders": {
+      const { scheduleId, message, participants, scheduledAt } = parsed;
+      if (!Array.isArray(participants) || participants.length === 0) return;
 
-          await Promise.all(
-            participants.map((participant: string | { userId?: string }) => {
-              const userId = resolveParticipantUserId(participant);
-              if (!userId) return;
-              return prisma.notification.create({
+      await processWithConcurrency(
+        participants,
+        DB_WRITE_CONCURRENCY,
+        async (participant: string | { userId?: string }) => {
+          const userId = resolveParticipantUserId(participant);
+          if (!userId) return;
+
+          await withRetry(
+            () =>
+              prisma.notification.create({
                 data: {
                   userId,
                   type: "MEETING_REMINDER",
                   message,
                   metadata: { scheduleId, scheduledAt },
                 },
-              });
-            }),
+              }),
+            "MeetingReminders.createNotification",
+            queueName,
+            { participant, scheduleId, message, scheduledAt },
+          );
+        },
+        queueName,
+      );
+      break;
+    }
+
+    case "SetupGoogleCalendarReminders": {
+      const { googleRefreshTokens, eventDetails, type } = parsed;
+      if (
+        !Array.isArray(googleRefreshTokens) ||
+        googleRefreshTokens.length === 0
+      ) {
+        return;
+      }
+
+      switch (type) {
+        case "Create":
+          await processWithConcurrency(
+            googleRefreshTokens,
+            PROVIDER_CONCURRENCY,
+            async (g: { googleRefreshToken?: string; userId: string }) => {
+              if (!g.googleRefreshToken) return;
+              if (!g.userId) {
+                console.warn(
+                  "Missing userId for Google Calendar event creation, skipping...",
+                );
+                return;
+              }
+
+              const id = await withRetry(
+                () => createCalendarEvent(g.googleRefreshToken!, eventDetails),
+                "GoogleCalendar.CreateEvent",
+                queueName,
+                { userId: g.userId, eventDetails },
+              );
+
+              if (!id) return;
+
+              await withRetry(
+                () =>
+                  prisma.scheduleParticipant.update({
+                    where: {
+                      scheduleId_userId: {
+                        scheduleId: eventDetails.scheduleId,
+                        userId: g.userId,
+                      },
+                    },
+                    data: {
+                      googleEventId: id,
+                    },
+                  }),
+                "GoogleCalendar.PersistEventId",
+                queueName,
+                { userId: g.userId, scheduleId: eventDetails.scheduleId, id },
+              );
+            },
+            `${queueName}.Create`,
+          );
+          break;
+
+        case "Cancel":
+          await processWithConcurrency(
+            googleRefreshTokens,
+            PROVIDER_CONCURRENCY,
+            async (g: { googleRefreshToken?: string; eventId?: string }) => {
+              if (!g.googleRefreshToken || !g.eventId) return;
+              await withRetry(
+                () => deleteCalendarEvent(g.googleRefreshToken!, g.eventId!),
+                "GoogleCalendar.CancelEvent",
+                queueName,
+                { eventId: g.eventId },
+              );
+            },
+            `${queueName}.Cancel`,
+          );
+          break;
+
+        case "Update":
+          await processWithConcurrency(
+            googleRefreshTokens,
+            PROVIDER_CONCURRENCY,
+            async (g: { googleRefreshToken?: string; eventId?: string }) => {
+              if (!g.googleRefreshToken || !g.eventId) return;
+              await withRetry(
+                () =>
+                  updateCalendarEvent(
+                    g.googleRefreshToken!,
+                    g.eventId!,
+                    eventDetails,
+                  ),
+                "GoogleCalendar.UpdateEvent",
+                queueName,
+                { eventId: g.eventId, eventDetails },
+              );
+            },
+            `${queueName}.Update`,
+          );
+          break;
+
+        default:
+          console.warn("Unknown Google Calendar reminder action:", type);
+      }
+      break;
+    }
+
+    case "Notifications": {
+      const { type } = parsed;
+      switch (type) {
+        case "GMAIL": {
+          const { recipientEmails, eventDetails } = parsed;
+          if (!Array.isArray(recipientEmails) || !eventDetails) return;
+
+          await processWithConcurrency(
+            recipientEmails,
+            PROVIDER_CONCURRENCY,
+            async (email: string) => {
+              await withRetry(
+                () => sendGmailMessage(email, eventDetails),
+                "Notifications.GMAIL",
+                queueName,
+                { email, eventDetails },
+              );
+            },
+            "Notifications.GMAIL",
           );
           break;
         }
 
-        case "SetupGoogleCalendarReminders":
-          {
-            const { googleRefreshTokens, eventDetails, type } = parsed;
-            if (!googleRefreshTokens) break;
+        case "SLACK": {
+          const {
+            slackBotToken,
+            slackUserId,
+            eventDetails: slackEventDetails,
+          } = parsed;
+          if (!slackBotToken || !slackUserId || !slackEventDetails) return;
 
-            switch (type) {
-              case "Create":
-                await Promise.all(
-                  googleRefreshTokens.map(
-                    async (g: {
-                      googleRefreshToken?: string;
-                      userId: string;
-                    }) => {
-                      if (!g.googleRefreshToken) return;
-                      if (!g.userId) {
-                        console.warn(
-                          "Missing userId for Google Calendar event creation, skipping...",
-                        );
-                        return;
-                      }
-                      const id = await createCalendarEvent(
-                        g.googleRefreshToken,
-                        eventDetails,
-                      );
-                      if (id) {
-                        await prisma.scheduleParticipant.update({
-                          where: {
-                            scheduleId_userId: {
-                              scheduleId: eventDetails.scheduleId,
-                              userId: g.userId,
-                            },
-                          },
-                          data: {
-                            googleEventId: id,
-                          },
-                        });
-                      }
-                    },
-                  ),
-                );
-                break;
-
-              case "Cancel":
-                await Promise.all(
-                  googleRefreshTokens.map(
-                    async (g: {
-                      googleRefreshToken?: string;
-                      eventId?: string;
-                    }) => {
-                      if (!g.googleRefreshToken || !g.eventId) return;
-                      try {
-                        await deleteCalendarEvent(
-                          g.googleRefreshToken,
-                          g.eventId,
-                        );
-                      } catch (err) {
-                        console.error(
-                          `Failed to delete calendar event for eventId: ${g.eventId}`,
-                          err,
-                        );
-                      }
-                    },
-                  ),
-                );
-                break;
-
-              case "Update":
-                await Promise.all(
-                  googleRefreshTokens.map(
-                    async (g: {
-                      googleRefreshToken?: string;
-                      eventId?: string;
-                    }) => {
-                      if (!g.googleRefreshToken || !g.eventId) return;
-                      try {
-                        await updateCalendarEvent(
-                          g.googleRefreshToken,
-                          g.eventId,
-                          eventDetails,
-                        );
-                      } catch (err) {
-                        console.error(
-                          `Failed to update calendar event for eventId: ${g.eventId}`,
-                          err,
-                        );
-                      }
-                    },
-                  ),
-                );
-                break;
-            }
-          }
-          break;
-
-        case "Notifications": {
-          const { type } = parsed;
-          switch (type) {
-            case "GMAIL": {
-              const { recipientEmails, eventDetails } = parsed;
-              if (!recipientEmails || !eventDetails) break;
-              try {
-                await Promise.all(
-                  recipientEmails.map((email: string) =>
-                    sendGmailMessage(email, eventDetails),
-                  ),
-                );
-              } catch (err) {
-                console.error(
-                  `Failed to send Gmail notification to ${recipientEmails}`,
-                  err,
-                );
-              }
-              break;
-            }
-
-            case "SLACK": {
-              const {
+          await withRetry(
+            () =>
+              sendSlackDirectMessage(
                 slackBotToken,
                 slackUserId,
-                eventDetails: slackEventDetails,
-              } = parsed;
-              if (!slackBotToken || !slackUserId || !slackEventDetails) break;
-              try {
-                await sendSlackDirectMessage(
-                  slackBotToken,
-                  slackUserId,
-                  slackEventDetails,
-                );
-              } catch (err) {
-                console.error(
-                  `Failed to send Slack notification to user ${slackUserId}`,
-                  err,
-                );
-              }
-              break;
-            }
+                slackEventDetails,
+              ),
+            "Notifications.SLACK",
+            queueName,
+            { slackUserId, eventDetails: slackEventDetails },
+          );
+          break;
+        }
 
-            case "DISCORD": {
-              const { discordWebhookUrl, eventDetails: discordEventDetails } =
-                parsed;
-              if (!discordWebhookUrl || !discordEventDetails) break;
-              try {
-                await sendDiscordNotification(
-                  discordWebhookUrl,
-                  discordEventDetails,
-                );
-              } catch (err) {
-                console.error(
-                  `Failed to send Discord notification to user ${discordWebhookUrl}`,
-                  err,
-                );
-              }
-              break;
-            }
+        case "DISCORD": {
+          const { discordWebhookUrl, eventDetails: discordEventDetails } =
+            parsed;
+          if (!discordWebhookUrl || !discordEventDetails) return;
 
-            default:
-              console.warn("Unknown notification type:", type);
-          }
+          await withRetry(
+            () =>
+              sendDiscordNotification(discordWebhookUrl, discordEventDetails),
+            "Notifications.DISCORD",
+            queueName,
+            { discordWebhookUrl, eventDetails: discordEventDetails },
+          );
           break;
         }
 
         default:
-          console.warn("Unknown queue:", queueName);
+          console.warn("Unknown notification type:", type);
       }
+      break;
+    }
+
+    default:
+      console.warn("Unknown queue:", queueName);
+  }
+}
+
+async function processRawQueueMessage(queueName: string, data: string) {
+  if (!QUEUES.includes(queueName as QueueName)) {
+    console.warn("Unknown queue:", queueName);
+    return;
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(data);
+  } catch (error) {
+    console.error("Failed to parse queue payload", error);
+    await pushToDeadLetterQueue(queueName, data, error, "JSON.parse");
+    return;
+  }
+
+  await processQueueMessage(queueName as QueueName, parsed);
+}
+
+export async function notificationWorker() {
+  const inFlight = new Set<Promise<void>>();
+
+  while (true) {
+    try {
+      if (inFlight.size >= MAX_IN_FLIGHT_JOBS) {
+        await Promise.race(inFlight);
+      }
+
+      // Use an infinite blocking pop so Redis wakes the worker only when work exists.
+      const result = await redisSubscriber.brpop(...QUEUES, 0);
+      if (!result) continue;
+
+      const [queueName, data] = result;
+
+      const job = processRawQueueMessage(queueName, data)
+        .catch(async (error) => {
+          console.error("Failed to process queue job", error);
+          await pushToDeadLetterQueue(
+            queueName,
+            data,
+            error,
+            "processRawQueueMessage",
+          );
+        })
+        .finally(() => {
+          inFlight.delete(job);
+        });
+
+      inFlight.add(job);
     } catch (error) {
       console.error("Worker error, retrying...", error);
       await new Promise((r) => setTimeout(r, 1000));

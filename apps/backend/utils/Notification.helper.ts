@@ -1,5 +1,4 @@
 import { prisma } from "@repo/db/client";
-import { toPublicRecordingLink } from "./helpers";
 
 export async function handleProcessingStatus(meetingIdentifier: string) {
   const meeting = await getMeetingByIdentifier(meetingIdentifier);
@@ -37,7 +36,11 @@ export async function handleFailedStatus(meetingIdentifier: string) {
   ]);
 }
 
-export async function handleReadyStatus(meetingIdentifier: string, finalPath: string, version?: string) {
+export async function handleReadyStatus(
+  meetingIdentifier: string,
+  finalPath: string,
+  version?: string,
+) {
   const meeting = await getMeetingByIdentifier(meetingIdentifier);
 
   await prisma.$transaction(async (tx) => {
@@ -81,10 +84,7 @@ export async function handleReadyStatus(meetingIdentifier: string, finalPath: st
 async function getMeetingByIdentifier(meetingIdentifier: string) {
   const meeting = await prisma.meeting.findFirst({
     where: {
-      OR: [
-        { roomId: meetingIdentifier },
-        { id: meetingIdentifier },
-      ],
+      OR: [{ roomId: meetingIdentifier }, { id: meetingIdentifier }],
     },
   });
 
