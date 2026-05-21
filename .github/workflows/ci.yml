@@ -6,7 +6,6 @@ on:
       - "apps/**"
       - "packages/**"
       - "docker/**"
-      - "ops/**"
       - ".github/workflows/**"
       - "turbo.json"
       - "package.json"
@@ -19,7 +18,6 @@ on:
       - "apps/**"
       - "packages/**"
       - "docker/**"
-      - "ops/**"
       - ".github/workflows/**"
       - "turbo.json"
       - "package.json"
@@ -131,6 +129,30 @@ jobs:
           fi
 
           if echo "$CHANGED_FILES" | grep -q '^apps/transcoder/'; then
+            echo "transcoder=true" >> $GITHUB_OUTPUT
+          fi
+
+          if echo "$CHANGED_FILES" | grep -q '^docker/backend\.dockerfile$'; then
+            echo "backend=true" >> $GITHUB_OUTPUT
+          fi
+
+          if echo "$CHANGED_FILES" | grep -q '^docker/frontend\.dockerfile$'; then
+            echo "frontend=true" >> $GITHUB_OUTPUT
+          fi
+
+          if echo "$CHANGED_FILES" | grep -q '^docker/ws-relayer\.dockerfile$'; then
+            echo "ws_relayer=true" >> $GITHUB_OUTPUT
+          fi
+
+          if echo "$CHANGED_FILES" | grep -q '^docker/merger-worker\.dockerfile$'; then
+            echo "merger_worker=true" >> $GITHUB_OUTPUT
+          fi
+
+          if echo "$CHANGED_FILES" | grep -q '^docker/editor-worker\.dockerfile$'; then
+            echo "editor_worker=true" >> $GITHUB_OUTPUT
+          fi
+
+          if echo "$CHANGED_FILES" | grep -q '^docker/transcoder\.dockerfile$'; then
             echo "transcoder=true" >> $GITHUB_OUTPUT
           fi
 
