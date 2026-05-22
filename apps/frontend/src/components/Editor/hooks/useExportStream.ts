@@ -7,6 +7,7 @@ import type { ExportJob } from "../types";
 type ExportStreamHandlers = {
   onProgress?: (progress: number) => void;
   onStatus?: (status: string | null) => void;
+  onEta?: (etaMs: number | null) => void;
   onComplete?: () => void;
   onFailed?: () => void;
 };
@@ -15,6 +16,7 @@ interface StreamEvent {
   type: "status" | "update" | "error";
   job?: ExportJob;
   message?: string;
+  etaMs?: number;
 }
 
 class StreamError extends Error {
@@ -31,6 +33,7 @@ export function useExportStream(
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [etaMs, setEtaMs] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -72,6 +75,11 @@ export function useExportStream(
                     handlers.onFailed?.();
                     abort.abort();
                     return;
+                  }
+
+                  if (data.etaMs !== undefined) {
+                    setEtaMs(data.etaMs);
+                    handlers.onEta?.(data.etaMs);
                   }
 
                   if (data.job) {
@@ -129,5 +137,6 @@ export function useExportStream(
     progress: jobId ? progress : 0,
     status: jobId ? status : null,
     error: jobId ? error : null,
+    etaMs: jobId ? etaMs : null,
   };
 }

@@ -23,6 +23,7 @@ interface ExportDialogProps {
   job: ExportJob;
   exportProgress: number;
   exportStatus: ExportJob["status"];
+  exportEtaMs?: number | null;
   onClose: () => void;
   onCompleted?: () => void;
   onFailed?: () => void;
@@ -44,6 +45,7 @@ export function ExportDialog({
   job,
   exportProgress,
   exportStatus,
+  exportEtaMs,
   onClose,
   onCompleted,
   onFailed,
@@ -52,21 +54,57 @@ export function ExportDialog({
   onNotifyChange,
 }: ExportDialogProps) {
   const [showErrorDetails, setShowErrorDetails] = useState(false);
-  const completionNotifiedRef = useRef(false);
   const prevStatusRef = useRef(exportStatus);
+  const [remainingText, setRemainingText] = useState<string | null>(null);
+  const etaRef = useRef({ value: 0, timestamp: 0 });
+
+  useEffect(() => {
+    if (exportEtaMs == null) {
+      etaRef.current = { value: 0, timestamp: 0 };
+      return;
+    }
+    etaRef.current = { value: exportEtaMs, timestamp: Date.now() };
+  }, [exportEtaMs]);
+
+  useEffect(() => {
+    const tick = () => {
+      const { value, timestamp } = etaRef.current;
+      if (!value || exportStatus !== "PROCESSING") {
+        setRemainingText(null);
+        return;
+      }
+
+      const elapsed = Date.now() - timestamp;
+      const remaining = Math.max(0, value - elapsed);
+      const mins = Math.ceil(remaining / 60000);
+
+      if (mins >= 2) {
+        setRemainingText(`About ${mins} minutes remaining`);
+      } else if (mins === 1) {
+        setRemainingText("About 1 minute remaining");
+      } else {
+        const secs = Math.ceil(remaining / 1000);
+        if (secs > 10) setRemainingText("Less than a minute remaining");
+        else if (secs > 0) setRemainingText("Almost done...");
+        else setRemainingText(null);
+      }
+    };
+
+    tick();
+    const interval = window.setInterval(tick, 1000);
+    return () => window.clearInterval(interval);
+  }, [exportStatus, exportEtaMs]);
 
   useEffect(() => {
     const prev = prevStatusRef.current;
     prevStatusRef.current = exportStatus;
 
     if (exportStatus === "DONE" && prev !== "DONE") {
-      completionNotifiedRef.current = true;
       onCompleted?.();
       return;
     }
 
     if (exportStatus === "FAILED" && prev !== "FAILED") {
-      completionNotifiedRef.current = true;
       onFailed?.();
       return;
     }
@@ -74,6 +112,10 @@ export function ExportDialog({
 
   const isInProgress =
     exportStatus === "QUEUED" || exportStatus === "PROCESSING";
+  const statusLabel =
+    exportStatus === "QUEUED"
+      ? "Waiting for a render slot"
+      : "Rendering and assembling your export";
 
   const currentStepIndex = isInProgress
     ? EXPORT_STEPS.findIndex(
@@ -91,27 +133,51 @@ export function ExportDialog({
     <Dialog open onOpenChange={onClose}>
       <DialogContent
         showCloseButton={false}
-        className="border-[#f5a623]/20 bg-[#0a0a08] text-[#fff5de] sm:max-w-md pt-6"
+        className="border-[#f5a623]/20 bg-[#0a0a08] text-[#fff5de] sm:max-w-lg pt-6 shadow-[0_24px_120px_rgba(0,0,0,0.55)]"
       >
         <DialogHeader className="gap-0.5">
           <DialogTitle className="text-base font-semibold">
             Exporting Video
           </DialogTitle>
-          {exportStatus === "PROCESSING" && (
-            <p className="text-xs text-white/40">About 2 minutes remaining</p>
-          )}
-          {exportStatus === "QUEUED" && (
-            <p className="text-xs text-white/40">Waiting in queue...</p>
-          )}
+          <p className="text-xs text-white/40">
+            {isInProgress
+              ? (remainingText ??
+                "This can continue in the background while you keep working.")
+              : "We’ll keep you posted if the export is still running."}
+          </p>
         </DialogHeader>
 
-        <div className="pt-3 space-y-5">
+        <div className="pt-4 space-y-5">
           {/* ── In progress: progress bar + steps + notify + close ── */}
           {isInProgress && (
             <>
+              <div className="rounded-2xl border border-white/[0.07] bg-white/2.5 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/30">
+                      Current status
+                    </p>
+                    <p className="mt-1 text-sm text-white/80">{statusLabel}</p>
+                  </div>
+                  <div className="rounded-full border border-[#f5a623]/20 bg-[#f5a623]/10 px-3 py-1 text-xs font-semibold text-[#f5a623]">
+                    {exportProgress}%
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+                  <span className="rounded-full border border-white/10 bg-white/3 px-2.5 py-1 text-white/55">
+                    {exportStatus === "QUEUED" ? "Queued" : "Processing"}
+                  </span>
+                  {remainingText && (
+                    <span className="rounded-full border border-[#f5a623]/20 bg-[#f5a623]/10 px-2.5 py-1 text-[#f5a623]">
+                      {remainingText}
+                    </span>
+                  )}
+                </div>
+              </div>
+
               {/* Progress bar */}
               <div className="relative">
-                <div className="h-[10px] w-full rounded-full bg-white/[0.04] overflow-hidden">
+                <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/4">
                   <div
                     className="relative h-full rounded-full bg-[#f5a623] transition-all duration-500 overflow-hidden"
                     style={{ width: `${exportProgress}%` }}
@@ -119,7 +185,7 @@ export function ExportDialog({
                     <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.18),transparent)] animate-shimmer" />
                   </div>
                 </div>
-                <span className="absolute -top-[18px] left-3 text-xs font-mono text-[#f5a623] pointer-events-none">
+                <span className="pointer-events-none absolute -top-4.5 left-1 text-xs font-mono text-[#f5a623]">
                   {exportProgress}%
                 </span>
               </div>
@@ -132,18 +198,18 @@ export function ExportDialog({
                   return (
                     <div
                       key={step.label}
-                      className={`flex items-center gap-3 py-[7px] ${
+                      className={`flex items-center gap-3 py-1.75 ${
                         isCurrent
-                          ? "border-l-2 border-[#f5a623] bg-[rgba(255,160,0,0.06)] -ml-px pl-3 pr-3 rounded-r-[4px]"
-                          : "pl-[18px] pr-3"
+                          ? "border-l-2 border-[#f5a623] bg-[rgba(255,160,0,0.06)] -ml-px pl-3 pr-3 rounded-r-lg"
+                          : "pl-4.5 pr-3"
                       }`}
                     >
                       {isCompleted ? (
-                        <CheckCircle2 className="h-[13px] w-[13px] shrink-0 text-[#22c55e]/60" />
+                        <CheckCircle2 className="h-3.25 w-3.25 shrink-0 text-[#22c55e]/60" />
                       ) : isCurrent ? (
-                        <Loader2 className="h-[15px] w-[15px] shrink-0 animate-spin text-[#f5a623]" />
+                        <Loader2 className="h-3.75 w-3.75 shrink-0 animate-spin text-[#f5a623]" />
                       ) : (
-                        <span className="h-[13px] w-[13px] shrink-0 rounded-full border border-white/25" />
+                        <span className="h-3.25 w-3.25 shrink-0 rounded-full border border-white/25" />
                       )}
                       <span
                         className={
@@ -162,7 +228,7 @@ export function ExportDialog({
               </div>
 
               {/* Notification toggle card */}
-              <div className="rounded-lg border border-white/[0.07] bg-white/[0.02] px-4 py-3">
+              <div className="rounded-2xl border border-white/[0.07] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015))] px-4 py-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <Bell className="h-4 w-4 text-white/45" />
@@ -175,21 +241,21 @@ export function ExportDialog({
                     role="switch"
                     aria-checked={notifyOnComplete}
                     onClick={() => onNotifyChange?.(!notifyOnComplete)}
-                    className={`relative inline-flex h-5 w-[38px] shrink-0 cursor-pointer items-center rounded-full transition-colors ${
+                    className={`relative inline-flex h-5 w-9.5 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
                       notifyOnComplete ? "bg-[#f5a623]" : "bg-white/10"
                     }`}
                   >
                     <span
-                      className={`inline-block h-[14px] w-[14px] transform rounded-full bg-white transition-transform ${
+                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
                         notifyOnComplete
-                          ? "translate-x-[21px]"
-                          : "translate-x-[3px]"
+                          ? "translate-x-5.25"
+                          : "translate-x-0.75"
                       }`}
                     />
                   </button>
                 </div>
                 <p className="mt-1 text-xs text-white/35">
-                  We'll send you an in-app notification
+                  Close this dialog and we’ll keep tracking the export for you.
                 </p>
               </div>
 
@@ -198,7 +264,7 @@ export function ExportDialog({
                 <Button
                   variant="outline"
                   onClick={onClose}
-                  className="border-white/10 text-white/50 hover:text-white/70 hover:bg-white/5 text-sm h-9 px-5 cursor-pointer"
+                  className="h-10 cursor-pointer border-white/10 px-5 text-sm text-white/55 hover:bg-white/5 hover:text-white/80"
                 >
                   Minimize to background
                 </Button>
@@ -214,9 +280,14 @@ export function ExportDialog({
                   <CheckCircle2 className="h-7 w-7 text-[#22c55e]" />
                 </div>
               </div>
-              <p className="text-center text-sm text-white/60">
-                Your video is ready to download.
-              </p>
+              <div className="space-y-1 text-center">
+                <p className="text-sm font-medium text-white/85">
+                  Your video is ready to download.
+                </p>
+                <p className="text-xs text-white/45">
+                  You can download it now or jump back to the dashboard.
+                </p>
+              </div>
               <Button
                 onClick={handleDownload}
                 className="w-full bg-[#f5a623] text-[#0a0a08] hover:bg-[#f5a623]/90 cursor-pointer"
@@ -234,13 +305,6 @@ export function ExportDialog({
                 >
                   <LayoutDashboard className="mr-2 h-4 w-4" />
                   View in Dashboard
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={onClose}
-                  className="flex-1 text-white/40 hover:text-white/60 hover:bg-white/5 cursor-pointer"
-                >
-                  Close
                 </Button>
               </div>
             </div>

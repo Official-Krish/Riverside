@@ -381,14 +381,11 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
 
     // Push notification to user that export is ready
     try {
-      const label =
-        project.meeting.roomName ?? `Project ${projectId.slice(0, 8)}`;
       await publishConnection.lpush(
         "Notifications",
         JSON.stringify({
           userId: project.ownerId,
           type: "RENDER_COMPLETE",
-          message: `Export "${label}" is ready`,
           metadata: {
             jobId,
             projectId,

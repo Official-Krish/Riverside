@@ -7,7 +7,11 @@ import {
   SaveEditorProjectSchema,
 } from "@repo/types";
 import { redisPublisher } from "../utils/redis";
-import { canViewFinalRecording, toPublicRecordingLink } from "../utils/helpers";
+import {
+  canViewFinalRecording,
+  computeEtaMs,
+  toPublicRecordingLink,
+} from "../utils/helpers";
 import { buildS3Key } from "@repo/amazons3";
 import { putObjectToS3 } from "../utils/storage";
 import {
@@ -691,6 +695,7 @@ editorRouter.get("/exports/:jobId/stream", authMiddleware, async (req, res) => {
         id: jobId as string,
         project: { ownerId: userId },
       },
+      include: { project: { select: { durationMs: true } } },
     });
 
     if (!job) {
@@ -699,7 +704,13 @@ editorRouter.get("/exports/:jobId/stream", authMiddleware, async (req, res) => {
       return;
     }
 
-    send({ type: "status", job });
+    const projectDurationMs = job.project?.durationMs ?? null;
+
+    send({
+      type: "status",
+      job,
+      etaMs: computeEtaMs(projectDurationMs, job.startedAt, job.progress),
+    });
 
     if (job.status === "DONE" || job.status === "FAILED") {
       res.end();
@@ -723,7 +734,15 @@ editorRouter.get("/exports/:jobId/stream", authMiddleware, async (req, res) => {
           updated.status !== job.status ||
           updated.progress !== job.progress
         ) {
-          send({ type: "update", job: updated });
+          send({
+            type: "update",
+            job: updated,
+            etaMs: computeEtaMs(
+              projectDurationMs,
+              job.startedAt ?? updated.startedAt,
+              updated.progress,
+            ),
+          });
 
           if (updated.status === "DONE" || updated.status === "FAILED") {
             clearInterval(interval);

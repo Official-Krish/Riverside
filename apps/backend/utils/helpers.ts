@@ -384,3 +384,17 @@ export function formatTime(time: string | Date) {
     timeStyle: "short",
   });
 }
+
+export function computeEtaMs(
+  durationMs: number | null,
+  startedAt: Date | null,
+  progress: number,
+): number | null {
+  if (!durationMs) return null;
+  const initialEstimate = Math.round(durationMs * 1.5);
+  if (!startedAt || progress <= 5) return initialEstimate;
+  const elapsed = Date.now() - startedAt.getTime();
+  if (elapsed <= 0) return initialEstimate;
+  const refined = Math.round((elapsed / progress) * (100 - progress));
+  return Math.max(5000, Math.min(initialEstimate, refined));
+}

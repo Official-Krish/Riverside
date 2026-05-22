@@ -13,7 +13,7 @@ export async function handleJob(payload: RenderPayload): Promise<void> {
   try {
     await prisma.exportJob.update({
       where: { id: jobId, status: "QUEUED" },
-      data: { status: "PROCESSING", error: null },
+      data: { status: "PROCESSING", error: null, startedAt: new Date() },
     });
   } catch {
     log("warn", "Job already processing or not QUEUED — skipping", { jobId });

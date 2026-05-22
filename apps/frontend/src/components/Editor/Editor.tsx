@@ -203,9 +203,9 @@ export function Editor() {
     handleExportFailed,
     resetExport,
     isExporting,
-    setIsExporting,
     exportProgress,
     exportStatus,
+    exportEtaMs,
     notifyOnComplete,
     setNotifyOnComplete,
   } = useExport(project, tracks, overlays, durationMs);
@@ -808,12 +808,11 @@ export function Editor() {
             job={exportJob}
             exportProgress={exportProgress}
             exportStatus={exportStatus as ExportJob["status"]}
+            exportEtaMs={exportEtaMs}
             onClose={() => {
               setShowExportDialog(false);
               if (shouldResetAfterExport) {
                 window.location.href = "/dashboard";
-              } else {
-                setIsExporting(false);
               }
             }}
             onCompleted={() => {
