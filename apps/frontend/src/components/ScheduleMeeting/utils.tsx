@@ -1,4 +1,4 @@
-import { BellOff } from "lucide-react";
+import { Bell } from "lucide-react";
 import { FaDiscord, FaSlack } from "react-icons/fa";
 import { SiGmail } from "react-icons/si";
 
@@ -18,15 +18,15 @@ export const NOTIFICATION_OPTIONS: NotificationOption[] = [
     id: null,
     label: "None",
     description: "No external notification",
-    icon: <BellOff className="size-4" />,
+    icon: <Bell className="size-3.5" />,
     color: "text-[#6b5c35]",
     glow: "",
   },
   {
     id: "GMAIL",
-    label: "Gmail",
-    description: "Send email to each invitee",
-    icon: <SiGmail className="size-4" />,
+    label: "Email",
+    description: "Send email invitations",
+    icon: <SiGmail className="size-3.5" />,
     color: "text-[#ea4335]",
     glow: "shadow-[0_0_16px_rgba(234,67,53,0.25)]",
   },
@@ -34,7 +34,7 @@ export const NOTIFICATION_OPTIONS: NotificationOption[] = [
     id: "SLACK",
     label: "Slack",
     description: "DM invitees via Slack bot",
-    icon: <FaSlack className="size-4" />,
+    icon: <FaSlack className="size-3.5" />,
     color: "text-[#4a154b]",
     glow: "shadow-[0_0_16px_rgba(74,21,75,0.35)]",
   },
@@ -42,7 +42,7 @@ export const NOTIFICATION_OPTIONS: NotificationOption[] = [
     id: "DISCORD",
     label: "Discord",
     description: "Post to Discord webhook",
-    icon: <FaDiscord className="size-4" />,
+    icon: <FaDiscord className="size-3.5" />,
     color: "text-[#5865f2]",
     glow: "shadow-[0_0_16px_rgba(88,101,242,0.3)]",
   },

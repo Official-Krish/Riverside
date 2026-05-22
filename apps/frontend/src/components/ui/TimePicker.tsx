@@ -8,7 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 type DatePickerTimeProps = {
   value?: Date | null;
@@ -36,6 +40,7 @@ export function DatePickerTime({
   timeLabel = "Time",
 }: DatePickerTimeProps) {
   const [open, setOpen] = React.useState(false);
+  const [timeFocused, setTimeFocused] = React.useState(false);
 
   const updateDate = (nextDate?: Date) => {
     if (!nextDate) {
@@ -60,9 +65,12 @@ export function DatePickerTime({
 
   return (
     <FieldGroup className={className}>
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_160px]">
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field>
-          <FieldLabel htmlFor="schedule-date-picker" className="text-xs uppercase tracking-[0.14em] text-[#b49650]/75">
+          <FieldLabel
+            htmlFor="schedule-date-picker"
+            className="text-[12px] font-medium text-[#c8a870]/70"
+          >
             {dateLabel}
           </FieldLabel>
           <Popover open={open} onOpenChange={setOpen}>
@@ -70,7 +78,7 @@ export function DatePickerTime({
               <Button
                 variant="outline"
                 id="schedule-date-picker"
-                className="h-12 w-full justify-between border-white/10 bg-white/4 font-normal text-[#fff5de] hover:bg-white/6"
+                className="h-12 w-full justify-between border-white/12 bg-white/4 font-normal text-[#fff5de] hover:bg-white/6"
               >
                 <span className="inline-flex items-center gap-2">
                   <CalendarDays className="size-4 text-[#f5a623]" />
@@ -79,7 +87,10 @@ export function DatePickerTime({
                 <ChevronDownIcon className="size-4 text-[#b49650]/70" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto overflow-hidden border border-white/10 bg-[#15120d] p-0" align="start">
+            <PopoverContent
+              className="w-auto overflow-hidden border border-white/10 bg-[#15120d] p-0"
+              align="start"
+            >
               <Calendar
                 mode="single"
                 selected={value ?? undefined}
@@ -92,7 +103,10 @@ export function DatePickerTime({
         </Field>
 
         <Field>
-          <FieldLabel htmlFor="schedule-time-picker" className="text-xs uppercase tracking-[0.14em] text-[#b49650]/75">
+          <FieldLabel
+            htmlFor="schedule-time-picker"
+            className="text-[12px] font-medium text-[#c8a870]/70"
+          >
             {timeLabel}
           </FieldLabel>
           <div className="relative">
@@ -101,9 +115,21 @@ export function DatePickerTime({
               id="schedule-time-picker"
               value={formatTimeValue(value)}
               onChange={updateTime}
-              className="h-12 border-white/10 bg-white/4 pl-11 text-sm text-[#fff5de] [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+              onFocus={() => setTimeFocused(true)}
+              onBlur={() => setTimeFocused(false)}
+              className={[
+                "h-12 border-white/12 bg-white/4 pl-11 text-sm outline-none transition focus:border-[#f5a623]/40 focus:ring-2 focus:ring-[#f5a623]/15 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none",
+                value || timeFocused
+                  ? "text-[#fff5de]"
+                  : "text-transparent caret-[#fff5de]",
+              ].join(" ")}
             />
             <Clock3 className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-[#f5a623]" />
+            {!value && !timeFocused ? (
+              <span className="pointer-events-none absolute left-11 top-1/2 -translate-y-1/2 text-sm text-[#b49650]/55">
+                09:00 AM
+              </span>
+            ) : null}
           </div>
         </Field>
       </div>

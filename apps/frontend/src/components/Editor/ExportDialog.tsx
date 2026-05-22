@@ -41,6 +41,14 @@ const EXPORT_STEPS = [
   { label: "Saving and promoting", range: [85, 100] },
 ];
 
+function formatCountdown(remainingMs: number) {
+  const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 export function ExportDialog({
   job,
   exportProgress,
@@ -55,7 +63,9 @@ export function ExportDialog({
 }: ExportDialogProps) {
   const [showErrorDetails, setShowErrorDetails] = useState(false);
   const prevStatusRef = useRef(exportStatus);
-  const [remainingText, setRemainingText] = useState<string | null>(null);
+  const [remainingCountdown, setRemainingCountdown] = useState<string | null>(
+    null,
+  );
   const etaRef = useRef({ value: 0, timestamp: 0 });
 
   useEffect(() => {
@@ -70,24 +80,13 @@ export function ExportDialog({
     const tick = () => {
       const { value, timestamp } = etaRef.current;
       if (!value || exportStatus !== "PROCESSING") {
-        setRemainingText(null);
+        setRemainingCountdown(null);
         return;
       }
 
       const elapsed = Date.now() - timestamp;
       const remaining = Math.max(0, value - elapsed);
-      const mins = Math.ceil(remaining / 60000);
-
-      if (mins >= 2) {
-        setRemainingText(`About ${mins} minutes remaining`);
-      } else if (mins === 1) {
-        setRemainingText("About 1 minute remaining");
-      } else {
-        const secs = Math.ceil(remaining / 1000);
-        if (secs > 10) setRemainingText("Less than a minute remaining");
-        else if (secs > 0) setRemainingText("Almost done...");
-        else setRemainingText(null);
-      }
+      setRemainingCountdown(formatCountdown(remaining));
     };
 
     tick();
@@ -141,8 +140,9 @@ export function ExportDialog({
           </DialogTitle>
           <p className="text-xs text-white/40">
             {isInProgress
-              ? (remainingText ??
-                "This can continue in the background while you keep working.")
+              ? remainingCountdown
+                ? `ETA ${remainingCountdown}`
+                : "This can continue in the background while you keep working."
               : "We’ll keep you posted if the export is still running."}
           </p>
         </DialogHeader>
@@ -167,9 +167,9 @@ export function ExportDialog({
                   <span className="rounded-full border border-white/10 bg-white/3 px-2.5 py-1 text-white/55">
                     {exportStatus === "QUEUED" ? "Queued" : "Processing"}
                   </span>
-                  {remainingText && (
+                  {remainingCountdown && (
                     <span className="rounded-full border border-[#f5a623]/20 bg-[#f5a623]/10 px-2.5 py-1 text-[#f5a623]">
-                      {remainingText}
+                      {remainingCountdown}
                     </span>
                   )}
                 </div>
