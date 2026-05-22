@@ -17,7 +17,6 @@ export function RootLayout() {
   const location = useLocation();
   const { isAuthenticated, name, signOut } = useAuth();
   const isLiveMeeting = location.pathname.startsWith("/meeting/live/");
-  const isLanding = location.pathname === "/";
   const isDashboard = location.pathname === "/dashboard";
 
   useEffect(() => {
@@ -38,7 +37,6 @@ export function RootLayout() {
         {isDashboard || isLiveMeeting ? null : (
           <Appbar
             isLiveMeeting={isLiveMeeting}
-            isLanding={isLanding}
             theme={theme}
             toggleTheme={toggleTheme}
             isAuthenticated={isAuthenticated}

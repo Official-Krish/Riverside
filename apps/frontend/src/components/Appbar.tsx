@@ -11,7 +11,7 @@ type NavItem = {
 
 const authenticatedNavItems: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", end: true },
-  { to: "/meetingSetup", label: "Create or Join Meeting" },
+  { to: "/meetingSetup", label: "New Meeting" },
   { to: "/meeting/schedule", label: "Schedule" },
 ];
 
@@ -23,7 +23,6 @@ const guestNavItems: NavItem[] = [
 
 type AppbarProps = {
   isLiveMeeting: boolean;
-  isLanding: boolean;
   theme: "light" | "dark";
   toggleTheme: () => void;
   isAuthenticated: boolean;
@@ -33,7 +32,6 @@ type AppbarProps = {
 
 export function Appbar({
   isLiveMeeting,
-  isLanding,
   theme,
   toggleTheme,
   isAuthenticated,
@@ -48,63 +46,64 @@ export function Appbar({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
       className={[
-        isLanding
-          ? "fixed top-0 left-0 border-b border-white/15 bg-background/20 backdrop-blur-xl supports-backdrop-filter:bg-background/15"
-          : isLiveMeeting
-            ? "relative"
-            : "sticky top-0",
+        isLiveMeeting
+          ? "relative"
+          : "sticky top-0 border-b border-white/6 bg-background/20 backdrop-blur-xl",
         "z-50 w-full px-6 lg:px-8",
-        !isLanding && "border-b border-white/15 bg-background/80 backdrop-blur-xl",
-      ]
-        .filter(Boolean)
-        .join(" ")}
+      ].join(" ")}
     >
-      <div className="mx-auto flex max-w-7xl items-center justify-between py-4">
+      <div className="mx-auto flex max-w-7xl items-center justify-between py-3.5">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2.5">
+        <Link to="/" className="flex items-center gap-3">
           <img
             src={theme === "dark" ? "/logo-dark.svg" : "/logo-light.svg"}
             alt="Weave logo"
-            className="h-8 w-auto"
+            className="h-9 w-auto"
           />
         </Link>
 
         {/* Nav Links */}
-		<div className="flex">
-			<nav className="hidden items-center gap-7 md:flex mr-6">
-				{navItems.map((item) => (
-					<NavLink
-					key={item.to}
-					to={item.to}
-					end={Boolean(item.end)}
-					className={({ isActive }) =>
-						[
-						"text-sm transition-colors duration-200",
-						isActive
-							? "text-white"
-							: "text-white/50 hover:text-white/90",
-						].join(" ")
-					}
-					>
-					{item.label}
-					</NavLink>
-				))}
-			</nav>
+        <div className="flex items-center gap-4 md:gap-5">
+          <nav className="hidden items-center gap-8 md:flex">
+            {navItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={Boolean(item.end)}
+                className={({ isActive }) =>
+                  [
+                    "relative py-1 text-sm font-medium tracking-wide transition-colors duration-200 after:absolute after:bottom-[-0.45rem] after:left-0 after:h-px after:w-full after:origin-left after:rounded-full after:bg-[#f5a623] after:transition-transform after:duration-200 after:content-['']",
+                    isActive
+                      ? "text-white after:scale-x-100"
+                      : "text-white/60 after:scale-x-0 hover:text-white/90 hover:after:scale-x-100",
+                  ].join(" ")
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
 
-			{/* CTA */}
-			<div className="flex items-center gap-3">
-				{isAuthenticated ? (
-					<ProfileDropdown
-					name={name}
-					theme={theme}
-					toggleTheme={toggleTheme}
-					signOut={signOut}
-					/>
-				) : (
-					<HoverArrowButton href="/signup" label="Try for free" />
-				)}
-			</div>
-		</div>
+          {isAuthenticated ? (
+            <Link
+              to="/pricing"
+              className="hidden rounded-full border border-[#f5a623]/35 px-4 py-2 text-[12.5px] font-semibold text-[#f5c050] transition-colors duration-200 hover:bg-[#f5a623] hover:text-[#0b0b0d] md:inline-flex"
+            >
+              Upgrade
+            </Link>
+          ) : (
+            <HoverArrowButton href="/signup" label="Try for free" />
+          )}
+
+          {isAuthenticated ? (
+            <ProfileDropdown
+              name={name}
+              theme={theme}
+              toggleTheme={toggleTheme}
+              signOut={signOut}
+            />
+          ) : null}
+        </div>
       </div>
     </motion.header>
   );

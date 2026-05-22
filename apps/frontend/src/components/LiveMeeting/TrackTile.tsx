@@ -8,6 +8,18 @@ import {
   VideoOff,
 } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { http } from "@/https";
+import type { UserProfileResponse } from "@repo/types/api";
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
 
 type VideoTrackLike = {
   attach?: (element: HTMLVideoElement) => void;
@@ -36,6 +48,18 @@ export function TrackTile({
   className?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  const { data: profile } = useQuery({
+    queryKey: ["user-profile"],
+    queryFn: async () => {
+      const res = await http.get<UserProfileResponse>("/user/me");
+      return res.data.user;
+    },
+    staleTime: 5 * 60 * 1000,
+    enabled: !!isLocal,
+  });
+
+  const avatarUrl = profile?.avatarUrl;
 
   useEffect(() => {
     const videoElement = videoRef.current;
@@ -89,13 +113,25 @@ export function TrackTile({
         >
           <div
             className={[
-              "flex h-18 w-18 items-center justify-center rounded-full border backdrop-blur-sm",
+              "flex h-18 w-18 items-center justify-center overflow-hidden rounded-full border backdrop-blur-sm",
               isLocal
                 ? "border-sky-300/28 bg-sky-400/12"
                 : "border-[#f5a623]/16 bg-[#2a1c0e]",
             ].join(" ")}
           >
-            <User className="h-8 w-8" />
+            {avatarUrl && avatarUrl !== "null" ? (
+              <img
+                src={avatarUrl}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : title ? (
+              <span className="text-xl font-bold tracking-tight">
+                {getInitials(title)}
+              </span>
+            ) : (
+              <User className="h-8 w-8" />
+            )}
           </div>
         </div>
       )}
@@ -103,7 +139,7 @@ export function TrackTile({
       <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/82 via-black/18 to-transparent" />
       <div
         className={[
-          "pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+          "pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100",
         ].join(" ")}
       />
 

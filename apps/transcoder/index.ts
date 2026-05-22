@@ -22,6 +22,7 @@ import {
   putObjectToS3,
   resolveStorageContext,
 } from "@repo/amazons3";
+import { toWorkerError } from "./errors";
 
 type TranscodePayload = {
   meetingId: string;
@@ -515,7 +516,6 @@ async function workQueue() {
 
     activeJobs++;
 
-    // Run the job asynchronously so the loop can keep consuming (up to MAX_CONCURRENT_JOBS).
     (async () => {
       const tag = `[job:${payload.meetingId}]`;
       try {
@@ -530,7 +530,36 @@ async function workQueue() {
         );
         console.log(`${tag} reported READY`);
       } catch (err) {
-        console.error(`${tag} processing failed:`, (err as Error).message);
+        const workerErr = toWorkerError(err);
+        console.error(`${tag} processing failed:`, {
+          code: workerErr.code,
+          recoverable: workerErr.recoverable,
+          message: workerErr.message,
+        });
+
+        // Push render-failed notification
+        try {
+          await redisClient.lpush(
+            "Notifications",
+            JSON.stringify({
+              userId: payload.meetingId,
+              type: "RENDER_FAILED",
+              message: `Transcode for meeting ${payload.meetingId} failed`,
+              metadata: {
+                meetingId: payload.meetingId,
+                error: workerErr.message,
+                errorCode: workerErr.code,
+                recoverable: workerErr.recoverable,
+              },
+            }),
+          );
+        } catch (notifyErr: any) {
+          console.error(
+            `${tag} failed to push notification:`,
+            notifyErr.message,
+          );
+        }
+
         try {
           await reportWorkerStatus(payload.meetingId, "FAILED");
         } catch (statusErr) {

@@ -8,7 +8,7 @@ export const api = {
       response.data.notifications.map((notification) => ({
         ...notification,
         metadata: notification.metadata ?? undefined,
-      }))
+      })),
     ),
 
   markRead: (id: string): Promise<void> =>
@@ -26,7 +26,13 @@ export const api = {
       .delete("/notifications/delete", { data: { notificationIds: [id] } })
       .then(() => undefined),
 
-  approveRecordingRequest: ({ roomId, notificationId }: NotificationActionInput): Promise<void> =>
+  deleteAllNotifications: (): Promise<void> =>
+    http.delete("/notifications/clear").then(() => undefined),
+
+  approveRecordingRequest: ({
+    roomId,
+    notificationId,
+  }: NotificationActionInput): Promise<void> =>
     http
       .post("/notifications/create", {
         type: "RECORDING_REQUEST_APPROVED",
@@ -35,7 +41,10 @@ export const api = {
       })
       .then(() => undefined),
 
-  denyRecordingRequest: ({ roomId, notificationId }: NotificationActionInput): Promise<void> =>
+  denyRecordingRequest: ({
+    roomId,
+    notificationId,
+  }: NotificationActionInput): Promise<void> =>
     http
       .post("/notifications/create", {
         type: "RECORDING_REQUEST_DENIED",

@@ -1,4 +1,4 @@
-import { Bell, CheckCircle2, Hash, Mail, Webhook, AtSign } from "lucide-react";
+import { Bell, CheckCircle2, Mail, Webhook, AtSign } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { circOut, circIn } from "framer-motion";
 import { NOTIFICATION_OPTIONS, type NotificationSelectorProps } from "./utils";
@@ -19,17 +19,26 @@ export function NotificationSelector({
   discordWebhookUrl,
   setDiscordWebhookUrl,
 }: NotificationSelectorProps) {
+  const helperText =
+    notificationType === "GMAIL"
+      ? "Email invitations will be sent automatically."
+      : notificationType === "SLACK"
+        ? "Slack DM details are required below."
+        : notificationType === "DISCORD"
+          ? "Discord webhook details are required below."
+          : "No external notification. Participants will still see the meeting in-app.";
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <Bell className="size-3.5 text-[#f5a623]/70" />
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#b49650]/75">
-          Notify via
+        <p className="text-[12px] font-medium text-[#c8a870]/70">
+          Notify participants via
         </p>
       </div>
 
       {/* Channel pills */}
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {NOTIFICATION_OPTIONS.map((opt) => {
           const isSelected = notificationType === opt.id;
           return (
@@ -37,22 +46,26 @@ export function NotificationSelector({
               key={String(opt.id)}
               type="button"
               onClick={() => setNotificationType(opt.id)}
-              className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition-all duration-200 cursor-pointer
+              className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-semibold transition-all duration-200 cursor-pointer
                 ${
                   isSelected
-                    ? "border-[#f5a623]/50 bg-[#f5a623]/12 text-[#ffd166]"
+                    ? "border-[#f5a623]/50 bg-[#f5a623]/12 text-[#ffd166] shadow-[0_0_0_1px_rgba(245,166,35,0.12)]"
                     : "border-white/10 bg-white/4 text-[#fff5de]/60 hover:border-white/20 hover:text-[#fff5de]/90"
                 }`}
             >
-              <span className={isSelected ? "text-[#f5a623]" : "text-[#b49650]/60"}>
+              <span
+                className={isSelected ? "text-[#f5a623]" : "text-[#b49650]/60"}
+              >
                 {opt.icon}
               </span>
               {opt.label}
-              {isSelected && <CheckCircle2 className="size-3.5 text-[#f5a623]" />}
+              {isSelected && <CheckCircle2 className="size-3 text-[#f5a623]" />}
             </button>
           );
         })}
       </div>
+
+      <p className="text-[11px] leading-5 text-[#b49650]/60">{helperText}</p>
 
       {/* Credentials panel */}
       <AnimatePresence mode="wait">
@@ -63,15 +76,14 @@ export function NotificationSelector({
             initial="hidden"
             animate="show"
             exit="exit"
-            className="rounded-2xl border border-[#ea4335]/20 bg-[#ea4335]/5 p-4 space-y-3"
+            className="rounded-2xl border border-white/8 bg-white/4 px-4 py-3"
           >
-            <div className="flex items-center gap-2 mb-1">
-              <Mail className="size-4 text-[#ea4335]" />
-              <p className="text-sm font-bold text-[#fff5de]">Gmail notification</p>
+            <div className="flex items-center gap-2">
+              <Mail className="size-3.5 text-[#ea4335]" />
+              <p className="text-sm text-[#fff5de]/78">
+                Email invitations will be sent automatically.
+              </p>
             </div>
-            <p className="text-xs text-[#b49650]/65 leading-5">
-              Each invitee will receive a branded email invitation via Weave's mail service. No extra credentials required.
-            </p>
           </motion.div>
         )}
 
@@ -82,38 +94,31 @@ export function NotificationSelector({
             initial="hidden"
             animate="show"
             exit="exit"
-            className="rounded-2xl border border-[#4a154b]/40 bg-[#4a154b]/10 p-4 space-y-3"
+            className="rounded-2xl border border-white/8 bg-white/4 p-4 space-y-3"
           >
-            <div className="flex items-center gap-2 mb-1">
-              <Hash className="size-4 text-[#9b59b6]" />
-              <p className="text-sm font-bold text-[#fff5de]">Slack credentials</p>
-            </div>
-            <p className="text-xs text-[#b49650]/65 leading-5">
-              Your bot will send a DM to the target user. The bot must already be in the workspace.
-            </p>
             <div className="space-y-2.5">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-[0.12em] text-[#b49650]/60">
+                <label className="text-[11px] font-medium text-[#c8a870]/70">
                   Bot Token
                 </label>
                 <input
                   value={slackBotToken}
                   onChange={(e) => setSlackBotToken(e.target.value)}
                   placeholder="xoxb-..."
-                  className="h-10 w-full rounded-xl border border-white/10 bg-white/4 px-3 font-mono text-xs text-[#fff5de] outline-none transition focus:border-[#9b59b6]/50 focus:ring-2 focus:ring-[#9b59b6]/15"
+                  className="h-10 w-full rounded-xl border border-white/12 bg-black/20 px-3 font-mono text-xs text-[#fff5de] outline-none transition focus:border-[#f5a623]/35 focus:ring-2 focus:ring-[#f5a623]/12"
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-[0.12em] text-[#b49650]/60">
+                <label className="text-[11px] font-medium text-[#c8a870]/70">
                   Slack User ID
                 </label>
                 <div className="relative">
-                  <AtSign className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-[#b49650]/40 pointer-events-none" />
+                  <AtSign className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-[#b49650]/40" />
                   <input
                     value={slackUserId}
                     onChange={(e) => setSlackUserId(e.target.value)}
                     placeholder="U0123456789"
-                    className="h-10 w-full rounded-xl border border-white/10 bg-white/4 pl-8 pr-3 font-mono text-xs text-[#fff5de] outline-none transition focus:border-[#9b59b6]/50 focus:ring-2 focus:ring-[#9b59b6]/15"
+                    className="h-10 w-full rounded-xl border border-white/12 bg-black/20 pl-8 pr-3 font-mono text-xs text-[#fff5de] outline-none transition focus:border-[#f5a623]/35 focus:ring-2 focus:ring-[#f5a623]/12"
                   />
                 </div>
               </div>
@@ -128,24 +133,23 @@ export function NotificationSelector({
             initial="hidden"
             animate="show"
             exit="exit"
-            className="rounded-2xl border border-[#5865f2]/30 bg-[#5865f2]/8 p-4 space-y-3"
+            className="rounded-2xl border border-white/8 bg-white/4 p-4 space-y-3"
           >
-            <div className="flex items-center gap-2 mb-1">
-              <Webhook className="size-4 text-[#5865f2]" />
-              <p className="text-sm font-bold text-[#fff5de]">Discord webhook</p>
+            <div className="flex items-center gap-2">
+              <Webhook className="size-3.5 text-[#5865f2]" />
+              <p className="text-sm text-[#fff5de]/78">
+                Paste a Discord channel webhook URL below.
+              </p>
             </div>
-            <p className="text-xs text-[#b49650]/65 leading-5">
-              Paste a Discord channel webhook URL. The bot will post a rich embed card with all meeting details.
-            </p>
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-[0.12em] text-[#b49650]/60">
+              <label className="text-[11px] font-medium text-[#c8a870]/70">
                 Webhook URL
               </label>
               <input
                 value={discordWebhookUrl}
                 onChange={(e) => setDiscordWebhookUrl(e.target.value)}
                 placeholder="https://discord.com/api/webhooks/..."
-                className="h-10 w-full rounded-xl border border-white/10 bg-white/4 px-3 font-mono text-xs text-[#fff5de] outline-none transition focus:border-[#5865f2]/50 focus:ring-2 focus:ring-[#5865f2]/15"
+                className="h-10 w-full rounded-xl border border-white/12 bg-black/20 px-3 font-mono text-xs text-[#fff5de] outline-none transition focus:border-[#f5a623]/35 focus:ring-2 focus:ring-[#f5a623]/12"
               />
             </div>
           </motion.div>

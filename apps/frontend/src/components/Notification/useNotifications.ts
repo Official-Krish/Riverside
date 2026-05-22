@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type Filter, type Notification } from "./types";
 import { api } from "./api";
@@ -17,15 +17,41 @@ export function useNotifications(
   const queryClient = useQueryClient();
   const [activeFilter, setActiveFilter] = useState<Filter>("All");
   const displayName = name?.trim() || "Guest";
+  const prevUnreadRef = useRef(0);
 
   const notificationsQuery = useQuery({
     queryKey: notificationsQueryKey,
     queryFn: api.getNotifications,
     enabled: isAuthenticated,
-    refetchInterval: 30_000,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      const hasUnread = data?.some((n) => !n.isRead) ?? false;
+      return hasUnread ? 10_000 : 30_000;
+    },
   });
 
-  const notifications = notificationsQuery.data ?? [];
+  const notifications = useMemo(
+    () => notificationsQuery.data ?? [],
+    [notificationsQuery.data],
+  );
+
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  useEffect(() => {
+    const previousUnread = prevUnreadRef.current;
+
+    if (unreadCount > previousUnread && previousUnread > 0) {
+      const newCount = unreadCount - previousUnread;
+      const newNotifs = notifications
+        .filter((n) => !n.isRead)
+        .slice(0, newCount);
+      for (const n of newNotifs) {
+        toast.info(n.message, { duration: 5000 });
+      }
+    }
+
+    prevUnreadRef.current = unreadCount;
+  }, [notifications, unreadCount]);
 
   const markRead = useMutation({
     mutationFn: api.markRead,
@@ -89,6 +115,24 @@ export function useNotifications(
     onError: (_e, _id, ctx) => {
       queryClient.setQueryData(notificationsQueryKey, ctx?.prev);
       toast.error("Failed to delete notification");
+    },
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: notificationsQueryKey }),
+  });
+
+  const deleteAll = useMutation({
+    mutationFn: api.deleteAllNotifications,
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: notificationsQueryKey });
+      const prev = queryClient.getQueryData<Notification[]>(
+        notificationsQueryKey,
+      );
+      queryClient.setQueryData<Notification[]>(notificationsQueryKey, []);
+      return { prev };
+    },
+    onError: (error, _v, ctx) => {
+      queryClient.setQueryData(notificationsQueryKey, ctx?.prev);
+      toast.error(getHttpErrorMessage(error, "Failed to delete notifications"));
     },
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: notificationsQueryKey }),
@@ -175,6 +219,7 @@ export function useNotifications(
     markRead,
     markAllRead,
     deleteNotif,
+    deleteAll,
     acceptRecording,
     acceptInvite,
     declineRecording,

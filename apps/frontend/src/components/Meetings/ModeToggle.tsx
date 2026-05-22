@@ -5,13 +5,15 @@ type ModeToggleProps = {
 
 export function ModeToggle({ mode, onChange }: ModeToggleProps) {
   return (
-    <div className="inline-flex rounded-full border border-border bg-card p-1">
+    <div className="grid grid-cols-2 rounded-[16px] border border-white/8 bg-black/20 p-1.5">
       <button
         type="button"
         onClick={() => onChange("create")}
         className={[
-          "rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] transition",
-          mode === "create" ? "bg-primary text-primary-foreground" : "text-muted-foreground",
+          "rounded-[12px] px-4 py-2 text-sm font-semibold transition cursor-pointer",
+          mode === "create"
+            ? "bg-[#f5a623] text-[#1b1100] shadow-[0_10px_22px_rgba(245,166,35,0.18)]"
+            : "text-[#c8a870]/60 hover:bg-white/4 hover:text-[#fff5de]",
         ].join(" ")}
       >
         Create
@@ -20,8 +22,10 @@ export function ModeToggle({ mode, onChange }: ModeToggleProps) {
         type="button"
         onClick={() => onChange("join")}
         className={[
-          "rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] transition",
-          mode === "join" ? "bg-primary text-primary-foreground" : "text-muted-foreground",
+          "rounded-[12px] px-4 py-2 text-sm font-semibold transition cursor-pointer",
+          mode === "join"
+            ? "bg-[#f5a623] text-[#1b1100] shadow-[0_10px_22px_rgba(245,166,35,0.18)]"
+            : "text-[#c8a870]/60 hover:bg-white/4 hover:text-[#fff5de]",
         ].join(" ")}
       >
         Join

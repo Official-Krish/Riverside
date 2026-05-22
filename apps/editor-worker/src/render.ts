@@ -21,6 +21,7 @@ import {
 import { downloadSourceToLocal } from "./storage";
 import { generateTemplateOverlays } from "./presets";
 import { materializeClipEffectsAssets } from "./effects/materialize";
+import { publishConnection } from "./redis";
 
 async function validatePartFile(partPath: string): Promise<void> {
   try {
@@ -377,6 +378,27 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
       publicFinalPath,
       transcodeQueue: CONFIG.TRANSCODE_QUEUE_NAME,
     });
+
+    // Push notification to user that export is ready
+    try {
+      await publishConnection.lpush(
+        "Notifications",
+        JSON.stringify({
+          userId: project.ownerId,
+          type: "RENDER_COMPLETE",
+          metadata: {
+            jobId,
+            projectId,
+            downloadUrl: publicFinalPath,
+          },
+        }),
+      );
+    } catch (notifyErr: any) {
+      log("warn", "Failed to push render-complete notification", {
+        jobId,
+        err: notifyErr.message,
+      });
+    }
   } finally {
     // Clean up temp files and intermediates.
     // Use force: true so already-deleted files (e.g. outputPath after promotion) don't throw.

@@ -305,6 +305,7 @@ model ExportJob {
   outputUrl String?
   progress  Int          @default(0)
   error     String?
+  startedAt DateTime?
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt  
 
@@ -396,6 +397,10 @@ enum NotificationType {
   RECORDING_REQUEST_DENIED
   RECORDING_READY
   RECORDING_FAILED
+  RENDER_COMPLETE
+  RENDER_FAILED
+  MERGE_COMPLETE
+  MERGE_FAILED
   OTHER
 }
 

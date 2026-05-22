@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { editorApi } from "../api";
 import type { EditorProject, Track, Overlay, Asset } from "../types";
+import { handleApiError } from "@/lib/errorHandler";
 
 export function useEditorProject(
   meetingId: string | undefined,
@@ -14,7 +15,12 @@ export function useEditorProject(
   setSourceUrl: (url: string) => void,
   setActiveAssetId: (id: string | null) => void,
   resetHistory: (initialTracks: Track[], initialOverlays: Overlay[]) => void,
-  extractThumbnailsForAsset: (assetId: string, url: string, durationMs: number) => Promise<void>
+  extractThumbnailsForAsset: (
+    assetId: string,
+    url: string,
+    durationMs: number,
+  ) => Promise<void>,
+  pauseSaving?: boolean,
 ) {
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState<EditorProject | null>(null);
@@ -39,25 +45,32 @@ export function useEditorProject(
         setTracks(projectData.tracks || []);
         setOverlays(projectData.overlays || []);
         setDurationMs(projectData.durationMs || 0);
-        
-        const assetsMap = Object.fromEntries((projectData.assets || []).map((a) => [a.id, a]));
+
+        const assetsMap = Object.fromEntries(
+          (projectData.assets || []).map((a) => [a.id, a]),
+        );
         setAssetsById(assetsMap);
-        
+
         resetHistory(projectData.tracks || [], projectData.overlays || []);
 
-        const videoAsset = projectData.assets?.find((a) => a.assetType === "VIDEO");
+        const videoAsset = projectData.assets?.find(
+          (a) => a.assetType === "VIDEO",
+        );
         if (videoAsset?.url) {
           setSourceUrl(videoAsset.url);
           setActiveAssetId(videoAsset.id);
         }
 
-        const existingVideoTrack = (projectData.tracks || []).find((t) => t.type === "VIDEO");
+        const existingVideoTrack = (projectData.tracks || []).find(
+          (t) => t.type === "VIDEO",
+        );
         const hasClips = (projectData.tracks || []).some(
-          (t) => t.type === "VIDEO" && t.clips && t.clips.length > 0
+          (t) => t.type === "VIDEO" && t.clips && t.clips.length > 0,
         );
 
         if (!hasClips && videoAsset?.url) {
-          let assetDuration = videoAsset.durationMs || projectData.durationMs || 0;
+          let assetDuration =
+            videoAsset.durationMs || projectData.durationMs || 0;
 
           if (assetDuration <= 0) {
             try {
@@ -69,7 +82,7 @@ export function useEditorProject(
                   const dur = Math.round((probe.duration || 1) * 1000);
                   resolve(dur);
                 };
-                probe.onerror = () => resolve(60000); 
+                probe.onerror = () => resolve(60000);
               });
             } catch {
               assetDuration = 60000;
@@ -87,9 +100,7 @@ export function useEditorProject(
 
           if (existingVideoTrack) {
             const updatedTracks = (projectData.tracks || []).map((t) =>
-              t.id === existingVideoTrack.id
-                ? { ...t, clips: [newClip] }
-                : t
+              t.id === existingVideoTrack.id ? { ...t, clips: [newClip] } : t,
             );
             setTracks(updatedTracks);
           } else {
@@ -107,20 +118,26 @@ export function useEditorProject(
 
           if (assetDuration > 0) setDurationMs(assetDuration);
 
-          void extractThumbnailsForAsset(videoAsset.id, videoAsset.url, assetDuration);
+          void extractThumbnailsForAsset(
+            videoAsset.id,
+            videoAsset.url,
+            assetDuration,
+          );
         } else if (videoAsset?.url) {
           void extractThumbnailsForAsset(
             videoAsset.id,
             videoAsset.url,
-            videoAsset.durationMs || projectData.durationMs || 0
+            videoAsset.durationMs || projectData.durationMs || 0,
           );
         }
       } catch (error) {
-        const status = (error as { response?: { status?: number } })?.response?.status;
+        const status = (error as { response?: { status?: number } })?.response
+          ?.status;
         if (status === 403) {
           setAccessDenied(true);
+          return;
         }
-        console.error("Failed to initialize project:", error);
+        handleApiError(error, "Failed to initialize project");
       } finally {
         setLoading(false);
       }
@@ -130,7 +147,7 @@ export function useEditorProject(
   }, [meetingId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!project || !tracks.length) return;
+    if (!project || !tracks.length || pauseSaving) return;
 
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
@@ -148,7 +165,7 @@ export function useEditorProject(
           height: project.height ?? 1080,
         });
       } catch (error) {
-        console.error("Failed to save project:", error);
+        handleApiError(error, "Failed to save project");
       } finally {
         setSaving(false);
       }
@@ -159,7 +176,7 @@ export function useEditorProject(
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [project, tracks, overlays, durationMs]);
+  }, [project, tracks, overlays, durationMs, pauseSaving]);
 
   return { project, loading, saving, accessDenied };
 }

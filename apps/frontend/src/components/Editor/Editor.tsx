@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
-import type { Track, Overlay, Asset, PresetType } from "./types";
+import type { ExportJob, Track, Overlay, Asset, PresetType } from "./types";
 import type { TransitionType } from "./transitions/types";
 import { Timeline } from "./Timeline";
 import { ExportDialog } from "./ExportDialog";
@@ -191,10 +191,24 @@ export function Editor() {
     setActiveAssetId,
     resetHistory,
     extractThumbnailsForAsset,
+    false,
   );
 
-  const { exportJob, showExportDialog, setShowExportDialog, handleExport } =
-    useExport(project, tracks, overlays, durationMs);
+  const {
+    exportJob,
+    showExportDialog,
+    setShowExportDialog,
+    handleExport,
+    handleExportComplete,
+    handleExportFailed,
+    resetExport,
+    isExporting,
+    exportProgress,
+    exportStatus,
+    exportEtaMs,
+    notifyOnComplete,
+    setNotifyOnComplete,
+  } = useExport(project, tracks, overlays, durationMs);
 
   const { handleDeleteOverlay, handleUpdateOverlay, handleAddOverlay } =
     useOverlayOperations(setOverlays);
@@ -283,17 +297,18 @@ export function Editor() {
     });
   }, [tracks, assetsById]);
 
-  const { handleClipFilePicked, handleAudioFilePicked } = useMediaUpload(
-    project,
-    tracks,
-    setTracks,
-    setAssetsById,
-    setDurationMs,
-    sourceUrl,
-    setSourceUrl,
-    setActiveAssetId,
-    extractThumbnailsForAsset,
-  );
+  const { handleClipFilePicked, handleAudioFilePicked, pendingUploads } =
+    useMediaUpload(
+      project,
+      tracks,
+      setTracks,
+      setAssetsById,
+      setDurationMs,
+      sourceUrl,
+      setSourceUrl,
+      setActiveAssetId,
+      extractThumbnailsForAsset,
+    );
 
   const handleApplyPreset = useCallback((preset: PresetType | null) => {
     if (preset === null) {
@@ -709,7 +724,15 @@ export function Editor() {
                 onRedo={handleRedoWithToast}
                 canUndo={canUndo}
                 canRedo={canRedo}
-                onExport={handleExport}
+                onExport={() => {
+                  if (pendingUploads > 0) {
+                    toast.info(
+                      "Please wait for uploads to finish before exporting.",
+                    );
+                    return;
+                  }
+                  handleExport();
+                }}
                 saving={saving}
                 tracks={tracks}
               />
@@ -783,14 +806,41 @@ export function Editor() {
         {showExportDialog && exportJob && (
           <ExportDialog
             job={exportJob}
+            exportProgress={exportProgress}
+            exportStatus={exportStatus as ExportJob["status"]}
+            exportEtaMs={exportEtaMs}
             onClose={() => {
               setShowExportDialog(false);
               if (shouldResetAfterExport) {
                 window.location.href = "/dashboard";
               }
             }}
-            onCompleted={() => setShouldResetAfterExport(true)}
+            onCompleted={() => {
+              setShouldResetAfterExport(true);
+              handleExportComplete();
+            }}
+            onFailed={handleExportFailed}
+            onRetry={() => {
+              resetExport();
+              setTimeout(handleExport, 100);
+            }}
+            notifyOnComplete={notifyOnComplete}
+            onNotifyChange={setNotifyOnComplete}
           />
+        )}
+
+        {/* Export blocking overlay */}
+        {isExporting && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/70 backdrop-blur-md">
+            <Loader2 className="h-12 w-12 animate-spin text-[#f5a623]" />
+            <p className="mt-4 text-lg font-semibold text-white">
+              Export in progress...
+            </p>
+            <p className="text-sm text-white/60">{exportProgress}% complete</p>
+            <p className="mt-2 text-xs text-white/40">
+              You'll be notified when it's ready
+            </p>
+          </div>
         )}
       </div>
     </>

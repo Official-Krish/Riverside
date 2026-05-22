@@ -81,7 +81,7 @@ GoogleRouter.get("/auth/callback", async (req, res) => {
 
     const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
     const { data } = await oauth2.userinfo.get();
-    const { id: googleId, email, name } = data;
+    const { id: googleId, email, name, picture } = data;
 
     if (!email) {
       return res.status(401).json({ message: "No email from Google" });
@@ -105,6 +105,7 @@ GoogleRouter.get("/auth/callback", async (req, res) => {
         googleId,
         googleRefreshToken: tokens.refresh_token,
         isVerified: true,
+        avatarUrl: picture ?? "",
       },
     });
 

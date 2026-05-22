@@ -7,7 +7,11 @@ import {
   SaveEditorProjectSchema,
 } from "@repo/types";
 import { redisPublisher } from "../utils/redis";
-import { canViewFinalRecording, toPublicRecordingLink } from "../utils/helpers";
+import {
+  canViewFinalRecording,
+  computeEtaMs,
+  toPublicRecordingLink,
+} from "../utils/helpers";
 import { buildS3Key } from "@repo/amazons3";
 import { putObjectToS3 } from "../utils/storage";
 import {
@@ -359,13 +363,17 @@ editorRouter.put("/projects/:id", authMiddleware, async (req, res) => {
               };
             });
 
-          if (validClips.length !== track.clips.length) {
-            throw new Error("Invalid sourceAssetId in clips");
+          if (validClips.length === 0 && track.clips.length > 0) {
+            console.warn(
+              `Track ${track.id}: all ${track.clips.length} clips skipped — assets not yet uploaded`,
+            );
           }
 
-          await tx.editorClip.createMany({
-            data: validClips,
-          });
+          if (validClips.length > 0) {
+            await tx.editorClip.createMany({
+              data: validClips,
+            });
+          }
         }
       }
 
@@ -475,6 +483,10 @@ editorRouter.post(
         typeof req.body?.assetType === "string"
           ? String(req.body.assetType).toUpperCase()
           : null;
+      const providedAssetId =
+        typeof req.body?.assetId === "string" && req.body.assetId.trim()
+          ? req.body.assetId.trim()
+          : null;
       const isAudio = file.mimetype?.startsWith("audio/");
       const assetType =
         explicitAssetType === "AUDIO" || explicitAssetType === "VIDEO"
@@ -490,6 +502,7 @@ editorRouter.post(
 
       const asset = await prisma.editorAsset.create({
         data: {
+          ...(providedAssetId ? { id: providedAssetId } : {}),
           projectId,
           meetingId: project.meetingId,
           assetType,
@@ -659,6 +672,96 @@ editorRouter.get("/exports/:jobId", authMiddleware, async (req, res) => {
   } catch (error) {
     console.error("Error fetching export job:", error);
     return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+editorRouter.get("/exports/:jobId/stream", authMiddleware, async (req, res) => {
+  const userId = req.userId!;
+  const jobId = req.params.jobId;
+
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+  });
+
+  const send = (data: unknown) => {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  try {
+    const job = await prisma.exportJob.findFirst({
+      where: {
+        id: jobId as string,
+        project: { ownerId: userId },
+      },
+      include: { project: { select: { durationMs: true } } },
+    });
+
+    if (!job) {
+      send({ type: "error", message: "Export job not found" });
+      res.end();
+      return;
+    }
+
+    const projectDurationMs = job.project?.durationMs ?? null;
+
+    send({
+      type: "status",
+      job,
+      etaMs: computeEtaMs(projectDurationMs, job.startedAt, job.progress),
+    });
+
+    if (job.status === "DONE" || job.status === "FAILED") {
+      res.end();
+      return;
+    }
+
+    const interval = setInterval(async () => {
+      try {
+        const updated = await prisma.exportJob.findUnique({
+          where: { id: jobId as string },
+        });
+
+        if (!updated) {
+          send({ type: "error", message: "Export job deleted" });
+          clearInterval(interval);
+          res.end();
+          return;
+        }
+
+        if (
+          updated.status !== job.status ||
+          updated.progress !== job.progress
+        ) {
+          send({
+            type: "update",
+            job: updated,
+            etaMs: computeEtaMs(
+              projectDurationMs,
+              job.startedAt ?? updated.startedAt,
+              updated.progress,
+            ),
+          });
+
+          if (updated.status === "DONE" || updated.status === "FAILED") {
+            clearInterval(interval);
+            res.end();
+          }
+        }
+      } catch {
+        clearInterval(interval);
+        res.end();
+      }
+    }, 1000);
+
+    req.on("close", () => {
+      clearInterval(interval);
+    });
+  } catch (error) {
+    console.error("Error setting up SSE stream:", error);
+    send({ type: "error", message: "Internal server error" });
+    res.end();
   }
 });
 
