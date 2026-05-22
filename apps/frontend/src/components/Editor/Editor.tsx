@@ -193,8 +193,18 @@ export function Editor() {
     extractThumbnailsForAsset,
   );
 
-  const { exportJob, showExportDialog, setShowExportDialog, handleExport } =
-    useExport(project, tracks, overlays, durationMs);
+  const {
+    exportJob,
+    showExportDialog,
+    setShowExportDialog,
+    handleExport,
+    handleExportComplete,
+    handleExportFailed,
+    isExporting,
+    exportProgress,
+    notifyOnComplete,
+    setNotifyOnComplete,
+  } = useExport(project, tracks, overlays, durationMs);
 
   const { handleDeleteOverlay, handleUpdateOverlay, handleAddOverlay } =
     useOverlayOperations(setOverlays);
@@ -789,8 +799,28 @@ export function Editor() {
                 window.location.href = "/dashboard";
               }
             }}
-            onCompleted={() => setShouldResetAfterExport(true)}
+            onCompleted={() => {
+              setShouldResetAfterExport(true);
+              handleExportComplete();
+            }}
+            onFailed={handleExportFailed}
+            notifyOnComplete={notifyOnComplete}
+            onNotifyChange={setNotifyOnComplete}
           />
+        )}
+
+        {/* Export blocking overlay */}
+        {isExporting && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/70 backdrop-blur-md">
+            <Loader2 className="h-12 w-12 animate-spin text-[#f5a623]" />
+            <p className="mt-4 text-lg font-semibold text-white">
+              Export in progress...
+            </p>
+            <p className="text-sm text-white/60">{exportProgress}% complete</p>
+            <p className="mt-2 text-xs text-white/40">
+              You'll be notified when it's ready
+            </p>
+          </div>
         )}
       </div>
     </>

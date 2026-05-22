@@ -75,6 +75,36 @@ export async function handleJob(payload: RenderPayload): Promise<void> {
         }
       }
       log("error", "Job permanently failed", { jobId, projectId });
+
+      // Push notification to user that export failed
+      try {
+        const project = await prisma.editorProject.findUnique({
+          where: { id: projectId },
+          select: { ownerId: true, meeting: { select: { roomName: true } } },
+        });
+        if (project) {
+          const label =
+            project.meeting.roomName ?? `Project ${projectId.slice(0, 8)}`;
+          await publishConnection.rpush(
+            "Notifications",
+            JSON.stringify({
+              userId: project.ownerId,
+              type: "RENDER_FAILED",
+              message: `Export "${label}" failed`,
+              metadata: {
+                jobId,
+                projectId,
+                error: err.message,
+              },
+            }),
+          );
+        }
+      } catch (notifyErr: any) {
+        log("warn", "Failed to push render-failed notification", {
+          jobId,
+          err: notifyErr.message,
+        });
+      }
     }
   }
 }
