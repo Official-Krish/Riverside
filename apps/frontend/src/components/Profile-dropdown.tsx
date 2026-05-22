@@ -7,12 +7,14 @@ import {
   Sparkles,
   UserPen,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import type { UserProfileResponse } from "@repo/types/api";
 import { http } from "../https";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import type { Notification } from "./Notification/types";
+import { notificationsQueryKey } from "./Notification/useNotifications";
 
 type ProfileDropdownProps = {
   name?: string | null;
@@ -44,6 +46,12 @@ export function ProfileDropdown({
     },
     staleTime: 5 * 60 * 1000,
   });
+
+  const queryClient = useQueryClient();
+  const cachedNotifs = queryClient.getQueryData<Notification[]>(
+    notificationsQueryKey,
+  );
+  const unreadCount = cachedNotifs?.filter((n) => !n.isRead).length ?? 0;
 
   const displayName =
     profileQuery.data?.name?.trim() || name?.trim() || "Weave User";
@@ -199,13 +207,20 @@ export function ProfileDropdown({
                 icon={<UserPen className="size-3.5 cursor-pointer" />}
                 shortcut="E"
               />
-              <MenuButton
-                theme={theme}
-                label="Notifications"
-                onClick={() => navigate("/notifications")}
-                icon={<Bell className="size-3.5 cursor-pointer" />}
-                shortcut="W"
-              />
+              <div className="relative">
+                <MenuButton
+                  theme={theme}
+                  label="Notifications"
+                  onClick={() => navigate("/notifications")}
+                  icon={<Bell className="size-3.5 cursor-pointer" />}
+                  shortcut="W"
+                />
+                {unreadCount > 0 && (
+                  <span className="absolute right-10 top-1/2 -translate-y-1/2 flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-[#f5a623] px-1 text-[10px] font-bold text-black leading-none">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </div>
               <MenuButton
                 theme={theme}
                 label="Theme (Coming soon)"

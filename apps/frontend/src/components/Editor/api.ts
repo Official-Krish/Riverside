@@ -65,6 +65,7 @@ export const editorApi = {
     file: File,
     durationMs?: number,
     assetType?: "VIDEO" | "AUDIO",
+    assetId?: string,
   ): Promise<{
     id: string;
     assetType: "VIDEO" | "AUDIO";
@@ -78,6 +79,9 @@ export const editorApi = {
     }
     if (assetType) {
       formData.append("assetType", assetType);
+    }
+    if (assetId) {
+      formData.append("assetId", assetId);
     }
     const response = await http.post<{
       asset: {

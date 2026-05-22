@@ -16,6 +16,7 @@
     "@fontsource/epilogue": "^5.2.8",
     "@fontsource/syne": "^5.2.7",
     "@jitsi/react-sdk": "^1.4.4",
+    "@microsoft/fetch-event-source": "^2.0.1",
     "@react-oauth/google": "^0.13.5",
     "@repo/types": "workspace:*",
     "@tabler/icons-react": "^3.41.1",

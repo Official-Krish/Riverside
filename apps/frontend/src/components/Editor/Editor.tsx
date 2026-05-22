@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
-import type { Track, Overlay, Asset, PresetType } from "./types";
+import type { ExportJob, Track, Overlay, Asset, PresetType } from "./types";
 import type { TransitionType } from "./transitions/types";
 import { Timeline } from "./Timeline";
 import { ExportDialog } from "./ExportDialog";
@@ -191,6 +191,7 @@ export function Editor() {
     setActiveAssetId,
     resetHistory,
     extractThumbnailsForAsset,
+    false,
   );
 
   const {
@@ -200,8 +201,11 @@ export function Editor() {
     handleExport,
     handleExportComplete,
     handleExportFailed,
+    resetExport,
     isExporting,
+    setIsExporting,
     exportProgress,
+    exportStatus,
     notifyOnComplete,
     setNotifyOnComplete,
   } = useExport(project, tracks, overlays, durationMs);
@@ -293,17 +297,18 @@ export function Editor() {
     });
   }, [tracks, assetsById]);
 
-  const { handleClipFilePicked, handleAudioFilePicked } = useMediaUpload(
-    project,
-    tracks,
-    setTracks,
-    setAssetsById,
-    setDurationMs,
-    sourceUrl,
-    setSourceUrl,
-    setActiveAssetId,
-    extractThumbnailsForAsset,
-  );
+  const { handleClipFilePicked, handleAudioFilePicked, pendingUploads } =
+    useMediaUpload(
+      project,
+      tracks,
+      setTracks,
+      setAssetsById,
+      setDurationMs,
+      sourceUrl,
+      setSourceUrl,
+      setActiveAssetId,
+      extractThumbnailsForAsset,
+    );
 
   const handleApplyPreset = useCallback((preset: PresetType | null) => {
     if (preset === null) {
@@ -719,7 +724,15 @@ export function Editor() {
                 onRedo={handleRedoWithToast}
                 canUndo={canUndo}
                 canRedo={canRedo}
-                onExport={handleExport}
+                onExport={() => {
+                  if (pendingUploads > 0) {
+                    toast.info(
+                      "Please wait for uploads to finish before exporting.",
+                    );
+                    return;
+                  }
+                  handleExport();
+                }}
                 saving={saving}
                 tracks={tracks}
               />
@@ -793,10 +806,14 @@ export function Editor() {
         {showExportDialog && exportJob && (
           <ExportDialog
             job={exportJob}
+            exportProgress={exportProgress}
+            exportStatus={exportStatus as ExportJob["status"]}
             onClose={() => {
               setShowExportDialog(false);
               if (shouldResetAfterExport) {
                 window.location.href = "/dashboard";
+              } else {
+                setIsExporting(false);
               }
             }}
             onCompleted={() => {
@@ -804,6 +821,10 @@ export function Editor() {
               handleExportComplete();
             }}
             onFailed={handleExportFailed}
+            onRetry={() => {
+              resetExport();
+              setTimeout(handleExport, 100);
+            }}
             notifyOnComplete={notifyOnComplete}
             onNotifyChange={setNotifyOnComplete}
           />

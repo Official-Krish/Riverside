@@ -20,6 +20,7 @@ export function useEditorProject(
     url: string,
     durationMs: number,
   ) => Promise<void>,
+  pauseSaving?: boolean,
 ) {
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState<EditorProject | null>(null);
@@ -146,7 +147,7 @@ export function useEditorProject(
   }, [meetingId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!project || !tracks.length) return;
+    if (!project || !tracks.length || pauseSaving) return;
 
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
@@ -175,7 +176,7 @@ export function useEditorProject(
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [project, tracks, overlays, durationMs]);
+  }, [project, tracks, overlays, durationMs, pauseSaving]);
 
   return { project, loading, saving, accessDenied };
 }

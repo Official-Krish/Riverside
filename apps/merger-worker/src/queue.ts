@@ -2,6 +2,7 @@ import { blpopQueue, getRedisClient, rpushQueue } from "./redis";
 import { LocalVideoMerger } from "./merger";
 import { reportWorkerStatus } from "./worker-status";
 import { toWorkerError } from "./errors";
+import { prisma } from "@repo/db/client";
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 10000;
@@ -45,27 +46,45 @@ export async function processQueue(): Promise<void> {
         // ignore
       }
 
+      let ownerId: string | null = null;
+      try {
+        const byRoomId = await prisma.meeting.findUnique({
+          where: { roomId: meetingId },
+          select: { userId: true },
+        });
+        const meetingRecord =
+          byRoomId ??
+          (await prisma.meeting.findUnique({
+            where: { id: meetingId },
+            select: { userId: true },
+          }));
+        ownerId = meetingRecord?.userId ?? null;
+      } catch {
+        // ignore — notification will be skipped
+      }
+
       try {
         const merger = new LocalVideoMerger(meetingId);
         const finalPath = await merger.process();
 
-        // Push merge-complete notification
-        try {
-          const redisClient = getRedisClient();
-          await redisClient.lpush(
-            "Notifications",
-            JSON.stringify({
-              userId: meetingId,
-              type: "MERGE_COMPLETE",
-              message: `Recording merge complete for meeting ${meetingId}`,
-              metadata: { meetingId, finalPath },
-            }),
-          );
-        } catch (notifyErr: any) {
-          console.error(
-            `[${new Date().toISOString()}] Failed to push MERGE_COMPLETE notification:`,
-            notifyErr.message,
-          );
+        if (ownerId) {
+          try {
+            const redisClient = getRedisClient();
+            await redisClient.lpush(
+              "Notifications",
+              JSON.stringify({
+                userId: ownerId,
+                type: "MERGE_COMPLETE",
+                message: `Recording merge complete for meeting ${meetingId}`,
+                metadata: { meetingId, finalPath },
+              }),
+            );
+          } catch (notifyErr: any) {
+            console.error(
+              `[${new Date().toISOString()}] Failed to push MERGE_COMPLETE notification:`,
+              notifyErr.message,
+            );
+          }
         }
 
         await rpushQueue("TranscodeVideo", {
@@ -84,28 +103,29 @@ export async function processQueue(): Promise<void> {
           },
         );
 
-        // Push merge-failed notification
-        try {
-          const redisClient = getRedisClient();
-          await redisClient.lpush(
-            "Notifications",
-            JSON.stringify({
-              userId: meetingId,
-              type: "MERGE_FAILED",
-              message: `Recording merge failed for meeting ${meetingId}`,
-              metadata: {
-                meetingId,
-                error: workerErr.message,
-                errorCode: workerErr.code,
-                recoverable: workerErr.recoverable,
-              },
-            }),
-          );
-        } catch (notifyErr: any) {
-          console.error(
-            `[${new Date().toISOString()}] Failed to push MERGE_FAILED notification:`,
-            notifyErr.message,
-          );
+        if (ownerId) {
+          try {
+            const redisClient = getRedisClient();
+            await redisClient.lpush(
+              "Notifications",
+              JSON.stringify({
+                userId: ownerId,
+                type: "MERGE_FAILED",
+                message: `Recording merge failed for meeting ${meetingId}`,
+                metadata: {
+                  meetingId,
+                  error: workerErr.message,
+                  errorCode: workerErr.code,
+                  recoverable: workerErr.recoverable,
+                },
+              }),
+            );
+          } catch (notifyErr: any) {
+            console.error(
+              `[${new Date().toISOString()}] Failed to push MERGE_FAILED notification:`,
+              notifyErr.message,
+            );
+          }
         }
 
         const retryCount = (data.retryCount || 0) + 1;

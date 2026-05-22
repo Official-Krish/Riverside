@@ -104,6 +104,8 @@ export const baseSchema = z.object({
     "RECORDING_REQUEST_DENIED",
     "RENDER_COMPLETE",
     "RENDER_FAILED",
+    "MERGE_COMPLETE",
+    "MERGE_FAILED",
     "OTHER",
   ]),
 });
@@ -152,6 +154,18 @@ export const schemas = {
     jobId: z.string(),
     projectId: z.string(),
     error: z.string().optional(),
+  }),
+
+  MERGE_COMPLETE: z.object({
+    meetingId: z.string(),
+    finalPath: z.string().optional(),
+  }),
+
+  MERGE_FAILED: z.object({
+    meetingId: z.string(),
+    error: z.string().optional(),
+    errorCode: z.string().optional(),
+    recoverable: z.boolean().optional(),
   }),
 
   OTHER: z.object({

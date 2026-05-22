@@ -362,6 +362,36 @@ async function processQueueMessage(queueName: QueueName, parsed: any) {
           break;
         }
 
+        case "RENDER_COMPLETE":
+        case "MERGE_COMPLETE": {
+          const { userId, message, metadata } = parsed;
+          if (!userId || !message) return;
+          await prisma.notification.create({
+            data: {
+              userId,
+              type,
+              message:
+                "Your render is complete! It will be soon be available in your dashboard.",
+              metadata: metadata ?? {},
+            },
+          });
+          break;
+        }
+        case "RENDER_FAILED":
+        case "MERGE_FAILED": {
+          const { userId, message, metadata } = parsed;
+          if (!userId || !message) return;
+          await prisma.notification.create({
+            data: {
+              userId,
+              type,
+              message,
+              metadata: metadata ?? {},
+            },
+          });
+          break;
+        }
+
         default:
           console.warn("Unknown notification type:", type);
       }

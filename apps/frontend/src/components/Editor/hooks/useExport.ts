@@ -1,7 +1,8 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { editorApi } from "../api";
 import type { EditorProject, ExportJob, Track, Overlay } from "../types";
 import { handleApiError } from "@/lib/errorHandler";
+import { useExportStream } from "./useExportStream";
 
 export function useExport(
   project: EditorProject | null,
@@ -14,6 +15,41 @@ export function useExport(
   const [notifyOnComplete, setNotifyOnComplete] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+  const [exportStatus, setExportStatus] = useState<string | null>(null);
+
+  const handleExportComplete = useCallback(() => {
+    setIsExporting(false);
+    setExportProgress(100);
+    setExportStatus("DONE");
+    localStorage.removeItem("pendingExportJobId");
+    localStorage.removeItem("pendingExportProjectId");
+  }, []);
+
+  const handleExportFailed = useCallback(() => {
+    setIsExporting(false);
+    setExportStatus("FAILED");
+    localStorage.removeItem("pendingExportJobId");
+    localStorage.removeItem("pendingExportProjectId");
+  }, []);
+
+  const updateExportProgress = useCallback((progress: number) => {
+    setExportProgress(progress);
+  }, []);
+
+  const exportStreamHandlers = useMemo(
+    () => ({
+      onProgress: updateExportProgress,
+      onStatus: setExportStatus,
+      onComplete: handleExportComplete,
+      onFailed: handleExportFailed,
+    }),
+    [handleExportComplete, handleExportFailed, updateExportProgress],
+  );
+
+  useExportStream(
+    isExporting ? (exportJob?.id ?? null) : null,
+    exportStreamHandlers,
+  );
 
   const handleExport = useCallback(async () => {
     if (!project) return;
@@ -32,6 +68,7 @@ export function useExport(
       setShowExportDialog(true);
       setIsExporting(true);
       setExportProgress(0);
+      setExportStatus("QUEUED");
 
       if (notifyOnComplete) {
         localStorage.setItem("pendingExportJobId", job.id);
@@ -42,28 +79,12 @@ export function useExport(
     }
   }, [project, tracks, overlays, durationMs, notifyOnComplete]);
 
-  const handleExportComplete = useCallback(() => {
-    setIsExporting(false);
-    setExportProgress(100);
-    localStorage.removeItem("pendingExportJobId");
-    localStorage.removeItem("pendingExportProjectId");
-  }, []);
-
-  const handleExportFailed = useCallback(() => {
-    setIsExporting(false);
-    localStorage.removeItem("pendingExportJobId");
-    localStorage.removeItem("pendingExportProjectId");
-  }, []);
-
-  const updateExportProgress = useCallback((progress: number) => {
-    setExportProgress(progress);
-  }, []);
-
   const resetExport = useCallback(() => {
     setExportJob(null);
     setShowExportDialog(false);
     setIsExporting(false);
     setExportProgress(0);
+    setExportStatus(null);
     localStorage.removeItem("pendingExportJobId");
     localStorage.removeItem("pendingExportProjectId");
   }, []);
@@ -78,7 +99,9 @@ export function useExport(
     updateExportProgress,
     resetExport,
     isExporting,
+    setIsExporting,
     exportProgress,
+    exportStatus,
     notifyOnComplete,
     setNotifyOnComplete,
   };

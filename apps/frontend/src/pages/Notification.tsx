@@ -28,6 +28,7 @@ export default function NotificationsPage() {
     markRead,
     markAllRead,
     deleteNotif,
+    deleteAll,
     acceptRecording,
     acceptInvite,
     declineRecording,
@@ -59,7 +60,7 @@ export default function NotificationsPage() {
     <div className="relative min-h-screen overflow-hidden bg-[#090909] px-4 pb-16 pt-10 transition-colors duration-300">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute inset-x-0 top-0 h-80 bg-[radial-gradient(circle_at_top,rgba(245,166,35,0.14),transparent_56%)]" />
-        <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-gradient-to-b from-transparent via-white/[0.03] to-transparent" />
+        <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-linear-to-b from-transparent via-white/3 to-transparent" />
       </div>
 
       <div className="relative mx-auto max-w-6xl">
@@ -124,41 +125,69 @@ export default function NotificationsPage() {
                   </p>
                 </div>
 
-                <AnimatePresence>
-                  {unreadCount > 0 && (
-                    <motion.button
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      onClick={() =>
-                        markAllRead.mutate(
-                          notifications
-                            .filter((n) => !n.isRead)
-                            .map((n) => n.id),
-                        )
-                      }
-                      disabled={markAllRead.isPending}
-                      className="
-                    flex items-center gap-1.5 rounded-xl border border-amber-400/20 bg-amber-400/10 px-3.5 py-2 text-xs font-medium
-                    text-amber-100 shadow-[0_12px_24px_rgba(245,166,35,0.08)]
-                    transition-all duration-150 hover:bg-amber-400/14 active:scale-[0.98] disabled:opacity-50
-                  "
-                    >
-                      <svg
-                        viewBox="0 0 16 16"
-                        fill="currentColor"
-                        className="w-3.5 h-3.5"
+                <div className="flex items-center gap-2">
+                  <AnimatePresence>
+                    {notifications.length > 0 && (
+                      <motion.button
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        onClick={() => deleteAll.mutate()}
+                        disabled={deleteAll.isPending}
+                        className="
+                          flex items-center gap-1.5 rounded-xl border border-red-400/20 bg-red-400/10 px-3.5 py-2 text-xs font-medium
+                          text-red-100 shadow-[0_12px_24px_rgba(239,68,68,0.08)]
+                          transition-all duration-150 hover:bg-red-400/14 active:scale-[0.98] disabled:opacity-50 cursor-pointer
+                        "
                       >
-                        <path
-                          fillRule="evenodd"
-                          d="M2.5 3a.5.5 0 000 1h11a.5.5 0 000-1h-11zm0 4a.5.5 0 000 1h11a.5.5 0 000-1h-11zm0 4a.5.5 0 000 1h6a.5.5 0 000-1h-6z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      Mark all read
-                    </motion.button>
-                  )}
-                </AnimatePresence>
+                        <svg
+                          viewBox="0 0 16 16"
+                          fill="currentColor"
+                          className="w-3.5 h-3.5"
+                        >
+                          <path d="M6.5 1.5a1 1 0 00-1 1V3h-3a.5.5 0 000 1h.5l.6 9.1A2 2 0 005.6 15h4.8a2 2 0 002-1.9L13 4h.5a.5.5 0 000-1h-3v-.5a1 1 0 00-1-1h-3zM6.5 3V2.5h3V3h-3zM6 6.5a.5.5 0 01.5.5v5a.5.5 0 01-1 0v-5a.5.5 0 01.5-.5zm4 0a.5.5 0 01.5.5v5a.5.5 0 01-1 0v-5a.5.5 0 01.5-.5z" />
+                        </svg>
+                        Delete all
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
+
+                  <AnimatePresence>
+                    {unreadCount > 0 && (
+                      <motion.button
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        onClick={() =>
+                          markAllRead.mutate(
+                            notifications
+                              .filter((n) => !n.isRead)
+                              .map((n) => n.id),
+                          )
+                        }
+                        disabled={markAllRead.isPending}
+                        className="
+                      flex items-center gap-1.5 rounded-xl border border-amber-400/20 bg-amber-400/10 px-3.5 py-2 text-xs font-medium
+                      text-amber-100 shadow-[0_12px_24px_rgba(245,166,35,0.08)]
+                      transition-all duration-150 hover:bg-amber-400/14 active:scale-[0.98] disabled:opacity-50 cursor-pointer
+                    "
+                      >
+                        <svg
+                          viewBox="0 0 16 16"
+                          fill="currentColor"
+                          className="w-3.5 h-3.5"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M2.5 3a.5.5 0 000 1h11a.5.5 0 000-1h-11zm0 4a.5.5 0 000 1h11a.5.5 0 000-1h-11zm0 4a.5.5 0 000 1h6a.5.5 0 000-1h-6z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        Mark all read
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
             </motion.div>
 
@@ -193,7 +222,7 @@ export default function NotificationsPage() {
                         <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
                           {date}
                         </span>
-                        <div className="h-px flex-1 bg-white/[0.06]" />
+                        <div className="h-px flex-1 bg-white/6" />
                       </div>
 
                       <div className="space-y-2">

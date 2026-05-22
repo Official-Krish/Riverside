@@ -1,4 +1,4 @@
-import { useCallback, type ChangeEvent } from "react";
+import { useCallback, useState, type ChangeEvent } from "react";
 import { editorApi } from "../api";
 import type { EditorProject, Track, Asset } from "../types";
 import { handleApiError } from "@/lib/errorHandler";
@@ -11,13 +11,15 @@ export function useMediaUpload(
   setDurationMs: React.Dispatch<React.SetStateAction<number>>,
   sourceUrl: string,
   setSourceUrl: (url: string) => void,
-  setActiveAssetId: (id: string | null) => void,
+  setActiveAssetId: React.Dispatch<React.SetStateAction<string | null>>,
   extractThumbnailsForAsset: (
     assetId: string,
     url: string,
     durationMs: number,
   ) => Promise<void>,
 ) {
+  const [pendingUploads, setPendingUploads] = useState(0);
+
   const handleMediaFilePicked = useCallback(
     async (
       e: ChangeEvent<HTMLInputElement>,
@@ -32,6 +34,7 @@ export function useMediaUpload(
         ? forcedAssetType === "AUDIO"
         : file.type.startsWith("audio/");
       const assetType: "VIDEO" | "AUDIO" = isAudio ? "AUDIO" : "VIDEO";
+      const assetId = crypto.randomUUID();
 
       const metaElement = document.createElement(isAudio ? "audio" : "video");
       metaElement.preload = "metadata";
@@ -56,20 +59,6 @@ export function useMediaUpload(
         metaElement.addEventListener("error", handleError);
       });
 
-      let assetId: string;
-      try {
-        const uploaded = await editorApi.uploadAsset(
-          project.id,
-          file,
-          duration,
-          assetType,
-        );
-        assetId = uploaded.id;
-      } catch (error) {
-        handleApiError(error, "Failed to upload asset");
-        assetId = crypto.randomUUID();
-      }
-
       const newAsset: Asset = {
         id: assetId,
         assetType,
@@ -77,6 +66,7 @@ export function useMediaUpload(
         durationMs: duration,
       };
       setAssetsById((prev) => ({ ...prev, [assetId]: newAsset }));
+      setPendingUploads((count) => count + 1);
 
       if (!isAudio) {
         void extractThumbnailsForAsset(assetId, objectUrl, duration);
@@ -156,6 +146,66 @@ export function useMediaUpload(
         setSourceUrl(objectUrl);
         setActiveAssetId(assetId);
       }
+
+      void (async () => {
+        try {
+          const uploaded = await editorApi.uploadAsset(
+            project.id,
+            file,
+            duration,
+            assetType,
+            assetId,
+          );
+
+          setAssetsById((prev) => {
+            const existing = prev[assetId];
+            if (!existing) return prev;
+            return {
+              ...prev,
+              [assetId]: {
+                ...existing,
+                url: uploaded.url,
+                durationMs: uploaded.durationMs ?? duration,
+              },
+            };
+          });
+
+          if (sourceUrl === objectUrl) {
+            setSourceUrl(uploaded.url);
+          }
+        } catch (error) {
+          handleApiError(error, "Failed to upload asset");
+
+          setTracks((prev) =>
+            prev
+              .map((track) => ({
+                ...track,
+                clips: track.clips.filter(
+                  (clip) => clip.sourceAssetId !== assetId,
+                ),
+              }))
+              .filter((track) => track.clips.length > 0),
+          );
+
+          setAssetsById((prev) => {
+            if (!prev[assetId]) return prev;
+            const next = { ...prev };
+            delete next[assetId];
+            return next;
+          });
+
+          if (sourceUrl === objectUrl) {
+            setSourceUrl("");
+          }
+          if (!isAudio) {
+            setActiveAssetId((current) =>
+              current === assetId ? null : current,
+            );
+          }
+        } finally {
+          setPendingUploads((count) => Math.max(0, count - 1));
+        }
+      })();
     },
     [
       sourceUrl,
@@ -167,6 +217,7 @@ export function useMediaUpload(
       setDurationMs,
       setActiveAssetId,
       setSourceUrl,
+      setPendingUploads,
     ],
   );
 
@@ -184,5 +235,5 @@ export function useMediaUpload(
     [handleMediaFilePicked],
   );
 
-  return { handleClipFilePicked, handleAudioFilePicked };
+  return { handleClipFilePicked, handleAudioFilePicked, pendingUploads };
 }
