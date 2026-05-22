@@ -7,7 +7,12 @@ interface NotificationFiltersProps {
   notifications: Notification[];
 }
 
-export function NotificationFilters({ activeFilter, setActiveFilter, unreadCount, notifications }: NotificationFiltersProps) {
+export function NotificationFilters({
+  activeFilter,
+  setActiveFilter,
+  unreadCount,
+  notifications,
+}: NotificationFiltersProps) {
   return (
     <div className="rounded-[28px] border border-white/10 bg-[#111111]/94 p-5 shadow-[0_18px_60px_rgba(0,0,0,0.34)]">
       <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
@@ -19,10 +24,16 @@ export function NotificationFilters({ activeFilter, setActiveFilter, unreadCount
             f === "Unread"
               ? unreadCount
               : f === "Recording"
-              ? notifications.filter((n) => n.type.startsWith("RECORDING")).length
-              : f === "Meeting"
-              ? notifications.filter((n) => n.type.startsWith("MEETING")).length
-              : notifications.length;
+                ? notifications.filter(
+                    (n) =>
+                      n.type.startsWith("RECORDING") ||
+                      n.type.startsWith("RENDER") ||
+                      n.type.startsWith("MERGE"),
+                  ).length
+                : f === "Meeting"
+                  ? notifications.filter((n) => n.type.startsWith("MEETING"))
+                      .length
+                  : notifications.length;
 
           return (
             <button
@@ -40,15 +51,19 @@ export function NotificationFilters({ activeFilter, setActiveFilter, unreadCount
                   {f === "All"
                     ? "Everything in your inbox"
                     : f === "Unread"
-                    ? "New items only"
-                    : f === "Recording"
-                    ? "Access and media updates"
-                    : "Invites and reminders"}
+                      ? "New items only"
+                      : f === "Recording"
+                        ? "Access, exports, and media updates"
+                        : "Invites and reminders"}
                 </div>
               </div>
-              <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-[0.2em] uppercase ${
-                activeFilter === f ? "bg-black/20 text-amber-100" : "bg-white/[0.05] text-zinc-500"
-              }`}>
+              <span
+                className={`rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-[0.2em] uppercase ${
+                  activeFilter === f
+                    ? "bg-black/20 text-amber-100"
+                    : "bg-white/[0.05] text-zinc-500"
+                }`}
+              >
                 {count > 99 ? "99+" : count}
               </span>
             </button>

@@ -40,7 +40,9 @@ export function NotificationCard({
     notification.type === "MEETING_INVITE" ||
     notification.type === "MEETING_REMINDER" ||
     notification.type === "RECORDING_READY" ||
-    notification.type === "RECORDING_REQUEST_APPROVED";
+    notification.type === "RECORDING_REQUEST_APPROVED" ||
+    notification.type === "RENDER_COMPLETE" ||
+    notification.type === "MERGE_COMPLETE";
 
   return (
     <motion.div
@@ -139,6 +141,25 @@ export function NotificationCard({
                 think this is a mistake.
               </p>
             )}
+            {(notification.type === "RENDER_FAILED" ||
+              notification.type === "MERGE_FAILED") && (
+              <div className="mt-2 space-y-1">
+                <p className="font-mono text-xs text-red-300">
+                  ↳{" "}
+                  {notification.metadata?.error || "An unknown error occurred"}
+                </p>
+                {notification.metadata?.errorCode && (
+                  <p className="font-mono text-[11px] text-zinc-500">
+                    Error code: {notification.metadata.errorCode}
+                    {notification.metadata.recoverable === false && (
+                      <span className="ml-2 text-amber-500">
+                        (non-recoverable)
+                      </span>
+                    )}
+                  </p>
+                )}
+              </div>
+            )}
             {/* Action buttons */}
             {isActionable && !notification.isRead && (
               <motion.div
@@ -213,11 +234,52 @@ export function NotificationCard({
                           `/recordings/${notification?.metadata?.recordingId}`,
                         );
                       }}
-                      className="
-                        inline-flex items-center gap-1.5 rounded-xl bg-[linear-gradient(135deg,#ffd166,#f5a623)] px-3.5 py-2 text-xs font-semibold text-black cursor-pointer
-                        shadow-[0_12px_24px_rgba(245,166,35,0.18)] transition-all duration-150 active:scale-95
-                        hover:bg-[linear-gradient(135deg,#ffd166,#f5a623)] hover:brightness-110
-                      "
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-[linear-gradient(135deg,#ffd166,#f5a623)] px-3.5 py-2 text-xs font-semibold text-black cursor-pointer shadow-[0_12px_24px_rgba(245,166,35,0.18)] transition-all duration-150 active:scale-95 hover:bg-[linear-gradient(135deg,#ffd166,#f5a623)] hover:brightness-110"
+                    >
+                      View Recording
+                    </button>
+                  </>
+                )}
+                {notification.type === "RENDER_COMPLETE" && (
+                  <>
+                    <button
+                      onClick={() => {
+                        onMarkRead(notification.id);
+                        if (notification.metadata?.projectId) {
+                          navigate(
+                            `/editor/${notification.metadata.projectId}`,
+                          );
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-[linear-gradient(135deg,#ffd166,#f5a623)] px-3.5 py-2 text-xs font-semibold text-black cursor-pointer shadow-[0_12px_24px_rgba(245,166,35,0.18)] transition-all duration-150 active:scale-95 hover:bg-[linear-gradient(135deg,#ffd166,#f5a623)] hover:brightness-110"
+                    >
+                      View Project
+                    </button>
+                    {notification.metadata?.downloadUrl && (
+                      <a
+                        href={notification.metadata.downloadUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => onMarkRead(notification.id)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2 text-xs font-semibold text-zinc-200 cursor-pointer transition-all duration-150 active:scale-95 hover:border-white/20 hover:bg-white/[0.06] hover:text-zinc-100 no-underline"
+                      >
+                        Download
+                      </a>
+                    )}
+                  </>
+                )}
+                {notification.type === "MERGE_COMPLETE" && (
+                  <>
+                    <button
+                      onClick={() => {
+                        onMarkRead(notification.id);
+                        if (notification.metadata?.recordingId) {
+                          navigate(
+                            `/recordings/${notification.metadata.recordingId}`,
+                          );
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-[linear-gradient(135deg,#ffd166,#f5a623)] px-3.5 py-2 text-xs font-semibold text-black cursor-pointer shadow-[0_12px_24px_rgba(245,166,35,0.18)] transition-all duration-150 active:scale-95 hover:bg-[linear-gradient(135deg,#ffd166,#f5a623)] hover:brightness-110"
                     >
                       View Recording
                     </button>

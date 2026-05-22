@@ -22,7 +22,7 @@ import {
   putObjectToS3,
   resolveStorageContext,
 } from "@repo/amazons3";
-import { WorkerError, toWorkerError } from "./errors";
+import { toWorkerError } from "./errors";
 
 type TranscodePayload = {
   meetingId: string;

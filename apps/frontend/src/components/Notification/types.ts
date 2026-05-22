@@ -8,6 +8,8 @@ export type NotificationType =
   | "RECORDING_REQUEST_DENIED"
   | "RENDER_COMPLETE"
   | "RENDER_FAILED"
+  | "MERGE_COMPLETE"
+  | "MERGE_FAILED"
   | "OTHER";
 
 export interface NotificationMetadata {
@@ -24,6 +26,10 @@ export interface NotificationMetadata {
   projectId?: string;
   downloadUrl?: string;
   error?: string;
+  errorCode?: string;
+  recoverable?: boolean;
+  meetingId?: string;
+  finalPath?: string;
 }
 
 export interface Notification {

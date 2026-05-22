@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { editorApi } from "../api";
 import type { EditorProject, ExportJob, Track, Overlay } from "../types";
+import { handleApiError } from "@/lib/errorHandler";
 
 export function useExport(
   project: EditorProject | null,
@@ -37,7 +38,7 @@ export function useExport(
         localStorage.setItem("pendingExportProjectId", project.id);
       }
     } catch (error) {
-      console.error("Failed to start export:", error);
+      handleApiError(error, "Failed to start export");
     }
   }, [project, tracks, overlays, durationMs, notifyOnComplete]);
 
