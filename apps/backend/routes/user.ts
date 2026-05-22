@@ -1,12 +1,21 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import multer from "multer";
+import crypto from "node:crypto";
 import { LoginSchema, SignupSchema } from "@repo/types";
 import { prisma } from "@repo/db/client";
 import { authMiddleware } from "../utils/authMiddleware";
 import { generateRandomToken, SendVerificationEmail } from "../utils/helpers";
+import { buildS3Key } from "@repo/amazons3";
+import { putObjectToS3, keyToCdnUrl } from "../utils/storage";
 
 const userRouter: Router = Router();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+}); // 5 MB
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -202,6 +211,7 @@ userRouter.get("/me", authMiddleware, async (req, res) => {
         id: true,
         name: true,
         email: true,
+        avatarUrl: true,
       },
     });
 
@@ -234,6 +244,7 @@ userRouter.get("/profile", authMiddleware, async (req, res) => {
       select: {
         name: true,
         email: true,
+        avatarUrl: true,
         googleId: true,
         githubUsername: true,
         createdAt: true,
@@ -296,5 +307,53 @@ userRouter.post("/update-profile", authMiddleware, async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
+
+userRouter.post(
+  "/avatar/upload",
+  authMiddleware,
+  upload.single("avatar"),
+  async (req, res) => {
+    const userId = req.userId;
+    const file = req.file;
+
+    if (!userId || !file) {
+      return res.status(400).json({ message: "Missing user or file" });
+    }
+
+    const allowedMimes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!allowedMimes.includes(file.mimetype)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid file type. Allowed: jpeg, png, webp, gif" });
+    }
+
+    try {
+      const extMatch = (file.originalname || "").match(/\.([a-zA-Z0-9]+)$/);
+      const ext = extMatch ? `.${extMatch[1]}` : ".jpg";
+      const objectKey = buildS3Key("weave", "user-profile", `${userId}${ext}`);
+
+      await putObjectToS3({
+        key: objectKey,
+        body: file.buffer,
+        contentType: file.mimetype,
+      });
+
+      const avatarUrl = keyToCdnUrl(objectKey);
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: { avatarUrl },
+      });
+
+      return res.status(200).json({
+        message: "Avatar uploaded successfully",
+        avatarUrl,
+      });
+    } catch (error) {
+      console.error("Avatar upload failed:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  },
+);
 
 export default userRouter;

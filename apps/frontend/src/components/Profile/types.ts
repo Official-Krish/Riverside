@@ -8,6 +8,7 @@ export type Meeting = {
 export type User = {
   name: string;
   email: string;
+  avatarUrl: string | null;
   googleId: string | null;
   githubUsername: string | null;
   createdAt: string;

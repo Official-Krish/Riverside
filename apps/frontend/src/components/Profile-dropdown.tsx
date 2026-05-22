@@ -56,6 +56,7 @@ export function ProfileDropdown({
   const displayName =
     profileQuery.data?.name?.trim() || name?.trim() || "Weave User";
   const displayEmail = profileQuery.data?.email?.trim() || "";
+  const displayAvatarUrl = profileQuery.data?.avatarUrl ?? null;
   const firstName = displayName.split(/\s+/)[0] || displayName;
   const initial = displayName.charAt(0).toUpperCase();
 
@@ -103,7 +104,7 @@ export function ProfileDropdown({
           }
         >
           {variant === "sidebar" ? (
-            <Avatar initial={initial} size="sm" />
+            <Avatar initial={initial} avatarUrl={displayAvatarUrl} size="sm" />
           ) : null}
           {variant === "sidebar" ? (
             <span className="hidden min-w-0 md:flex md:flex-col">
@@ -149,7 +150,9 @@ export function ProfileDropdown({
           )}
         </div>
 
-        {variant !== "sidebar" ? <Avatar initial={initial} size="sm" /> : null}
+        {variant !== "sidebar" ? (
+          <Avatar initial={initial} avatarUrl={displayAvatarUrl} size="sm" />
+        ) : null}
 
         <motion.span
           animate={{ rotate: open ? 180 : 0 }}
@@ -194,7 +197,11 @@ export function ProfileDropdown({
               ].join(" ")}
             >
               <div className="flex items-center gap-2.5">
-                <Avatar initial={initial} size="md" />
+                <Avatar
+                  initial={initial}
+                  avatarUrl={displayAvatarUrl}
+                  size="md"
+                />
                 <div>
                   <p
                     className={[
@@ -346,8 +353,26 @@ export function ProfileDropdown({
   );
 }
 
-function Avatar({ initial, size }: { initial: string; size: "sm" | "md" }) {
+function Avatar({
+  initial,
+  avatarUrl,
+  size,
+}: {
+  initial: string;
+  avatarUrl?: string | null;
+  size: "sm" | "md";
+}) {
   const dim = size === "sm" ? "size-8 text-sm" : "size-10 text-base";
+
+  if (avatarUrl) {
+    return (
+      <span
+        className={`inline-flex ${dim} shrink-0 overflow-hidden rounded-full ${dim}`}
+      >
+        <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+      </span>
+    );
+  }
 
   return (
     <span

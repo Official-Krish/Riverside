@@ -8,6 +8,7 @@ export type UserProfile = {
   id: string;
   name?: string | null;
   email?: string | null;
+  avatarUrl?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -39,7 +40,13 @@ export type JoinMeetingResponse = {
   roomId: string;
   meetingId: string;
   isHost: boolean;
-  recordingState: "IDLE" | "RECORDING" | "UPLOADING" | "PROCESSING" | "READY" | "FAILED";
+  recordingState:
+    | "IDLE"
+    | "RECORDING"
+    | "UPLOADING"
+    | "PROCESSING"
+    | "READY"
+    | "FAILED";
 };
 
 export type ServerPublicKeyResponse = {
@@ -94,7 +101,13 @@ export type RecordingStatusResponse = {
   meetingId: string;
   isHost: boolean;
   isRecording: boolean;
-  recordingState: "IDLE" | "RECORDING" | "UPLOADING" | "PROCESSING" | "READY" | "FAILED";
+  recordingState:
+    | "IDLE"
+    | "RECORDING"
+    | "UPLOADING"
+    | "PROCESSING"
+    | "READY"
+    | "FAILED";
   recordingStartedAt?: string | null;
   recordingStoppedAt?: string | null;
   processingStartedAt?: string | null;
@@ -116,7 +129,13 @@ export type RecordingPageResponse = {
   meetingId: string;
   roomName?: string | null;
   isHost: boolean;
-  recordingState?: "IDLE" | "RECORDING" | "UPLOADING" | "PROCESSING" | "READY" | "FAILED";
+  recordingState?:
+    | "IDLE"
+    | "RECORDING"
+    | "UPLOADING"
+    | "PROCESSING"
+    | "READY"
+    | "FAILED";
   hostEmail?: string | null;
   userEmail?: string | null;
   canViewRecording: boolean;
@@ -168,7 +187,13 @@ export type MeetingDetails = {
     leftAt?: string | null;
   }[];
 
-  recordingState: "IDLE" | "RECORDING" | "UPLOADING" | "PROCESSING" | "READY" | "FAILED";
+  recordingState:
+    | "IDLE"
+    | "RECORDING"
+    | "UPLOADING"
+    | "PROCESSING"
+    | "READY"
+    | "FAILED";
   processingStartedAt: string | null;
   processingEndedAt: string | null;
 
@@ -190,13 +215,13 @@ export type GetAllMeetingsResponse = {
 export type RemoveVisibleEmailRequest = {
   meetingId: string;
   visibleToEmails: string[];
-}
+};
 
 export type GoogleAuthResponse = {
   name: string;
   token: string;
   message: string;
-}
+};
 
 export type ChatMessageSender = {
   participantId: string;

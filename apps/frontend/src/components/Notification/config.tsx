@@ -18,9 +18,9 @@ export const TYPE_CONFIG: Record<
         <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm12.553 1.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
       </svg>
     ),
-    accent: "text-amber-500",
-    bg: "bg-amber-500/10 border-amber-500/20",
-    darkBg: "dark:bg-amber-500/10 dark:border-amber-500/20",
+    accent: "text-[#d4a44d]",
+    bg: "bg-[rgba(212,164,77,0.08)] border-[#d4a44d]/20",
+    darkBg: "dark:bg-[rgba(212,164,77,0.08)] dark:border-[#d4a44d]/20",
   },
   RECORDING_REQUEST_APPROVED: {
     label: "Recording Request Approved",
@@ -33,16 +33,16 @@ export const TYPE_CONFIG: Record<
         />
       </svg>
     ),
-    accent: "text-green-500",
-    bg: "bg-green-500/10 border-green-500/20",
-    darkBg: "dark:bg-green-500/10 dark:border-green-500/20",
+    accent: "text-[#e5c98f]",
+    bg: "bg-[rgba(229,201,143,0.08)] border-[#e5c98f]/20",
+    darkBg: "dark:bg-[rgba(229,201,143,0.08)] dark:border-[#e5c98f]/20",
   },
   RECORDING_REQUEST_DENIED: {
     label: "Recording Request Denied",
     icon: <X className="w-5 h-5" />,
-    accent: "text-red-500",
-    bg: "bg-red-500/10 border-red-500/20",
-    darkBg: "dark:bg-red-500/10 dark:border-red-500/20",
+    accent: "text-[#c46a63]",
+    bg: "bg-[rgba(196,106,99,0.08)] border-[#c46a63]/20",
+    darkBg: "dark:bg-[rgba(196,106,99,0.08)] dark:border-[#c46a63]/20",
   },
   RECORDING_READY: {
     label: "Recording Ready",
@@ -55,9 +55,9 @@ export const TYPE_CONFIG: Record<
         />
       </svg>
     ),
-    accent: "text-emerald-500",
-    bg: "bg-emerald-500/10 border-emerald-500/20",
-    darkBg: "dark:bg-emerald-500/10 dark:border-emerald-500/20",
+    accent: "text-[#e5c98f]",
+    bg: "bg-[rgba(212,164,77,0.08)] border-[#e5c98f]/20",
+    darkBg: "dark:bg-[rgba(212,164,77,0.08)] dark:border-[#e5c98f]/20",
   },
   RECORDING_FAILED: {
     label: "Recording Failed",
@@ -70,9 +70,9 @@ export const TYPE_CONFIG: Record<
         />
       </svg>
     ),
-    accent: "text-red-500",
-    bg: "bg-red-500/10 border-red-500/20",
-    darkBg: "dark:bg-red-500/10 dark:border-red-500/20",
+    accent: "text-[#c46a63]",
+    bg: "bg-[rgba(196,106,99,0.08)] border-[#c46a63]/20",
+    darkBg: "dark:bg-[rgba(196,106,99,0.08)] dark:border-[#c46a63]/20",
   },
   MEETING_INVITE: {
     label: "Meeting Invite",
@@ -81,9 +81,9 @@ export const TYPE_CONFIG: Record<
         <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
       </svg>
     ),
-    accent: "text-blue-400",
-    bg: "bg-blue-500/10 border-blue-500/20",
-    darkBg: "dark:bg-blue-500/10 dark:border-blue-500/20",
+    accent: "text-[#d4a44d]",
+    bg: "bg-[rgba(212,164,77,0.08)] border-[#d4a44d]/20",
+    darkBg: "dark:bg-[rgba(212,164,77,0.08)] dark:border-[#d4a44d]/20",
   },
   MEETING_REMINDER: {
     label: "Reminder",
@@ -92,9 +92,9 @@ export const TYPE_CONFIG: Record<
         <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
       </svg>
     ),
-    accent: "text-violet-400",
-    bg: "bg-violet-500/10 border-violet-500/20",
-    darkBg: "dark:bg-violet-500/10 dark:border-violet-500/20",
+    accent: "text-[#d4a44d]",
+    bg: "bg-[rgba(212,164,77,0.08)] border-[#d4a44d]/20",
+    darkBg: "dark:bg-[rgba(212,164,77,0.08)] dark:border-[#d4a44d]/20",
   },
   OTHER: {
     label: "Update",
@@ -107,9 +107,9 @@ export const TYPE_CONFIG: Record<
         />
       </svg>
     ),
-    accent: "text-zinc-400",
-    bg: "bg-zinc-500/10 border-zinc-500/20",
-    darkBg: "dark:bg-zinc-500/10 dark:border-zinc-500/20",
+    accent: "text-[#d4a44d]",
+    bg: "bg-[rgba(212,164,77,0.08)] border-[#d4a44d]/20",
+    darkBg: "dark:bg-[rgba(212,164,77,0.08)] dark:border-[#d4a44d]/20",
   },
   RENDER_COMPLETE: {
     label: "Export Ready",
@@ -122,9 +122,9 @@ export const TYPE_CONFIG: Record<
         />
       </svg>
     ),
-    accent: "text-emerald-500",
-    bg: "bg-emerald-500/10 border-emerald-500/20",
-    darkBg: "dark:bg-emerald-500/10 dark:border-emerald-500/20",
+    accent: "text-[#e5c98f]",
+    bg: "bg-[rgba(229,201,143,0.08)] border-[#e5c98f]/20",
+    darkBg: "dark:bg-[rgba(229,201,143,0.08)] dark:border-[#e5c98f]/20",
   },
   RENDER_FAILED: {
     label: "Export Failed",
@@ -137,9 +137,9 @@ export const TYPE_CONFIG: Record<
         />
       </svg>
     ),
-    accent: "text-red-500",
-    bg: "bg-red-500/10 border-red-500/20",
-    darkBg: "dark:bg-red-500/10 dark:border-red-500/20",
+    accent: "text-[#c46a63]",
+    bg: "bg-[rgba(196,106,99,0.08)] border-[#c46a63]/20",
+    darkBg: "dark:bg-[rgba(196,106,99,0.08)] dark:border-[#c46a63]/20",
   },
   MERGE_COMPLETE: {
     label: "Merge Complete",
@@ -152,9 +152,9 @@ export const TYPE_CONFIG: Record<
         />
       </svg>
     ),
-    accent: "text-emerald-500",
-    bg: "bg-emerald-500/10 border-emerald-500/20",
-    darkBg: "dark:bg-emerald-500/10 dark:border-emerald-500/20",
+    accent: "text-[#e5c98f]",
+    bg: "bg-[rgba(229,201,143,0.08)] border-[#e5c98f]/20",
+    darkBg: "dark:bg-[rgba(229,201,143,0.08)] dark:border-[#e5c98f]/20",
   },
   MERGE_FAILED: {
     label: "Merge Failed",
@@ -167,8 +167,8 @@ export const TYPE_CONFIG: Record<
         />
       </svg>
     ),
-    accent: "text-red-500",
-    bg: "bg-red-500/10 border-red-500/20",
-    darkBg: "dark:bg-red-500/10 dark:border-red-500/20",
+    accent: "text-[#c46a63]",
+    bg: "bg-[rgba(196,106,99,0.08)] border-[#c46a63]/20",
+    darkBg: "dark:bg-[rgba(196,106,99,0.08)] dark:border-[#c46a63]/20",
   },
 };
