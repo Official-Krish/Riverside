@@ -28,9 +28,6 @@ spec:
           ports:
             - containerPort: 80
           resources:
-            requests:
-              cpu: "100m"
-              memory: "128Mi"
             limits:
               cpu: "300m"
               memory: "256Mi"
@@ -95,9 +92,6 @@ spec:
             - containerPort: 3000
 
           resources:
-            requests:
-              cpu: "200m"
-              memory: "256Mi"
             limits:
               cpu: "500m"
               memory: "512Mi"
@@ -148,12 +142,9 @@ spec:
           imagePullPolicy: Always
 
           resources:
-            requests:
-              cpu: "100m"
-              memory: "256Mi"
             limits:
-              cpu: "1"
-              memory: "2Gi"
+              cpu: "512m"
+              memory: "1Gi"
 
           volumeMounts:
             - name: env-file
@@ -208,12 +199,9 @@ spec:
           imagePullPolicy: Always
 
           resources:
-            requests:
-              cpu: "100m"
-              memory: "256Mi"
             limits:
-              cpu: "1"
-              memory: "2Gi"
+              cpu: "512m"
+              memory: "1Gi"
 
           volumeMounts:
             - name: env-file
@@ -268,12 +256,9 @@ spec:
           imagePullPolicy: Always
 
           resources:
-            requests:
-              cpu: "200m"
-              memory: "512Mi"
             limits:
-              cpu: "2"
-              memory: "4Gi"
+              cpu: "512m"
+              memory: "1Gi"
 
           volumeMounts:
             - name: env-file
@@ -329,9 +314,6 @@ spec:
             - containerPort: 9093
 
           resources:
-            requests:
-              cpu: "100m"
-              memory: "128Mi"
             limits:
               cpu: "300m"
               memory: "256Mi"
@@ -381,12 +363,9 @@ spec:
             - containerPort: 6379
 
           resources:
-            requests:
+            limits:
               cpu: "100m"
               memory: "128Mi"
-            limits:
-              cpu: "300m"
-              memory: "256Mi"
 
           volumeMounts:
             - name: redis-data
