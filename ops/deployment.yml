@@ -28,6 +28,9 @@ spec:
           ports:
             - containerPort: 80
           resources:
+            requests:
+              cpu: "5m"
+              memory: "32Mi"
             limits:
               cpu: "300m"
               memory: "256Mi"
@@ -92,6 +95,9 @@ spec:
             - containerPort: 3000
 
           resources:
+            requests:
+              cpu: "5m"
+              memory: "32Mi"
             limits:
               cpu: "500m"
               memory: "512Mi"
@@ -142,6 +148,9 @@ spec:
           imagePullPolicy: Always
 
           resources:
+            requests:
+              cpu: "5m"
+              memory: "32Mi"
             limits:
               cpu: "512m"
               memory: "1Gi"
@@ -199,6 +208,9 @@ spec:
           imagePullPolicy: Always
 
           resources:
+            requests:
+              cpu: "5m"
+              memory: "32Mi"
             limits:
               cpu: "512m"
               memory: "1Gi"
@@ -256,6 +268,9 @@ spec:
           imagePullPolicy: Always
 
           resources:
+            requests:
+              cpu: "5m"
+              memory: "32Mi"
             limits:
               cpu: "512m"
               memory: "1Gi"
@@ -314,6 +329,9 @@ spec:
             - containerPort: 9093
 
           resources:
+            requests:
+              cpu: "5m"
+              memory: "32Mi"
             limits:
               cpu: "300m"
               memory: "256Mi"
@@ -363,6 +381,9 @@ spec:
             - containerPort: 6379
 
           resources:
+            requests:
+              cpu: "5m"
+              memory: "32Mi"
             limits:
               cpu: "100m"
               memory: "128Mi"
