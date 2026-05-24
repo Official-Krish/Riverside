@@ -6,6 +6,7 @@ import { toPublicRecordingLink } from "./storage";
 export { toPublicRecordingLink };
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
+const EMAIL_FROM = process.env.EMAIL_FROM || "Weave <noreply@krishlabs.tech>";
 
 export function toSingleString(
   value: string | string[] | undefined,
@@ -41,7 +42,7 @@ export function generateRandomToken() {
 
 export async function SendVerificationEmail(email: string, token: string) {
   await resend.emails.send({
-    from: "Weave <support@weave.krishlabs.tech>",
+    from: EMAIL_FROM,
     to: email,
     subject: `Verify Your Weave Account`,
     html: ` <!DOCTYPE html>

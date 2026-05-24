@@ -1,41 +1,45 @@
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
+const EMAIL_FROM = process.env.EMAIL_FROM || "Weave <noreply@krishlabs.tech>";
 
 export async function sendGmailMessage(
-    recipientEmail: string,
-    eventDetails: {
-        hostedby: string;
-        summary: string;
-        description: string;
-        startDateTime: string;
-        attendees: string[];
-    }
+  recipientEmail: string,
+  eventDetails: {
+    hostedby: string;
+    summary: string;
+    description: string;
+    startDateTime: string;
+    attendees: string[];
+  },
 ) {
-    try {
-        const startDate = new Date(eventDetails.startDateTime);
-        const formattedTime = startDate.toLocaleString("en-US", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-            timeZoneName: "short",
-        });
+  try {
+    const startDate = new Date(eventDetails.startDateTime);
+    const formattedTime = startDate.toLocaleString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZoneName: "short",
+    });
 
-        const attendeeList =
-            eventDetails.attendees.length > 0
-                ? eventDetails.attendees
-                      .map((e) => `<span style="background:#1e1a12;color:#f5a623;padding:2px 8px;border-radius:999px;font-size:13px;margin:2px 2px;display:inline-block;">${e}</span>`)
-                      .join(" ")
-                : `<span style="color:#888;">No additional attendees</span>`;
+    const attendeeList =
+      eventDetails.attendees.length > 0
+        ? eventDetails.attendees
+            .map(
+              (e) =>
+                `<span style="background:#1e1a12;color:#f5a623;padding:2px 8px;border-radius:999px;font-size:13px;margin:2px 2px;display:inline-block;">${e}</span>`,
+            )
+            .join(" ")
+        : `<span style="color:#888;">No additional attendees</span>`;
 
-        await resend.emails.send({
-            from: "Weave <support@weave.krishlabs.tech>",
-            to: recipientEmail,
-            subject: `📅 Meeting Invitation: ${eventDetails.summary}`,
-            html: `
+    await resend.emails.send({
+      from: EMAIL_FROM,
+      to: recipientEmail,
+      subject: `📅 Meeting Invitation: ${eventDetails.summary}`,
+      html: `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -85,12 +89,16 @@ export async function sendGmailMessage(
                 </tr>
               </table>
 
-              ${eventDetails.description ? `
+              ${
+                eventDetails.description
+                  ? `
               <!-- Description -->
               <div style="background:#1a1408;border:1px solid rgba(245,166,35,0.12);border-radius:12px;padding:16px;margin-bottom:24px;">
                 <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#b49650;opacity:0.7;">Description</p>
                 <p style="margin:0;font-size:14px;color:#c5ac72;line-height:1.6;">${eventDetails.description}</p>
-              </div>` : ""}
+              </div>`
+                  : ""
+              }
 
               <!-- Attendees -->
               <div style="background:#1a1408;border:1px solid rgba(245,166,35,0.12);border-radius:12px;padding:16px;margin-bottom:32px;">
@@ -132,8 +140,8 @@ export async function sendGmailMessage(
 </body>
 </html>
             `,
-        });
-    } catch (error) {
-        console.error("Failed to send email:", error);
-    }
+    });
+  } catch (error) {
+    console.error("Failed to send email:", error);
+  }
 }

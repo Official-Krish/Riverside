@@ -21,8 +21,8 @@ import {
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 500 * 1024 * 1024 },
-}); // 500 MB
+  limits: { fileSize: 200 * 1024 * 1024 },
+}); // 200 MB
 
 const editorRouter = express.Router();
 
