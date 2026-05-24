@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: weave-frontend
-          image: krishanand01/weave-frontend:v1.2.22
+          image: krishanand01/weave-frontend:v1.2.24
           imagePullPolicy: Always
           ports:
             - containerPort: 80
@@ -88,7 +88,7 @@ spec:
     spec:
       containers:
         - name: weave-backend
-          image: krishanand01/weave-backend:v1.2.22
+          image: krishanand01/weave-backend:v1.2.24
           imagePullPolicy: Always
 
           ports:
