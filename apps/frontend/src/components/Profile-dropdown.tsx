@@ -223,18 +223,6 @@ export function ProfileDropdown({
                   </p>
                 </div>
               </div>
-
-              <div
-                className={[
-                  "mt-2.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest",
-                  theme === "dark"
-                    ? "border border-[#f5a623]/18 bg-[#f5a623]/10 text-[#f5a623]/80"
-                    : "border border-[#b47800]/22 bg-[#f5a623]/10 text-[#7a4d00]",
-                ].join(" ")}
-              >
-                <span className="size-1.5 rounded-full bg-[#f5a623]" />
-                Free plan
-              </div>
             </div>
 
             <div className="space-y-0.5 p-2">

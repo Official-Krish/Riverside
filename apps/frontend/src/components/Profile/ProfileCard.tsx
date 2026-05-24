@@ -149,22 +149,11 @@ export const ProfileCard = ({ user, dark }: { user: User; dark: boolean }) => {
             </div>
           </div>
         </div>
-        {!editing && (
-          <button
-            onClick={startEditing}
-            className={`shrink-0 cursor-pointer rounded-xl border px-3.5 py-2 text-xs font-medium transition-all ${
-              dark
-                ? "border-white/10 text-zinc-300 hover:border-amber-400/30 hover:bg-amber-400/10 hover:text-amber-100"
-                : "border-zinc-200 text-zinc-500 hover:border-amber-400 hover:text-amber-500"
-            }`}
-          >
-            Edit
-          </button>
-        )}
+        {/* floating edit removed — replaced with full-width control at the bottom */}
       </div>
-      {editing && (
+      {editing ? (
         <motion.div
-          className="pt-3 space-x-3"
+          className="pt-3 flex flex-col gap-3"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
         >
@@ -173,7 +162,7 @@ export const ProfileCard = ({ user, dark }: { user: User; dark: boolean }) => {
               setEditing(false);
               setNameInput(userName);
             }}
-            className={`cursor-pointer rounded-xl border px-3.5 py-2 text-xs font-medium transition-colors ${
+            className={`w-full cursor-pointer rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors ${
               dark
                 ? "border-white/10 text-zinc-400 hover:border-white/15 hover:text-zinc-200"
                 : "border-zinc-200 text-zinc-500 hover:border-zinc-300"
@@ -187,11 +176,24 @@ export const ProfileCard = ({ user, dark }: { user: User; dark: boolean }) => {
               handleSaveMutation.mutate(nameInput);
             }}
             disabled={saving}
-            className="cursor-pointer rounded-xl bg-[linear-gradient(135deg,#ffd166,#f5a623)] px-3.5 py-2 text-xs font-semibold text-black shadow-[0_12px_24px_rgba(245,166,35,0.18)] transition-all hover:brightness-105 disabled:opacity-60"
+            className="w-full cursor-pointer rounded-xl bg-[linear-gradient(135deg,#ffd166,#f5a623)] px-3.5 py-2 text-sm font-semibold text-black shadow-[0_12px_24px_rgba(245,166,35,0.18)] transition-all hover:brightness-105 disabled:opacity-60"
           >
             {saving ? "Saving\u2026" : "Save"}
           </button>
         </motion.div>
+      ) : (
+        <div className="pt-4">
+          <button
+            onClick={startEditing}
+            className={`w-full cursor-pointer rounded-xl border px-4 py-3 text-sm font-semibold transition-all ${
+              dark
+                ? "border-white/10 text-zinc-300 hover:border-amber-400/30 hover:bg-amber-400/10 hover:text-amber-100"
+                : "border-zinc-200 text-zinc-500 hover:border-amber-400 hover:text-amber-500"
+            }`}
+          >
+            Edit profile
+          </button>
+        </div>
       )}
     </motion.div>
   );

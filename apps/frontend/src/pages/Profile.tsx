@@ -63,19 +63,49 @@ export default function ProfilePage() {
           <div className="space-y-4">
             <ProfileCard user={user} dark={dark} />
 
-            <div className="rounded-[24px] border border-white/10 bg-[#101010]/92 p-5 shadow-[0_14px_50px_rgba(0,0,0,0.28)]">
-              <div className="text-[11px] uppercase tracking-[0.24em] text-zinc-500">
-                Quick Notes
+            {/* Stats grid + Upgrade card */}
+            <div className="grid gap-4">
+              <div className="grid grid-cols-2 gap-3 rounded-[20px] border border-white/10 bg-white/[0.02] p-3">
+                {(() => {
+                  const meetingsHosted = user.hostedMeetings.length;
+                  const participantsTotal = user.hostedMeetings.reduce(
+                    (s, m) => s + (m.participants?.length || 0),
+                    0,
+                  );
+                  const hoursRecorded = 0; // placeholder — implement actual metric when available
+                  const encryption = "AES";
+                  return [
+                    { label: "Meetings hosted", value: meetingsHosted },
+                    { label: "Participants total", value: participantsTotal },
+                    { label: "Hours recorded", value: hoursRecorded },
+                    { label: "Encryption", value: encryption },
+                  ].map(({ label, value }) => (
+                    <div
+                      key={label}
+                      className="flex flex-col gap-1 rounded-[12px] bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent)] p-3 text-sm"
+                    >
+                      <div className="text-xs uppercase tracking-[0.14em] text-zinc-500">
+                        {label}
+                      </div>
+                      <div className="text-lg font-semibold text-white">
+                        {value}
+                      </div>
+                    </div>
+                  ));
+                })()}
               </div>
-              <div className="mt-4 space-y-3 text-sm text-zinc-400">
-                <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
-                  Recording access and invited participant settings stay aligned
-                  with your meeting history.
+
+              <div className="rounded-[20px] border border-white/8 bg-[linear-gradient(180deg,rgba(25,24,24,0.98),rgba(12,12,12,0.92))] p-5">
+                <div className="text-sm font-semibold text-amber-200">
+                  Unlock Pro
                 </div>
-                <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
-                  Billing and integrations are presented here for faster account
-                  maintenance without leaving the workspace shell.
+                <div className="mt-2 text-sm text-zinc-400">
+                  4K export, unlimited recordings, custom rooms, and priority
+                  support.
                 </div>
+                <button className="mt-4 w-full rounded-xl bg-[linear-gradient(135deg,#ffd166,#f5a623)] px-4 py-2 text-sm font-semibold text-black">
+                  Upgrade now
+                </button>
               </div>
             </div>
           </div>
