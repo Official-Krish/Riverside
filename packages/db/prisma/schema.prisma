@@ -127,10 +127,11 @@ model Meeting {
 
   user           User              @relation("MeetingHost", fields: [userId], references: [id], onDelete: Cascade)
   schedule       MeetingSchedule?  @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
-  participants   MeetingParticipant[]
-  rawChunks      MediaChunk[]
-  finalRecording FinalRecording?
-  editorProjects EditorProject[]
+  participants      MeetingParticipant[]
+  rawChunks         MediaChunk[]
+  finalRecording    FinalRecording?
+  editorProjects    EditorProject[]
+  participantSources ParticipantSource[]
 
   @@index([userId])
   @@index([scheduleId])
@@ -213,10 +214,11 @@ model EditorProject {
   meeting          Meeting       @relation(fields: [meetingId], references: [id])
   finalRecording   FinalRecording? @relation(fields: [finalRecordingId], references: [id])
 
-  tracks   EditorTrack[]
-  overlays EditorOverlay[]
-  assets   EditorAsset[]
-  exports  ExportJob[]
+  tracks          EditorTrack[]
+  overlays        EditorOverlay[]
+  assets          EditorAsset[]
+  exports         ExportJob[]
+  multicamLayouts MulticamLayout[]
 
   @@index([ownerId])
   @@index([meetingId])
@@ -233,6 +235,7 @@ model EditorTrack {
   visible   Boolean     @default(true)
   muted     Boolean     @default(false)
   volume    Float?      @default(1.0)
+  participantKey String? /// V2 multicam: stable userId for per-participant track
 
   project   EditorProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
   clips     EditorClip[]
@@ -283,6 +286,7 @@ model EditorAsset {
   projectId     String
   meetingId     String        
   participantId String?
+  participantKey String?       /// V2 multicam: stable userId reference
   assetType     AssetType
   url           String
   waveformUrl   String?
@@ -296,6 +300,94 @@ model EditorAsset {
   @@index([meetingId])
   @@index([participantId])
   @@map("editor_assets")
+}
+
+model ParticipantSource {
+  id            String   @id @default(uuid())
+  meetingId     String
+  participantId String
+  videoUrl      String?
+  audioUrl      String?
+  durationMs    Int?
+  fileSizeBytes BigInt?
+  createdAt     DateTime @default(now())
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@unique([meetingId, participantId])
+  @@index([meetingId])
+  @@map("participant_sources")
+}
+
+model MulticamLayout {
+  id        String   @id @default(uuid())
+  projectId String
+  name      String   @default("Default")
+  viewMode  ViewMode @default(GRID)
+  rows      Int      @default(2)
+  cols      Int      @default(2)
+
+  project   EditorProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  segments  MulticamSegment[]
+
+  @@index([projectId])
+  @@map("multicam_layouts")
+}
+
+model MulticamSegment {
+  id            String   @id @default(uuid())
+  layoutId      String
+  participantKey String
+  timelineStartMs Int
+  durationMs    Int
+  order         Int      @default(0)
+  transition    String?  @default("cut")
+
+  layout MulticamLayout @relation(fields: [layoutId], references: [id], onDelete: Cascade)
+
+  @@index([layoutId])
+  @@map("multicam_segments")
+}
+
+model SpeakerTimeline {
+  id            String   @id @default(uuid())
+  meetingId     String
+  participantKey String
+  startMs       Int
+  endMs         Int
+  confidence    Float    @default(1.0)
+
+  @@index([meetingId])
+  @@index([meetingId, participantKey])
+  @@map("speaker_timelines")
+}
+
+model ParticipantFraming {
+  id            String   @id @default(uuid())
+  projectId     String
+  participantKey String
+  cropX         Float?
+  cropY         Float?
+  cropW         Float?
+  cropH         Float?
+  zoom          Float    @default(1.0)
+
+  @@unique([projectId, participantKey])
+  @@index([projectId])
+  @@map("participant_framings")
+}
+
+model CameraPriority {
+  id            String   @id @default(uuid())
+  projectId     String
+  participantKey String
+  priority      Int      @default(0)
+  alwaysVisible Boolean  @default(false)
+
+  @@unique([projectId, participantKey])
+  @@index([projectId])
+  @@index([projectId, priority])
+  @@map("camera_priorities")
 }
 
 model ExportJob {
@@ -346,6 +438,13 @@ enum ProjectStatus {
   EXPORTING  
   COMPLETED  
   FAILED     
+}
+
+enum ViewMode {
+  GRID
+  SINGLE
+  PIP
+  CUSTOM
 }
 
 enum TrackType {
