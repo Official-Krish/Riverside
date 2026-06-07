@@ -21,6 +21,11 @@ export function useEditorProject(
     durationMs: number,
   ) => Promise<void>,
   pauseSaving?: boolean,
+  sourceMode?: "FINAL" | "MULTITRACK",
+  onSourceModeChange?: (
+    mode: "FINAL" | "MULTITRACK",
+    projectId?: string,
+  ) => void,
 ) {
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState<EditorProject | null>(null);
@@ -38,7 +43,8 @@ export function useEditorProject(
       try {
         setAccessDenied(false);
         setLoading(true);
-        const { projectId } = await editorApi.createProject(meetingId, "FINAL");
+        const mode = sourceMode || "FINAL";
+        const { projectId } = await editorApi.createProject(meetingId, mode);
         const projectData = await editorApi.getProject(projectId);
 
         setProject(projectData);
@@ -68,7 +74,68 @@ export function useEditorProject(
           (t) => t.type === "VIDEO" && t.clips && t.clips.length > 0,
         );
 
-        if (!hasClips && videoAsset?.url) {
+        if (mode === "MULTITRACK") {
+          const videoAssets = (projectData.assets || []).filter(
+            (a) => a.assetType === "VIDEO",
+          );
+          const participantTracks: Track[] = videoAssets.map((asset, i) => {
+            const duration =
+              asset.durationMs || projectData.durationMs || 60000;
+            const pk = asset.participantId || `camera-${i}`;
+            return {
+              id: crypto.randomUUID(),
+              type: "VIDEO" as const,
+              order: i,
+              visible: true,
+              muted: false,
+              volume: 100,
+              participantKey: pk,
+              kind: "video" as const,
+              clips: [
+                {
+                  id: crypto.randomUUID(),
+                  sourceAssetId: asset.id,
+                  sourceStartMs: 0,
+                  timelineStartMs: 0,
+                  durationMs: duration,
+                  name: pk,
+                },
+              ],
+            };
+          });
+
+          const programTrack: Track = {
+            id: crypto.randomUUID(),
+            type: "VIDEO",
+            order: videoAssets.length,
+            visible: true,
+            muted: false,
+            volume: 100,
+            kind: "program",
+            clips: [],
+          };
+
+          const allTracks = [...participantTracks, programTrack];
+          setTracks(allTracks);
+
+          const maxDur = videoAssets.reduce(
+            (max, a) => Math.max(max, a.durationMs || 0),
+            0,
+          );
+          if (maxDur > 0) setDurationMs(maxDur);
+
+          if (onSourceModeChange) onSourceModeChange("MULTITRACK", project?.id);
+
+          for (const asset of videoAssets) {
+            if (asset.url) {
+              void extractThumbnailsForAsset(
+                asset.id,
+                asset.url,
+                asset.durationMs || 60000,
+              );
+            }
+          }
+        } else if (!hasClips && videoAsset?.url) {
           let assetDuration =
             videoAsset.durationMs || projectData.durationMs || 0;
 

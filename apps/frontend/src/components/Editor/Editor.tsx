@@ -7,6 +7,8 @@ import { Timeline } from "./Timeline";
 import { ExportDialog } from "./ExportDialog";
 import { Loader2, Film } from "lucide-react";
 import { CanvasPlayer, useCanvasVideo } from "./CanvasPlayer";
+import { ConvertToMulticam, AngleSelector } from "./multicam";
+import { useMulticam } from "./hooks/useMulticam";
 import { OverlayLayer } from "./OverlayLayer";
 import { EditorPanel, type PanelTab } from "./EditorPanel";
 import { toast } from "sonner";
@@ -80,6 +82,14 @@ export function Editor() {
 
   // Preset state
   const [activePreset, setActivePreset] = useState<PresetType | null>(null);
+
+  // Multicam state
+  const [isMulticam, setIsMulticam] = useState(false);
+  const [multicamProjectId, setMulticamProjectId] = useState<string | null>(
+    null,
+  );
+  const { multicamConfig, loadMulticam, setActiveAngle, setActiveLayout } =
+    useMulticam(multicamProjectId);
 
   // Transition placement state
   const [transitionMode, setTransitionMode] = useState(false);
@@ -192,6 +202,14 @@ export function Editor() {
     resetHistory,
     extractThumbnailsForAsset,
     false,
+    undefined,
+    (mode, pid) => {
+      setIsMulticam(mode === "MULTITRACK");
+      if (mode === "MULTITRACK" && pid) {
+        setMulticamProjectId(pid);
+        setTimeout(() => loadMulticam(), 100);
+      }
+    },
   );
 
   const {
@@ -346,6 +364,10 @@ export function Editor() {
     handleRedo,
     setTimelineZoom,
     handleApplyPreset,
+    isMulticam ? setActiveAngle : undefined,
+    isMulticam
+      ? (multicamConfig?.participantSources.map((s) => s.participantKey) ?? [])
+      : [],
   );
 
   const stageWidth = project?.width || 1920;
@@ -552,6 +574,17 @@ export function Editor() {
     <>
       <style>{EDITOR_CSS}</style>
       <div className="editor-root space-y-4 relative">
+        {project.sourceMode === "FINAL" && !isMulticam && meetingId && (
+          <div className="flex justify-end">
+            <ConvertToMulticam
+              meetingId={project.meetingId}
+              roomId={meetingId}
+              onConverted={() => {
+                window.location.reload();
+              }}
+            />
+          </div>
+        )}
         {/* Global busy overlay while we prepare thumbnails/waveforms */}
         {isEditorBusy && (
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -602,6 +635,18 @@ export function Editor() {
                     handleCommitTextEdit={handleCommitTextEdit}
                     isPlaying={isPlaying}
                   />
+
+                  {isMulticam && multicamConfig && (
+                    <div className="absolute bottom-2 left-2 z-30 flex items-center gap-2">
+                      <AngleSelector
+                        participantKeys={multicamConfig.participantSources.map(
+                          (s) => s.participantKey,
+                        )}
+                        activeAngle={multicamConfig.activeAngle}
+                        onSelectAngle={setActiveAngle}
+                      />
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="aspect-video flex items-center justify-center">
@@ -621,6 +666,13 @@ export function Editor() {
               <EditorPanel
                 activeTab={activePanelTab}
                 onTabChange={setActivePanelTab}
+                isMulticam={isMulticam}
+                multicamSources={multicamConfig?.participantSources}
+                multicamActiveAngle={multicamConfig?.activeAngle ?? null}
+                multicamPriorities={multicamConfig?.cameraPriority}
+                multicamSpeakerTimeline={multicamConfig?.speakerTimeline}
+                onMulticamAngleChange={setActiveAngle}
+                onMulticamLayoutChange={setActiveLayout}
                 activePreset={activePreset}
                 onApplyPreset={handleApplyPreset}
                 clipEffects={

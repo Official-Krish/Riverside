@@ -62,6 +62,8 @@ export interface Track {
   muted: boolean;
   volume: number;
   clips: Clip[];
+  participantKey?: string;
+  kind?: "video" | "audio" | "program" | "suggestion";
 }
 
 export type OverlayStyle = Partial<TextOverlayStyle>;
@@ -216,6 +218,79 @@ export interface ClipPreset {
   clipId: string;
   preset: Preset | null;
   appliedAt: number;
+}
+
+// V2 Multicam types
+
+export interface ParticipantSourceInfo {
+  participantKey: string;
+  displayName: string;
+  role: "host" | "guest" | "screen";
+  sourceKind: "camera" | "screen" | "placeholder";
+  assetId: string;
+  url: string;
+  durationMs: number;
+  framing: ReframeSettings;
+  hidden: boolean;
+  priority: number;
+  order: number;
+}
+
+export interface SpeakerSegment {
+  participantKey: string;
+  displayName: string;
+  startMs: number;
+  endMs: number;
+  confidence: number;
+}
+
+export interface AutoCutSuggestion {
+  id: string;
+  timelineStartMs: number;
+  durationMs: number;
+  participantKey: string;
+  applied: boolean;
+}
+
+export interface ReframeSettings {
+  cropX: number;
+  cropY: number;
+  cropW: number;
+  cropH: number;
+  zoomPreset: "head" | "upper-body" | "full-body" | "custom";
+}
+
+export type LayoutPreset = "single" | "pip" | "split" | "grid";
+
+export interface CameraPriorityEntry {
+  participantKey: string;
+  priority: number;
+}
+
+export interface MulticamProjectConfig {
+  participantSources: ParticipantSourceInfo[];
+  speakerTimeline: SpeakerSegment[];
+  activeLayout: LayoutPreset;
+  activeAngle: string | null;
+  cameraPriority: CameraPriorityEntry[];
+  autoCutSegments: AutoCutSuggestion[];
+}
+
+export const PARTICIPANT_COLORS = [
+  "#f5a623", // gold
+  "#3b82f6", // blue
+  "#22c55e", // green
+  "#a855f7", // purple
+  "#ef4444", // red
+  "#06b6d4", // cyan
+  "#ec4899", // pink
+  "#f97316", // orange
+  "#14b8a6", // teal
+  "#8b5cf6", // violet
+];
+
+export function getParticipantColor(index: number): string {
+  return PARTICIPANT_COLORS[index % PARTICIPANT_COLORS.length];
 }
 
 export const PRESET_DEFINITIONS: Omit<Preset, "id">[] = [

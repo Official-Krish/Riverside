@@ -19,12 +19,23 @@ import {
   Clock,
   Layers,
   Wand2,
+  Camera,
 } from "lucide-react";
 import { TextStyleControls } from "./overlays";
 import { TransitionPanel } from "./transitions";
 import { TransitionControls } from "./transitions/TransitionControls";
 import type { TransitionType } from "./transitions/types";
-import { PRESET_DEFINITIONS, type PresetType } from "./types";
+import {
+  PRESET_DEFINITIONS,
+  type PresetType,
+  getParticipantColor,
+} from "./types";
+import type {
+  LayoutPreset,
+  CameraPriorityEntry,
+  SpeakerSegment,
+} from "./types";
+import { CameraPriorityPanel, AngleSelector } from "./multicam";
 import { EffectControls } from "./effects";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -35,7 +46,8 @@ export type PanelTab =
   | "transition"
   | "presets"
   | "effects"
-  | "transform";
+  | "transform"
+  | "multicam";
 
 interface CanvasTransform {
   stretchX: number;
@@ -52,6 +64,13 @@ interface CanvasTransform {
 interface EditorPanelProps {
   activeTab: PanelTab;
   onTabChange: (tab: PanelTab) => void;
+  isMulticam?: boolean;
+  multicamSources?: { participantKey: string; displayName?: string }[];
+  multicamActiveAngle?: string | null;
+  multicamPriorities?: CameraPriorityEntry[];
+  multicamSpeakerTimeline?: SpeakerSegment[];
+  onMulticamAngleChange?: (key: string) => void;
+  onMulticamLayoutChange?: (layout: LayoutPreset) => void;
   activePreset?: PresetType | null;
   onApplyPreset?: (presetType: PresetType) => void;
   clipEffects?: any;
@@ -102,6 +121,7 @@ const TABS = [
   { id: "presets" as PanelTab, label: "Presets", icon: Wand2 },
   { id: "effects" as PanelTab, label: "Effects", icon: Sparkles },
   { id: "transform" as PanelTab, label: "Transform", icon: Maximize },
+  { id: "multicam" as PanelTab, label: "Multicam", icon: Camera },
 ];
 
 function formatTime(ms: number): string {
@@ -141,6 +161,13 @@ export function EditorPanel({
   onExport,
   saving,
   tracks,
+  isMulticam,
+  multicamSources,
+  multicamActiveAngle,
+  multicamPriorities,
+  multicamSpeakerTimeline,
+  onMulticamAngleChange,
+  onMulticamLayoutChange,
 }: EditorPanelProps) {
   /* eslint-disable @typescript-eslint/no-explicit-any */
   const isTransformModified = canvasTransform
@@ -665,6 +692,103 @@ export function EditorPanel({
         {activeTab === "transform" && !canvasTransform && (
           <div className="text-center text-[#8d7850] text-sm py-8">
             Canvas transform not available
+          </div>
+        )}
+
+        {activeTab === "multicam" && isMulticam && (
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <div className="text-[11px] text-[#8d7850] uppercase tracking-wider flex items-center gap-2">
+                <Camera className="h-3 w-3" />
+                Angles
+              </div>
+              {multicamSources && onMulticamAngleChange && (
+                <AngleSelector
+                  participantKeys={multicamSources.map((s) => s.participantKey)}
+                  activeAngle={multicamActiveAngle}
+                  onSelectAngle={onMulticamAngleChange}
+                />
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <div className="text-[11px] text-[#8d7850] uppercase tracking-wider">
+                Layout
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {(["single", "pip", "split", "grid"] as LayoutPreset[]).map(
+                  (layout) => (
+                    <button
+                      key={layout}
+                      onClick={() => onMulticamLayoutChange?.(layout)}
+                      className="px-3 py-2 rounded-lg text-[11px] font-medium border transition-all"
+                      style={{
+                        borderColor: "rgba(245,166,35,0.15)",
+                        background: "rgba(245,166,35,0.05)",
+                        color: "#bfa873",
+                      }}
+                    >
+                      {layout.charAt(0).toUpperCase() + layout.slice(1)}
+                    </button>
+                  ),
+                )}
+              </div>
+            </div>
+
+            {multicamSources && (
+              <CameraPriorityPanel
+                priorities={multicamPriorities || []}
+                participantKeys={multicamSources.map((s) => s.participantKey)}
+                hiddenMap={{}}
+                onToggleHidden={() => {}}
+              />
+            )}
+
+            {multicamSpeakerTimeline && multicamSpeakerTimeline.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-[11px] text-[#8d7850] uppercase tracking-wider">
+                  Speaker Timeline
+                </div>
+                <div className="space-y-1">
+                  {[
+                    ...new Set(
+                      multicamSpeakerTimeline.map((s) => s.participantKey),
+                    ),
+                  ].map((key, i) => {
+                    const segs = multicamSpeakerTimeline.filter(
+                      (s) => s.participantKey === key,
+                    );
+                    const totalMs = segs.reduce(
+                      (a, s) => a + (s.endMs - s.startMs),
+                      0,
+                    );
+                    return (
+                      <div
+                        key={key}
+                        className="flex items-center gap-2 px-2 py-1 rounded bg-[#060605]/40"
+                      >
+                        <span
+                          className="h-2 w-2 rounded-full"
+                          style={{ backgroundColor: getParticipantColor(i) }}
+                        />
+                        <span className="text-xs text-[#bfa873] flex-1 truncate">
+                          {segs[0]?.displayName || key}
+                        </span>
+                        <span className="text-[10px] text-[#8d7850]">
+                          {(totalMs / 1000).toFixed(0)}s
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "multicam" && !isMulticam && (
+          <div className="text-center text-[#8d7850] text-sm py-8">
+            Multicam not available for this project
           </div>
         )}
       </div>

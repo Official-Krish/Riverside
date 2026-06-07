@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { http } from "@/https";
 import type { EditorProject, ExportJob } from "./types";
+import type {
+  ParticipantSourceInfo,
+  SpeakerSegment,
+  CameraPriorityEntry,
+} from "./types";
 
 export const editorApi = {
   async createProject(meetingId: string, sourceMode: "FINAL" | "MULTITRACK") {
@@ -94,5 +99,88 @@ export const editorApi = {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return response.data.asset;
+  },
+};
+
+export const multicamApi = {
+  async init(meetingId: string, roomId: string) {
+    const res = await http.post<{
+      projectId: string;
+      layout: any;
+      sources: ParticipantSourceInfo[];
+    }>("/multicam/init", { meetingId, roomId });
+    return res.data;
+  },
+
+  async getProject(projectId: string) {
+    const res = await http.get<{
+      project: any;
+      layouts: any[];
+      framings: any[];
+      priorities: CameraPriorityEntry[];
+      sources: ParticipantSourceInfo[];
+      speakerTimelines: SpeakerSegment[];
+    }>(`/multicam/projects/${projectId}`);
+    return res.data;
+  },
+
+  async createLayout(
+    projectId: string,
+    data: {
+      name?: string;
+      viewMode?: "GRID" | "SINGLE" | "PIP" | "CUSTOM";
+      rows?: number;
+      cols?: number;
+      segments?: {
+        participantKey: string;
+        timelineStartMs: number;
+        durationMs: number;
+        transition?: string;
+      }[];
+    },
+  ) {
+    const res = await http.post(
+      `/multicam/projects/${projectId}/layouts`,
+      data,
+    );
+    return res.data;
+  },
+
+  async saveFramings(
+    projectId: string,
+    framings: {
+      participantKey: string;
+      cropX?: number | null;
+      cropY?: number | null;
+      cropW?: number | null;
+      cropH?: number | null;
+      zoom?: number;
+    }[],
+  ) {
+    const res = await http.put(`/multicam/projects/${projectId}/framings`, {
+      framings,
+    });
+    return res.data;
+  },
+
+  async savePriorities(
+    projectId: string,
+    priorities: {
+      participantKey: string;
+      priority: number;
+      alwaysVisible?: boolean;
+    }[],
+  ) {
+    const res = await http.put(`/multicam/projects/${projectId}/priorities`, {
+      priorities,
+    });
+    return res.data;
+  },
+
+  async getSpeakerTimelines(meetingId: string) {
+    const res = await http.get<{ speakerTimelines: any[] }>(
+      `/multicam/meetings/${meetingId}/speakers`,
+    );
+    return res.data;
   },
 };
