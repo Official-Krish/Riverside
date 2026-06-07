@@ -35,7 +35,7 @@ import type {
   CameraPriorityEntry,
   SpeakerSegment,
 } from "./types";
-import { CameraPriorityPanel, AngleSelector } from "./multicam";
+import { CameraPriorityPanel, AngleSelector, PiPPresets } from "./multicam";
 import { EffectControls } from "./effects";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -71,6 +71,9 @@ interface EditorPanelProps {
   multicamSpeakerTimeline?: SpeakerSegment[];
   onMulticamAngleChange?: (key: string) => void;
   onMulticamLayoutChange?: (layout: LayoutPreset) => void;
+  activeLayout?: LayoutPreset;
+  showSpeakerLabels?: boolean;
+  onSpeakerLabelsChange?: (show: boolean) => void;
   activePreset?: PresetType | null;
   onApplyPreset?: (presetType: PresetType) => void;
   clipEffects?: any;
@@ -168,6 +171,9 @@ export function EditorPanel({
   multicamSpeakerTimeline,
   onMulticamAngleChange,
   onMulticamLayoutChange,
+  activeLayout = "single",
+  showSpeakerLabels = true,
+  onSpeakerLabelsChange,
 }: EditorPanelProps) {
   /* eslint-disable @typescript-eslint/no-explicit-any */
   const isTransformModified = canvasTransform
@@ -715,23 +721,36 @@ export function EditorPanel({
               <div className="text-[11px] text-[#8d7850] uppercase tracking-wider">
                 Layout
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                {(["single", "pip", "split", "grid"] as LayoutPreset[]).map(
-                  (layout) => (
-                    <button
-                      key={layout}
-                      onClick={() => onMulticamLayoutChange?.(layout)}
-                      className="px-3 py-2 rounded-lg text-[11px] font-medium border transition-all"
-                      style={{
-                        borderColor: "rgba(245,166,35,0.15)",
-                        background: "rgba(245,166,35,0.05)",
-                        color: "#bfa873",
-                      }}
-                    >
-                      {layout.charAt(0).toUpperCase() + layout.slice(1)}
-                    </button>
-                  ),
-                )}
+              {multicamSources && onMulticamLayoutChange && (
+                <PiPPresets
+                  active={activeLayout || "single"}
+                  onSelect={onMulticamLayoutChange}
+                  participantCount={multicamSources.length}
+                />
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-[#8d7850] uppercase tracking-wider">
+                  Speaker Labels
+                </span>
+                <button
+                  onClick={() =>
+                    onSpeakerLabelsChange?.(!(showSpeakerLabels ?? true))
+                  }
+                  className={`relative h-5 w-9 rounded-full transition-colors ${
+                    (showSpeakerLabels ?? true) ? "bg-[#f5a623]" : "bg-white/10"
+                  }`}
+                >
+                  <div
+                    className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                      (showSpeakerLabels ?? true)
+                        ? "translate-x-4"
+                        : "translate-x-0.5"
+                    }`}
+                  />
+                </button>
               </div>
             </div>
 

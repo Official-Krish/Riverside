@@ -4,3 +4,5 @@ export { AutoCutTrack } from "./AutoCutTrack";
 export { CameraPriorityPanel } from "./CameraPriorityPanel";
 export { PlaceholderAvatar } from "./PlaceholderAvatar";
 export { AngleSelector } from "./AngleSelector";
+export { PiPPresets } from "./PiPPresets";
+export { ReframeLayer } from "./ReframeLayer";
