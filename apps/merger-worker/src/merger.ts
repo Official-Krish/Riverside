@@ -20,6 +20,7 @@ import {
   computeMeetingEpochMs,
   timelineDurationSeconds,
 } from "./timeline";
+import { runSpeakerAnalysis } from "./speaker-analysis";
 import {
   type MergerConfig,
   type ProcessedUser,
@@ -221,6 +222,29 @@ export class LocalVideoMerger {
     }
   }
 
+  private async runSpeakerAnalysisAsync(
+    processedUsers: ProcessedUser[],
+    meetingId: string,
+    totalDurationMs: number,
+  ): Promise<void> {
+    try {
+      const participantVideos = new Map<string, string>();
+      for (const u of processedUsers) {
+        participantVideos.set(u.userId, u.videoPath);
+      }
+      const segments = await runSpeakerAnalysis(
+        participantVideos,
+        meetingId,
+        totalDurationMs,
+      );
+      this.log(
+        `[phase:speakerAnalysis] Stored ${segments.length} speaker segments for meeting ${meetingId}`,
+      );
+    } catch (err) {
+      this.log(`[phase:speakerAnalysis] Failed (non-fatal): ${err}`);
+    }
+  }
+
   public async process(): Promise<string> {
     const totalStartTime = Date.now();
 
@@ -363,6 +387,13 @@ export class LocalVideoMerger {
       processedUsers.sort((a, b) => a.joinTimestamp - b.joinTimestamp);
 
       await this.persistParticipantVideos(processedUsers, canonicalMeetingId);
+
+      // Speaker analysis (non-blocking — runs async, doesn't fail the merge)
+      this.runSpeakerAnalysisAsync(
+        processedUsers,
+        canonicalMeetingId,
+        meetingEndMs - meetingEpochMs,
+      );
 
       const gridVideo = await createGridVideo(
         processedUsers,

@@ -10,6 +10,7 @@ import {
 import {
   seedMulticamProject,
   buildParticipantManifest,
+  generateAutoCutSegments,
 } from "../utils/multicam.service";
 import { toPublicRecordingLink } from "../utils/storage";
 
@@ -23,12 +24,10 @@ multicamRouter.post("/init", authMiddleware, async (req, res) => {
     return res.status(400).json({ message: "Missing fields" });
   }
   if (!parseData.success) {
-    return res
-      .status(400)
-      .json({
-        message: "Invalid request body",
-        errors: parseData.error.errors,
-      });
+    return res.status(400).json({
+      message: "Invalid request body",
+      errors: parseData.error.errors,
+    });
   }
 
   try {
@@ -163,12 +162,10 @@ multicamRouter.put(
       return res.status(400).json({ message: "Missing fields" });
     }
     if (!parseData.success) {
-      return res
-        .status(400)
-        .json({
-          message: "Invalid request body",
-          errors: parseData.error.errors,
-        });
+      return res.status(400).json({
+        message: "Invalid request body",
+        errors: parseData.error.errors,
+      });
     }
 
     try {
@@ -233,12 +230,10 @@ multicamRouter.post(
       return res.status(400).json({ message: "Missing fields" });
     }
     if (!parseData.success) {
-      return res
-        .status(400)
-        .json({
-          message: "Invalid request body",
-          errors: parseData.error.errors,
-        });
+      return res.status(400).json({
+        message: "Invalid request body",
+        errors: parseData.error.errors,
+      });
     }
 
     try {
@@ -303,12 +298,10 @@ multicamRouter.put(
       return res.status(400).json({ message: "Missing fields" });
     }
     if (!parseData.success) {
-      return res
-        .status(400)
-        .json({
-          message: "Invalid request body",
-          errors: parseData.error.errors,
-        });
+      return res.status(400).json({
+        message: "Invalid request body",
+        errors: parseData.error.errors,
+      });
     }
 
     try {
@@ -369,12 +362,10 @@ multicamRouter.put(
       return res.status(400).json({ message: "Missing fields" });
     }
     if (!parseData.success) {
-      return res
-        .status(400)
-        .json({
-          message: "Invalid request body",
-          errors: parseData.error.errors,
-        });
+      return res.status(400).json({
+        message: "Invalid request body",
+        errors: parseData.error.errors,
+      });
     }
 
     try {
@@ -452,6 +443,38 @@ multicamRouter.get(
       return res.status(200).json({ speakerTimelines });
     } catch (error) {
       console.error("Error fetching speaker timelines:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  },
+);
+
+multicamRouter.post(
+  "/projects/:projectId/auto-cut",
+  authMiddleware,
+  async (req, res) => {
+    const userId = req.userId;
+    const projectId = req.params.projectId as string;
+
+    if (!userId || !projectId) {
+      return res.status(400).json({ message: "Missing fields" });
+    }
+
+    try {
+      const project = await prisma.editorProject.findFirst({
+        where: { id: projectId, ownerId: userId },
+      });
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const segments = await generateAutoCutSegments(projectId);
+
+      return res.status(201).json({
+        segments,
+        message: `Generated ${segments.length} auto-cut segments`,
+      });
+    } catch (error) {
+      console.error("Error generating auto-cut segments:", error);
       return res.status(500).json({ message: "Internal server error" });
     }
   },
