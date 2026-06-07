@@ -278,3 +278,67 @@ export type ChatPresencePayload = {
   isOnline: boolean;
   timestamp: number;
 };
+
+// V2 Multicam types
+
+export type MulticamSegmentDTO = {
+  id: string;
+  layoutId: string;
+  participantKey: string;
+  timelineStartMs: number;
+  durationMs: number;
+  transition: string | null;
+};
+
+export type MulticamLayoutDTO = {
+  id: string;
+  projectId: string;
+  name: string;
+  viewMode: "GRID" | "SINGLE" | "PIP" | "CUSTOM";
+  rows: number;
+  cols: number;
+  segments: MulticamSegmentDTO[];
+};
+
+export type ParticipantSourceDTO = {
+  id: string;
+  meetingId: string;
+  participantId: string;
+  videoUrl: string | null;
+  audioUrl: string | null;
+  durationMs: number | null;
+};
+
+export type SpeakerTimelineDTO = {
+  id: string;
+  meetingId: string;
+  participantKey: string;
+  startMs: number;
+  endMs: number;
+  confidence: number;
+};
+
+export type ParticipantFramingDTO = {
+  id: string;
+  projectId: string;
+  participantKey: string;
+  cropX: number | null;
+  cropY: number | null;
+  cropW: number | null;
+  cropH: number | null;
+  zoom: number;
+};
+
+export type CameraPriorityDTO = {
+  id: string;
+  projectId: string;
+  participantKey: string;
+  priority: number;
+  alwaysVisible: boolean;
+};
+
+export type MulticamInitResponse = {
+  projectId: string;
+  layout: MulticamLayoutDTO;
+  sources: ParticipantSourceDTO[];
+};

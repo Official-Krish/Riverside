@@ -19,12 +19,23 @@ import {
   Clock,
   Layers,
   Wand2,
+  Camera,
 } from "lucide-react";
 import { TextStyleControls } from "./overlays";
 import { TransitionPanel } from "./transitions";
 import { TransitionControls } from "./transitions/TransitionControls";
 import type { TransitionType } from "./transitions/types";
-import { PRESET_DEFINITIONS, type PresetType } from "./types";
+import {
+  PRESET_DEFINITIONS,
+  type PresetType,
+  getParticipantColor,
+} from "./types";
+import type {
+  LayoutPreset,
+  CameraPriorityEntry,
+  SpeakerSegment,
+} from "./types";
+import { CameraPriorityPanel, AngleSelector, PiPPresets } from "./multicam";
 import { EffectControls } from "./effects";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -35,7 +46,8 @@ export type PanelTab =
   | "transition"
   | "presets"
   | "effects"
-  | "transform";
+  | "transform"
+  | "multicam";
 
 interface CanvasTransform {
   stretchX: number;
@@ -52,6 +64,16 @@ interface CanvasTransform {
 interface EditorPanelProps {
   activeTab: PanelTab;
   onTabChange: (tab: PanelTab) => void;
+  isMulticam?: boolean;
+  multicamSources?: { participantKey: string; displayName?: string }[];
+  multicamActiveAngle?: string | null;
+  multicamPriorities?: CameraPriorityEntry[];
+  multicamSpeakerTimeline?: SpeakerSegment[];
+  onMulticamAngleChange?: (key: string) => void;
+  onMulticamLayoutChange?: (layout: LayoutPreset) => void;
+  activeLayout?: LayoutPreset;
+  showSpeakerLabels?: boolean;
+  onSpeakerLabelsChange?: (show: boolean) => void;
   activePreset?: PresetType | null;
   onApplyPreset?: (presetType: PresetType) => void;
   clipEffects?: any;
@@ -102,6 +124,7 @@ const TABS = [
   { id: "presets" as PanelTab, label: "Presets", icon: Wand2 },
   { id: "effects" as PanelTab, label: "Effects", icon: Sparkles },
   { id: "transform" as PanelTab, label: "Transform", icon: Maximize },
+  { id: "multicam" as PanelTab, label: "Multicam", icon: Camera },
 ];
 
 function formatTime(ms: number): string {
@@ -141,6 +164,16 @@ export function EditorPanel({
   onExport,
   saving,
   tracks,
+  isMulticam,
+  multicamSources,
+  multicamActiveAngle,
+  multicamPriorities,
+  multicamSpeakerTimeline,
+  onMulticamAngleChange,
+  onMulticamLayoutChange,
+  activeLayout = "single",
+  showSpeakerLabels = true,
+  onSpeakerLabelsChange,
 }: EditorPanelProps) {
   /* eslint-disable @typescript-eslint/no-explicit-any */
   const isTransformModified = canvasTransform
@@ -665,6 +698,116 @@ export function EditorPanel({
         {activeTab === "transform" && !canvasTransform && (
           <div className="text-center text-[#8d7850] text-sm py-8">
             Canvas transform not available
+          </div>
+        )}
+
+        {activeTab === "multicam" && isMulticam && (
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <div className="text-[11px] text-[#8d7850] uppercase tracking-wider flex items-center gap-2">
+                <Camera className="h-3 w-3" />
+                Angles
+              </div>
+              {multicamSources && onMulticamAngleChange && (
+                <AngleSelector
+                  participantKeys={multicamSources.map((s) => s.participantKey)}
+                  activeAngle={multicamActiveAngle}
+                  onSelectAngle={onMulticamAngleChange}
+                />
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <div className="text-[11px] text-[#8d7850] uppercase tracking-wider">
+                Layout
+              </div>
+              {multicamSources && onMulticamLayoutChange && (
+                <PiPPresets
+                  active={activeLayout || "single"}
+                  onSelect={onMulticamLayoutChange}
+                  participantCount={multicamSources.length}
+                />
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-[#8d7850] uppercase tracking-wider">
+                  Speaker Labels
+                </span>
+                <button
+                  onClick={() =>
+                    onSpeakerLabelsChange?.(!(showSpeakerLabels ?? true))
+                  }
+                  className={`relative h-5 w-9 rounded-full transition-colors ${
+                    (showSpeakerLabels ?? true) ? "bg-[#f5a623]" : "bg-white/10"
+                  }`}
+                >
+                  <div
+                    className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                      (showSpeakerLabels ?? true)
+                        ? "translate-x-4"
+                        : "translate-x-0.5"
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {multicamSources && (
+              <CameraPriorityPanel
+                priorities={multicamPriorities || []}
+                participantKeys={multicamSources.map((s) => s.participantKey)}
+                hiddenMap={{}}
+                onToggleHidden={() => {}}
+              />
+            )}
+
+            {multicamSpeakerTimeline && multicamSpeakerTimeline.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-[11px] text-[#8d7850] uppercase tracking-wider">
+                  Speaker Timeline
+                </div>
+                <div className="space-y-1">
+                  {[
+                    ...new Set(
+                      multicamSpeakerTimeline.map((s) => s.participantKey),
+                    ),
+                  ].map((key, i) => {
+                    const segs = multicamSpeakerTimeline.filter(
+                      (s) => s.participantKey === key,
+                    );
+                    const totalMs = segs.reduce(
+                      (a, s) => a + (s.endMs - s.startMs),
+                      0,
+                    );
+                    return (
+                      <div
+                        key={key}
+                        className="flex items-center gap-2 px-2 py-1 rounded bg-[#060605]/40"
+                      >
+                        <span
+                          className="h-2 w-2 rounded-full"
+                          style={{ backgroundColor: getParticipantColor(i) }}
+                        />
+                        <span className="text-xs text-[#bfa873] flex-1 truncate">
+                          {segs[0]?.displayName || key}
+                        </span>
+                        <span className="text-[10px] text-[#8d7850]">
+                          {(totalMs / 1000).toFixed(0)}s
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "multicam" && !isMulticam && (
+          <div className="text-center text-[#8d7850] text-sm py-8">
+            Multicam not available for this project
           </div>
         )}
       </div>

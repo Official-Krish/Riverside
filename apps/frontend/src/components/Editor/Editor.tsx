@@ -7,6 +7,10 @@ import { Timeline } from "./Timeline";
 import { ExportDialog } from "./ExportDialog";
 import { Loader2, Film } from "lucide-react";
 import { CanvasPlayer, useCanvasVideo } from "./CanvasPlayer";
+import { MulticamPreview } from "./canvas/MulticamPreview";
+import { useMulticamVideo } from "./CanvasPlayer/hooks/useMulticamVideo";
+import { ConvertToMulticam, AngleSelector } from "./multicam";
+import { useMulticam } from "./hooks/useMulticam";
 import { OverlayLayer } from "./OverlayLayer";
 import { EditorPanel, type PanelTab } from "./EditorPanel";
 import { toast } from "sonner";
@@ -80,6 +84,15 @@ export function Editor() {
 
   // Preset state
   const [activePreset, setActivePreset] = useState<PresetType | null>(null);
+
+  // Multicam state
+  const [isMulticam, setIsMulticam] = useState(false);
+  const [multicamProjectId, setMulticamProjectId] = useState<string | null>(
+    null,
+  );
+  const [showSpeakerLabels, setShowSpeakerLabels] = useState(true);
+  const { multicamConfig, loadMulticam, setActiveAngle, setActiveLayout } =
+    useMulticam(multicamProjectId);
 
   // Transition placement state
   const [transitionMode, setTransitionMode] = useState(false);
@@ -192,6 +205,14 @@ export function Editor() {
     resetHistory,
     extractThumbnailsForAsset,
     false,
+    undefined,
+    (mode, pid) => {
+      setIsMulticam(mode === "MULTITRACK");
+      if (mode === "MULTITRACK" && pid) {
+        setMulticamProjectId(pid);
+        setTimeout(() => loadMulticam(), 100);
+      }
+    },
   );
 
   const {
@@ -346,6 +367,10 @@ export function Editor() {
     handleRedo,
     setTimelineZoom,
     handleApplyPreset,
+    isMulticam ? setActiveAngle : undefined,
+    isMulticam
+      ? (multicamConfig?.participantSources.map((s) => s.participantKey) ?? [])
+      : [],
   );
 
   const stageWidth = project?.width || 1920;
@@ -424,6 +449,27 @@ export function Editor() {
     activeTransition: activeTransitionInfo,
     stageWidth,
     stageHeight,
+  });
+
+  // Multicam video hook
+  const multicamVideo = useMulticamVideo({
+    sources:
+      multicamConfig?.participantSources.map((s) => ({
+        participantKey: s.participantKey,
+        displayName: s.displayName,
+        url: s.url,
+        framing: s.framing,
+        hidden: s.hidden,
+      })) ?? [],
+    currentTimeMs: videoTime * 1000,
+    isPlaying,
+    activeLayout: multicamConfig?.activeLayout ?? "single",
+    activeAngle: multicamConfig?.activeAngle ?? null,
+    showSpeakerLabels,
+    stageWidth,
+    stageHeight,
+    onTimeUpdate: (t) => timeUpdateRef.current?.(t),
+    onPlayStateChange: (p) => playStateChangeRef.current?.(p),
   });
 
   useEffect(() => {
@@ -552,6 +598,17 @@ export function Editor() {
     <>
       <style>{EDITOR_CSS}</style>
       <div className="editor-root space-y-4 relative">
+        {project.sourceMode === "FINAL" && !isMulticam && meetingId && (
+          <div className="flex justify-end">
+            <ConvertToMulticam
+              meetingId={project.meetingId}
+              roomId={meetingId}
+              onConverted={() => {
+                window.location.reload();
+              }}
+            />
+          </div>
+        )}
         {/* Global busy overlay while we prepare thumbnails/waveforms */}
         {isEditorBusy && (
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -566,7 +623,54 @@ export function Editor() {
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <div className="overflow-hidden rounded-2xl border border-[#f5a623]/15 bg-[#0a0a08] shadow-[0_0_0_1px_rgba(245,166,35,0.06),0_16px_48px_rgba(0,0,0,0.5)]">
-              {sourceUrl ? (
+              {isMulticam &&
+              multicamConfig &&
+              multicamConfig.participantSources.length > 0 ? (
+                <div
+                  ref={previewContainerRef}
+                  className="relative w-full aspect-video bg-black rounded-lg overflow-hidden"
+                >
+                  <MulticamPreview
+                    canvasRef={multicamVideo.canvasRef}
+                    isLoaded={multicamVideo.isLoaded}
+                    activeAngle={multicamConfig.activeAngle}
+                    activeLayout={multicamConfig.activeLayout}
+                    participantCount={multicamConfig.participantSources.length}
+                    onDoubleClickFullscreen={() =>
+                      multicamVideo.canvasRef.current?.requestFullscreen?.()
+                    }
+                  />
+
+                  <OverlayLayer
+                    overlays={overlays}
+                    timelineTime={timelineTime}
+                    containerSize={containerSize}
+                    stageWidth={stageWidth}
+                    stageHeight={stageHeight}
+                    selectedOverlayId={selectedOverlayId}
+                    setSelectedOverlayId={setSelectedOverlayId}
+                    editingOverlayId={editingOverlayId}
+                    setEditingOverlayId={setEditingOverlayId}
+                    editText={editText}
+                    setEditText={setEditText}
+                    handleUpdateOverlay={handleUpdateOverlay}
+                    handleDeleteOverlay={handleDeleteOverlay}
+                    handleStartTextEdit={handleStartTextEdit}
+                    handleCommitTextEdit={handleCommitTextEdit}
+                    isPlaying={isPlaying}
+                  />
+
+                  <div className="absolute bottom-2 left-2 z-30 flex items-center gap-2">
+                    <AngleSelector
+                      participantKeys={multicamConfig.participantSources.map(
+                        (s) => s.participantKey,
+                      )}
+                      activeAngle={multicamConfig.activeAngle}
+                      onSelectAngle={setActiveAngle}
+                    />
+                  </div>
+                </div>
+              ) : sourceUrl ? (
                 <div
                   ref={previewContainerRef}
                   className="relative w-full aspect-video bg-black rounded-lg overflow-hidden"
@@ -621,6 +725,16 @@ export function Editor() {
               <EditorPanel
                 activeTab={activePanelTab}
                 onTabChange={setActivePanelTab}
+                isMulticam={isMulticam}
+                multicamSources={multicamConfig?.participantSources}
+                multicamActiveAngle={multicamConfig?.activeAngle ?? null}
+                multicamPriorities={multicamConfig?.cameraPriority}
+                multicamSpeakerTimeline={multicamConfig?.speakerTimeline}
+                onMulticamAngleChange={setActiveAngle}
+                onMulticamLayoutChange={setActiveLayout}
+                activeLayout={multicamConfig?.activeLayout || "single"}
+                showSpeakerLabels={showSpeakerLabels}
+                onSpeakerLabelsChange={setShowSpeakerLabels}
                 activePreset={activePreset}
                 onApplyPreset={handleApplyPreset}
                 clipEffects={

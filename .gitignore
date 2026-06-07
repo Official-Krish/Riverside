@@ -39,3 +39,4 @@ yarn-error.log*
 secrets.yml
 riverside-merger-secret.yml
 recordings
+plan.md

@@ -26,8 +26,12 @@ const upload = multer({
 
 const editorRouter = express.Router();
 
-async function canUserEditMeeting(meetingId: string, userId: string) {
-  const [meeting, user] = await Promise.all([
+async function canUserEditMeeting(
+  meetingId: string,
+  userId: string,
+  sourceMode?: string,
+) {
+  const [meeting, user, participant] = await Promise.all([
     prisma.meeting.findFirst({
       where: { id: meetingId },
       include: { finalRecording: true },
@@ -35,6 +39,9 @@ async function canUserEditMeeting(meetingId: string, userId: string) {
     prisma.user.findFirst({
       where: { id: userId },
       select: { email: true },
+    }),
+    prisma.meetingParticipant.findFirst({
+      where: { meetingId, userId },
     }),
   ]);
 
@@ -46,15 +53,21 @@ async function canUserEditMeeting(meetingId: string, userId: string) {
   const userEmail = user?.email?.toLowerCase() || null;
   const visibleToEmails = meeting.finalRecording?.visibleToEmails ?? [];
 
+  const canEditViaRecording =
+    meeting.recordingState === "READY" &&
+    canViewFinalRecording({
+      isHost,
+      userEmail,
+      visibleToEmails,
+    });
+
+  const isMultitrack = sourceMode === "MULTITRACK";
+  const isParticipant = !!participant;
+  const canEditMultitrack = isMultitrack && (isHost || isParticipant);
+
   return {
     meeting,
-    canEditRecording:
-      meeting.recordingState === "READY" &&
-      canViewFinalRecording({
-        isHost,
-        userEmail,
-        visibleToEmails,
-      }),
+    canEditRecording: canEditViaRecording || canEditMultitrack,
   };
 }
 
@@ -74,7 +87,7 @@ editorRouter.post("/projects", authMiddleware, async (req, res) => {
   }
   try {
     const { meetingId, sourceMode } = parseData.data;
-    const access = await canUserEditMeeting(meetingId, userId);
+    const access = await canUserEditMeeting(meetingId, userId, sourceMode);
 
     if (!access.meeting) {
       return res.status(404).json({ message: "Meeting not found" });
@@ -109,7 +122,40 @@ editorRouter.post("/projects", authMiddleware, async (req, res) => {
           height: 1080,
         },
       });
-      if (meeting.finalRecording?.videoLink) {
+
+      if (sourceMode === "MULTITRACK") {
+        const sources = await tx.participantSource.findMany({
+          where: { meetingId },
+        });
+        for (const source of sources) {
+          if (source.videoUrl) {
+            await tx.editorAsset.create({
+              data: {
+                projectId: project.id,
+                meetingId,
+                participantId: source.participantId,
+                participantKey: source.participantId,
+                assetType: "VIDEO",
+                url: source.videoUrl,
+                durationMs: source.durationMs ?? undefined,
+              },
+            });
+          }
+          if (source.audioUrl) {
+            await tx.editorAsset.create({
+              data: {
+                projectId: project.id,
+                meetingId,
+                participantId: source.participantId,
+                participantKey: source.participantId,
+                assetType: "AUDIO",
+                url: source.audioUrl,
+                durationMs: source.durationMs ?? undefined,
+              },
+            });
+          }
+        }
+      } else if (meeting.finalRecording?.videoLink) {
         await tx.editorAsset.create({
           data: {
             projectId: project.id,
@@ -122,6 +168,36 @@ editorRouter.post("/projects", authMiddleware, async (req, res) => {
       return { project };
     });
 
+    const snapshotAssets: {
+      assetType: string;
+      url: string;
+      participantKey?: string;
+    }[] = [];
+    if (sourceMode === "MULTITRACK") {
+      const sources = await prisma.participantSource.findMany({
+        where: { meetingId },
+      });
+      for (const s of sources) {
+        if (s.videoUrl)
+          snapshotAssets.push({
+            assetType: "VIDEO",
+            url: s.videoUrl,
+            participantKey: s.participantId,
+          });
+        if (s.audioUrl)
+          snapshotAssets.push({
+            assetType: "AUDIO",
+            url: s.audioUrl,
+            participantKey: s.participantId,
+          });
+      }
+    } else if (meeting.finalRecording?.videoLink) {
+      snapshotAssets.push({
+        assetType: "VIDEO",
+        url: meeting.finalRecording.videoLink,
+      });
+    }
+
     await writeProjectSnapshot(meeting.roomId, project.id, {
       projectId: project.id,
       meetingId,
@@ -129,9 +205,7 @@ editorRouter.post("/projects", authMiddleware, async (req, res) => {
       sourceMode,
       tracks: [],
       overlays: [],
-      assets: meeting.finalRecording?.videoLink
-        ? [{ assetType: "VIDEO", url: meeting.finalRecording.videoLink }]
-        : [],
+      assets: snapshotAssets,
       durationMs: null,
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,

@@ -1,6 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { putObjectToS3 } from "@repo/amazons3";
+import { putObjectToS3, buildS3Key } from "@repo/amazons3";
 import { resolveStorageContext } from "@repo/amazons3";
 import { HeadObjectCommand } from "@aws-sdk/client-s3";
 import { prisma } from "@repo/db/client";
@@ -20,6 +20,7 @@ import {
   computeMeetingEpochMs,
   timelineDurationSeconds,
 } from "./timeline";
+import { runSpeakerAnalysis } from "./speaker-analysis";
 import {
   type MergerConfig,
   type ProcessedUser,
@@ -156,6 +157,92 @@ export class LocalVideoMerger {
     );
 
     return finalKey;
+  }
+
+  private async persistParticipantVideos(
+    processedUsers: ProcessedUser[],
+    meetingId: string,
+  ): Promise<void> {
+    this.log(
+      `[phase:persistParticipants] Uploading ${processedUsers.length} participant videos`,
+    );
+
+    const results = await Promise.allSettled(
+      processedUsers.map(async (user) => {
+        const videoKey = buildS3Key(
+          "weave-recordings",
+          meetingId,
+          "participants",
+          user.userId,
+          "merged.mp4",
+        );
+        const fileStats = await fs.stat(user.videoPath);
+
+        const body = await fs.readFile(user.videoPath);
+        await putObjectToS3({
+          s3Client: this.s3Client,
+          bucketName: this.bucketName,
+          key: videoKey,
+          body,
+          contentType: "video/mp4",
+        });
+
+        await prisma.participantSource.upsert({
+          where: {
+            meetingId_participantId: {
+              meetingId,
+              participantId: user.userId,
+            },
+          },
+          update: {
+            videoUrl: videoKey,
+            durationMs: Math.round(user.duration * 1000),
+            fileSizeBytes: fileStats.size,
+          },
+          create: {
+            meetingId,
+            participantId: user.userId,
+            videoUrl: videoKey,
+            durationMs: Math.round(user.duration * 1000),
+            fileSizeBytes: fileStats.size,
+          },
+        });
+
+        this.log(
+          `[phase:persistParticipants] Uploaded ${user.userId} (${(fileStats.size / 1024 / 1024).toFixed(1)} MB)`,
+        );
+      }),
+    );
+
+    const failed = results.filter((r) => r.status === "rejected");
+    if (failed.length > 0) {
+      this.log(
+        `[phase:persistParticipants] ${failed.length}/${processedUsers.length} participant uploads failed`,
+      );
+    }
+  }
+
+  private async runSpeakerAnalysisAsync(
+    processedUsers: ProcessedUser[],
+    meetingId: string,
+    totalDurationMs: number,
+  ): Promise<void> {
+    try {
+      const participantVideos = new Map<string, string>();
+      for (const u of processedUsers) {
+        participantVideos.set(u.userId, u.videoPath);
+      }
+      const segments = await runSpeakerAnalysis(
+        participantVideos,
+        meetingId,
+        totalDurationMs,
+      );
+      this.log(
+        `[phase:speakerAnalysis] Stored ${segments.length} speaker segments for meeting ${meetingId}`,
+      );
+    } catch (err) {
+      this.log(`[phase:speakerAnalysis] Failed (non-fatal): ${err}`);
+    }
   }
 
   public async process(): Promise<string> {
@@ -299,6 +386,15 @@ export class LocalVideoMerger {
 
       processedUsers.sort((a, b) => a.joinTimestamp - b.joinTimestamp);
 
+      await this.persistParticipantVideos(processedUsers, canonicalMeetingId);
+
+      // Speaker analysis (non-blocking — runs async, doesn't fail the merge)
+      this.runSpeakerAnalysisAsync(
+        processedUsers,
+        canonicalMeetingId,
+        meetingEndMs - meetingEpochMs,
+      );
+
       const gridVideo = await createGridVideo(
         processedUsers,
         this.tempDir,
@@ -308,13 +404,12 @@ export class LocalVideoMerger {
 
       const finalPath = await this.persistFinal(gridVideo, canonicalMeetingId);
 
-      this.log("[phase:cleanup] Starting post-merge cleanup");
+      this.log(
+        "[phase:cleanup] Starting post-merge cleanup (keeping raw chunks for multicam)",
+      );
       await Promise.allSettled([
-        cleanupSourceChunksFromS3(
-          canonicalMeetingId,
-          this.s3Client,
-          this.bucketName,
-        ),
+        // Raw S3 chunks preserved for multicam timeline reconstruction
+        // cleanupSourceChunksFromS3(canonicalMeetingId, this.s3Client, this.bucketName),
         cleanupLegacyLocalChunks(this.recordingsRoot, canonicalMeetingId),
         cleanupLegacyRecordingsTmp(
           this.recordingsRoot,

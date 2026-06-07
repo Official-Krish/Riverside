@@ -8,9 +8,9 @@ const PRESET_SHORTCUTS: Record<string, PresetType> = {
   "4": "cinematic-bars",
   "5": "vhs",
   "6": "chromakey",
-  "i": "intro-template",
-  "m": "meme-format",
-  "p": "podcast-layout",
+  i: "intro-template",
+  m: "meme-format",
+  p: "podcast-layout",
 };
 
 export function useEditorShortcuts(
@@ -23,7 +23,9 @@ export function useEditorShortcuts(
   handleUndo: () => void,
   handleRedo: () => void,
   setTimelineZoom: (zoom: number | ((prev: number) => number)) => void,
-  onApplyPreset?: (preset: PresetType | null) => void
+  onApplyPreset?: (preset: PresetType | null) => void,
+  setActiveAngle?: (key: string) => void,
+  participantKeys?: string[],
 ) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -112,10 +114,12 @@ export function useEditorShortcuts(
         return;
       }
       if (!(e.ctrlKey || e.metaKey)) return;
-      if (e.key !== "+" && e.key !== "=" && e.key !== "-" && e.key !== "_") return;
+      if (e.key !== "+" && e.key !== "=" && e.key !== "-" && e.key !== "_")
+        return;
       e.preventDefault();
       setTimelineZoom((prev) => {
-        if (e.key === "+" || e.key === "=") return Math.min(6, +(prev + 0.25).toFixed(2));
+        if (e.key === "+" || e.key === "=")
+          return Math.min(6, +(prev + 0.25).toFixed(2));
         return Math.max(0.5, +(prev - 0.25).toFixed(2));
       });
     };
@@ -149,4 +153,27 @@ export function useEditorShortcuts(
     window.addEventListener("keydown", onPresetHotkeys);
     return () => window.removeEventListener("keydown", onPresetHotkeys);
   }, [onApplyPreset]);
+
+  useEffect(() => {
+    if (!setActiveAngle || !participantKeys?.length) return;
+
+    const onAngleHotkeys = (e: KeyboardEvent) => {
+      if (!participantKeys) return;
+      if (
+        e.ctrlKey ||
+        e.metaKey ||
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      )
+        return;
+      const key = parseInt(e.key, 10);
+      if (key >= 1 && key <= participantKeys.length) {
+        e.preventDefault();
+        setActiveAngle(participantKeys[key - 1]);
+      }
+    };
+
+    window.addEventListener("keydown", onAngleHotkeys);
+    return () => window.removeEventListener("keydown", onAngleHotkeys);
+  }, [setActiveAngle, participantKeys]);
 }

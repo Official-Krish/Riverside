@@ -187,6 +187,7 @@ export const SaveEditorProjectSchema = z.object({
       visible: z.boolean(),
       muted: z.boolean(),
       volume: z.number(),
+      participantKey: z.string().nullish(),
       clips: z.array(
         z.object({
           id: z.string().optional(),
@@ -242,6 +243,57 @@ export const SaveEditorProjectSchema = z.object({
   fps: z.number(),
   width: z.number(),
   height: z.number(),
+});
+
+/// V2 Multicam Editor Schemas
+
+export const MulticamSegmentSchema = z.object({
+  participantKey: z.string(),
+  timelineStartMs: z.number().int().min(0),
+  durationMs: z.number().int().min(0),
+  transition: z.enum(["cut", "fade"]).default("cut"),
+});
+
+export const SaveMulticamLayoutSchema = z.object({
+  name: z.string().min(1).max(128).default("Default"),
+  viewMode: z.enum(["GRID", "SINGLE", "PIP", "CUSTOM"]).default("GRID"),
+  rows: z.number().int().min(1).max(8).default(2),
+  cols: z.number().int().min(1).max(8).default(2),
+  segments: z.array(MulticamSegmentSchema).default([]),
+});
+
+export const CreateMulticamProjectSchema = z.object({
+  meetingId: z.string(),
+  roomId: z.string(),
+  seedLayout: SaveMulticamLayoutSchema.optional(),
+});
+
+export const RebuildMulticamSchema = z.object({
+  projectId: z.string(),
+});
+
+export const SaveParticipantFramingSchema = z.object({
+  participantKey: z.string(),
+  cropX: z.number().min(0).max(1).nullish(),
+  cropY: z.number().min(0).max(1).nullish(),
+  cropW: z.number().min(0).max(1).nullish(),
+  cropH: z.number().min(0).max(1).nullish(),
+  zoom: z.number().min(0.1).max(4).default(1.0),
+});
+
+export const SaveCameraPrioritySchema = z.object({
+  participantKey: z.string(),
+  priority: z.number().int().min(0).max(100).default(0),
+  alwaysVisible: z.boolean().default(false),
+});
+
+/// Schemas for batch operations
+export const BatchSaveFramingSchema = z.object({
+  framings: z.array(SaveParticipantFramingSchema),
+});
+
+export const BatchSavePrioritySchema = z.object({
+  priorities: z.array(SaveCameraPrioritySchema),
 });
 
 export const CreateGithubIssueSchema = z.object({

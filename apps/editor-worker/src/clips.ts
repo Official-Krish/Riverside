@@ -2,6 +2,21 @@ import type { RenderClip, AudioClipPlan } from "./types";
 import { toLocalRecordingPath } from "./helpers";
 import { normalizeClipEffects } from "./effects/normalize";
 
+/**
+ * Check whether a project uses multicam tracks.
+ */
+export function isMulticamProject(project: {
+  sourceMode?: string;
+  tracks?: Array<{ kind?: string; participantKey?: string | null }>;
+}): boolean {
+  if (project.sourceMode === "MULTITRACK") return true;
+
+  const hasParticipantTracks = (project.tracks ?? []).some(
+    (t) => t.kind === "video" && t.participantKey,
+  );
+  return hasParticipantTracks;
+}
+
 function normalizeTransitionMetadata(raw: unknown) {
   if (!raw || typeof raw !== "object") return null;
 
