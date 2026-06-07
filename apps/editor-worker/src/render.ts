@@ -6,7 +6,7 @@ import { log } from "./logger";
 import { CONFIG } from "./config";
 import { recordingsRoot, ensureDir, runBinaryWithRetries } from "./helpers";
 import { verifySourceExists, updateProgress } from "./utils";
-import { collectRenderClips } from "./clips";
+import { collectRenderClips, isMulticamProject } from "./clips";
 import {
   buildClipRenderArgs,
   getTransitionPlan,
@@ -92,6 +92,79 @@ export async function processRenderJob(payload: RenderPayload): Promise<void> {
   const fps = project.fps ?? 30;
   const width = project.width ?? 1920;
   const height = project.height ?? 1080;
+
+  // ── Multicam Pipeline ──
+  if (isMulticamProject(project)) {
+    log("info", "Detected multicam project, using multicam render pipeline", {
+      projectId,
+    });
+
+    const { renderMulticamExport } = await import("./multicam");
+    const { promoteRenderedVideo, refreshMeetingRecordingArtifacts } =
+      await import("./artifacts");
+    const { publishConnection } = await import("./redis");
+
+    const exportDir = path.join(
+      recordingsRoot,
+      roomId,
+      "editor",
+      "projects",
+      projectId,
+      "exports",
+    );
+    await ensureDir(exportDir);
+    const sourceCacheDir = path.join(
+      recordingsRoot,
+      roomId,
+      "editor",
+      "projects",
+      projectId,
+      "sources",
+    );
+
+    const { outputPath } = await renderMulticamExport(
+      project,
+      exportDir,
+      sourceCacheDir,
+      fps,
+      width,
+      height,
+    );
+
+    const version = String(Date.now());
+    const finalPath = await promoteRenderedVideo(roomId, outputPath, version);
+    const publicFinalPath = await refreshMeetingRecordingArtifacts(
+      roomId,
+      finalPath,
+      jobId,
+      projectId,
+      version,
+    );
+
+    log("info", "Multicam export complete and promoted", {
+      jobId,
+      finalPath,
+      publicFinalPath,
+    });
+
+    try {
+      await publishConnection.lpush(
+        "Notifications",
+        JSON.stringify({
+          userId: project.ownerId,
+          type: "RENDER_COMPLETE",
+          metadata: { jobId, projectId, downloadUrl: publicFinalPath },
+        }),
+      );
+    } catch (notifyErr: any) {
+      log("warn", "Failed to push render-complete notification", {
+        jobId,
+        err: notifyErr.message,
+      });
+    }
+
+    return;
+  }
 
   const { videoClips, audioClips } = collectRenderClips(project);
 

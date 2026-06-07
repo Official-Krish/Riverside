@@ -57,3 +57,42 @@ export interface PresetConfig {
   color?: string;
   threshold?: number;
 }
+
+// ── Multicam Render Types ──
+
+export type LayoutPreset = "single" | "pip" | "split" | "grid";
+
+export interface ParticipantSourcePlan {
+  participantKey: string;
+  sourcePath: string;
+  durationMs: number;
+  hasAudio: boolean;
+  reframeSettings: {
+    cropX: number;
+    cropY: number;
+    cropW: number;
+    cropH: number;
+  };
+  displayName: string;
+}
+
+export interface ProgramSegment {
+  timelineStartMs: number;
+  durationMs: number;
+  activeAngle: string;
+}
+
+export interface LayoutSegment {
+  timelineStartMs: number;
+  durationMs: number;
+  preset: LayoutPreset;
+  angles: string[];
+}
+
+export interface MulticamRenderConfig {
+  participantSources: Map<string, ParticipantSourcePlan>;
+  programSegments: ProgramSegment[];
+  layoutDefault: LayoutPreset;
+  layoutOverrides: LayoutSegment[];
+  showSpeakerLabels: boolean;
+}
